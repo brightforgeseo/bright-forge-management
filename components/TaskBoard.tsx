@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Plus, Sparkles, ChevronDown, ChevronUp, ChevronRight, Trash2, Briefcase, CheckCircle2, Settings, Mail, Phone, Globe, X, Image as ImageIcon, Edit3, Palette, Loader2, Upload } from 'lucide-react';
-import { Task, TaskGroup, User, ClientBoard, ToastType, LabelDefinition } from '../types';
+import { Plus, Sparkles, ChevronDown, ChevronUp, ChevronRight, Trash2, Briefcase, CheckCircle2, Settings, Mail, Phone, Globe, X, Image as ImageIcon, Edit3, Palette, Loader2, Upload, UserCircle } from 'lucide-react';
+import { Task, TaskGroup, User, ClientBoard, ToastType, LabelDefinition, Profile } from '../types';
 import { generateProjectTasks } from '../services/geminiService';
-import { fetchClientBoards, saveClientBoard, deleteClientBoard, uploadFile } from '../services/databaseService';
+import { fetchClientBoards, saveClientBoard, deleteClientBoard, uploadFile, fetchProfiles } from '../services/databaseService';
 
 interface TaskBoardProps {
   currentUser: User;
@@ -38,16 +38,18 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   const [clients, setClients] = useState<ClientBoard[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
+  const [teamProfiles, setTeamProfiles] = useState<Profile[]>([]);
 
   // Fetch Data on Mount
   useEffect(() => {
     const loadData = async () => {
       setIsLoadingData(true);
-      const boards = await fetchClientBoards();
+      const [boards, profiles] = await Promise.all([fetchClientBoards(), fetchProfiles()]);
       if (boards.length > 0) {
         setClients(boards);
         setSelectedClientId(boards[0].id);
       }
+      setTeamProfiles(profiles);
       setIsLoadingData(false);
     };
     loadData();
@@ -82,6 +84,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   const [activePicker, setActivePicker] = useState<{ type: 'status' | 'priority', taskId: string, groupId: string, clientId: string, anchor: HTMLElement | null } | null>(null);
+  const [activePersonPicker, setActivePersonPicker] = useState<{ taskId: string, groupId: string, clientId: string, anchor: HTMLElement | null } | null>(null);
   const [isLabelEditorOpen, setIsLabelEditorOpen] = useState(false);
   const [labelEditorType, setLabelEditorType] = useState<'status' | 'priority'>('status');
 
@@ -243,6 +246,16 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   };
   const handleSelectLabel = (defId: string) => {
       if(activePicker) { updateTaskField(activePicker.clientId, activePicker.groupId, activePicker.taskId, activePicker.type as keyof Task, defId); setActivePicker(null); }
+  };
+  const handlePersonClick = (e: React.MouseEvent, tid: string, gid: string, cid: string) => {
+      e.stopPropagation();
+      setActivePersonPicker({ taskId: tid, groupId: gid, clientId: cid, anchor: e.currentTarget as HTMLElement });
+  };
+  const handleSelectPerson = (profileId: string) => {
+      if(activePersonPicker) {
+          updateTaskField(activePersonPicker.clientId, activePersonPicker.groupId, activePersonPicker.taskId, 'assignedTo', profileId);
+          setActivePersonPicker(null);
+      }
   };
   const getLabelDef = (cid: string, id: string, type: 'status'|'priority') => {
      const c = clients.find(cl => cl.id === cid);
@@ -436,7 +449,8 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                            <table className="w-full min-w-[800px]">
                               <thead className="bg-slate-50 border-b border-slate-200">
                                 <tr>
-                                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-1/2 sticky left-0 bg-slate-50 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">Item</th>
+                                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-1/3 sticky left-0 bg-slate-50 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">Item</th>
+                                  <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-40">Person</th>
                                   <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-40">Status</th>
                                   <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-40">Priority</th>
                                   <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-40">Due Date</th>
@@ -465,7 +479,21 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                             </div>
                                         </td>
                                         <td className="py-2 px-2 text-center">
-                                           <button 
+                                           {(() => {
+                                              const assignedProfile = teamProfiles.find(p => p.id === task.assignedTo);
+                                              return (
+                                                <button
+                                                  onClick={(e) => handlePersonClick(e, task.id, group.id, activeClient.id)}
+                                                  className="w-full py-1.5 px-2 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded transition-colors flex items-center justify-center gap-1"
+                                                >
+                                                  <UserCircle className="w-3.5 h-3.5" />
+                                                  <span className="truncate">{assignedProfile ? assignedProfile.full_name : 'Unassigned'}</span>
+                                                </button>
+                                              );
+                                           })()}
+                                        </td>
+                                        <td className="py-2 px-2 text-center">
+                                           <button
                                              onClick={(e) => handleLabelClick(e, 'status', task.id, group.id, activeClient.id)}
                                              className="w-full py-1.5 text-xs font-bold text-white rounded shadow-sm hover:opacity-90 transition-opacity"
                                              style={{ backgroundColor: statusDef.color }}
@@ -517,7 +545,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                          )}
                                       </div>
                                    </td>
-                                   <td colSpan={4} className="border-t border-slate-100"></td>
+                                   <td colSpan={5} className="border-t border-slate-100"></td>
                                  </tr>
                               </tbody>
                            </table>
@@ -575,6 +603,46 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                >
                  <Edit3 className="w-3 h-3" /> Edit Labels
                </button>
+            </div>
+         </div>
+        </>
+      )}
+
+      {/* Person Picker Popover */}
+      {activePersonPicker && (
+        <>
+         <div className="fixed inset-0 z-30" onClick={() => setActivePersonPicker(null)}></div>
+         <div
+           className="fixed z-40 bg-white rounded-xl shadow-xl border border-slate-200 w-56 p-2 animate-fadeIn"
+           style={{
+             top: activePersonPicker.anchor?.getBoundingClientRect().bottom ?? 0,
+             left: activePersonPicker.anchor?.getBoundingClientRect().left ?? 0
+           }}
+         >
+            <div className="space-y-1 max-h-64 overflow-y-auto">
+              <button
+                onClick={() => handleSelectPerson('')}
+                className="w-full text-left px-3 py-2 text-xs font-medium text-slate-500 hover:bg-slate-100 rounded transition-colors flex items-center gap-2"
+              >
+                <UserCircle className="w-4 h-4" />
+                <span>Unassigned</span>
+              </button>
+              {teamProfiles.map(profile => (
+                <button
+                  key={profile.id}
+                  onClick={() => handleSelectPerson(profile.id)}
+                  className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded transition-colors flex items-center gap-2"
+                >
+                  {profile.avatar_url ? (
+                    <img src={profile.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-5 h-5 rounded-full bg-brand-100 flex items-center justify-center text-[10px] font-bold text-brand-700">
+                      {profile.full_name?.charAt(0) || '?'}
+                    </div>
+                  )}
+                  <span className="truncate">{profile.full_name || profile.id.substring(0, 8)}</span>
+                </button>
+              ))}
             </div>
          </div>
         </>

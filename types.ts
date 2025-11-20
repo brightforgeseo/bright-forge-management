@@ -93,6 +93,7 @@ export interface Task {
   status: string;
   priority: string;
   dueDate: string;
+  assignedTo?: string; // User ID or name of assigned person
 }
 
 export interface TaskGroup {
