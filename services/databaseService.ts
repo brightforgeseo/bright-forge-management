@@ -312,11 +312,21 @@ export const uploadFile = async (file: File, bucket: string = 'uploads'): Promis
   try {
     const fileExt = file.name.split('.').pop();
     const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
-    const { error } = await supabase.storage.from(bucket).upload(fileName, file);
-    if (error) return null;
+
+    console.log(`[Upload] Uploading to bucket: ${bucket}, file: ${fileName}`);
+    const { data: uploadData, error } = await supabase.storage.from(bucket).upload(fileName, file);
+
+    if (error) {
+      console.error(`[Upload] Error uploading file:`, error);
+      return null;
+    }
+
+    console.log(`[Upload] Upload successful:`, uploadData);
     const { data } = supabase.storage.from(bucket).getPublicUrl(fileName);
+    console.log(`[Upload] Public URL:`, data.publicUrl);
     return data.publicUrl;
-  } catch {
+  } catch (e) {
+    console.error(`[Upload] Unexpected error:`, e);
     return null;
   }
 };

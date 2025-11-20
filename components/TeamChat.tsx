@@ -260,12 +260,15 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                          id: newMsg.id,
                          channelId: newMsg.channel_id,
                          sender: newMsg.sender,
+                         senderId: newMsg.sender_id,
                          text: newMsg.text,
                          timestamp: newMsg.created_at,
                          isAi: newMsg.is_ai,
                          avatar: newMsg.avatar,
                          attachmentUrl: newMsg.attachment_url,
-                         attachmentType: newMsg.attachment_type
+                         attachmentType: newMsg.attachment_type,
+                         isEdited: newMsg.is_edited,
+                         editedAt: newMsg.edited_at
                      }]
                  };
              }
@@ -281,12 +284,15 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                          id: newMsg.id,
                          channelId: newMsg.channel_id,
                          sender: newMsg.sender,
+                         senderId: newMsg.sender_id,
                          text: newMsg.text,
                          timestamp: newMsg.created_at,
                          isAi: newMsg.is_ai,
                          avatar: newMsg.avatar,
                          attachmentUrl: newMsg.attachment_url,
-                         attachmentType: newMsg.attachment_type
+                         attachmentType: newMsg.attachment_type,
+                         isEdited: newMsg.is_edited,
+                         editedAt: newMsg.edited_at
                      }];
                  }
                  return prev;

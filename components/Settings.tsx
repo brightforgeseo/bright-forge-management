@@ -48,22 +48,30 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
       }
 
       // Upload to Supabase storage
+      console.log('[Settings] Starting avatar upload...');
       const url = await uploadFile(file, 'avatars');
+      console.log('[Settings] Upload result:', url);
 
       if (url) {
         // Update profile in database
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          await supabase
+          console.log('[Settings] Updating profile with avatar URL:', url);
+          const { error: updateError } = await supabase
             .from('profiles')
             .update({ avatar_url: url })
             .eq('id', user.id);
 
-          setAvatarUrl(url);
-          addToast('success', 'Profile picture updated!');
+          if (updateError) {
+            console.error('[Settings] Error updating profile:', updateError);
+            addToast('error', 'Failed to save avatar to profile');
+          } else {
+            setAvatarUrl(url);
+            addToast('success', 'Profile picture updated!');
+          }
         }
       } else {
-        addToast('error', 'Failed to upload image');
+        addToast('error', 'Failed to upload image. Check browser console for details.');
       }
     } catch (error) {
       console.error('Avatar upload error:', error);
