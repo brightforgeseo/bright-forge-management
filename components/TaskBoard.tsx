@@ -120,23 +120,49 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
         try {
           const linkData = JSON.parse(openTaskData);
           const { taskId, boardId, groupId, boardName } = linkData;
-          console.log('📂 Opening task from notification:', linkData);
-          console.log('📋 Available boards:', boards.map(b => ({ id: b.id, name: b.name })));
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.log('📂 NOTIFICATION DEEP LINK DEBUG');
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.log('Looking for:');
+          console.log('  boardId:', boardId);
+          console.log('  groupId:', groupId);
+          console.log('  taskId:', taskId);
+          console.log('  boardName:', boardName);
+          console.log('');
+          console.log('Available boards:');
+          boards.forEach((b, idx) => {
+            console.log(`  [${idx}] id: "${b.id}" name: "${b.name}"`);
+          });
+          console.log('');
 
           // Find the board, group, and task
           const board = boards.find(b => b.id === boardId);
           if (board) {
-            console.log('✅ Found board:', board.name, 'with ID:', board.id);
+            console.log('✅ FOUND BOARD:', board.name);
             targetBoardId = board.id;
+
+            console.log('Available groups in this board:');
+            board.groups.forEach((g, idx) => {
+              console.log(`  [${idx}] id: "${g.id}" title: "${g.title}"`);
+            });
+
             const group = board.groups.find(g => g.id === groupId);
             if (group) {
-              console.log('✅ Found group:', group.title);
+              console.log('✅ FOUND GROUP:', group.title);
+
+              console.log('Available tasks in this group:');
+              group.tasks.forEach((t, idx) => {
+                console.log(`  [${idx}] id: "${t.id}" title: "${t.title}"`);
+              });
+
               const task = group.tasks.find(t => t.id === taskId);
               if (task) {
-                console.log('✅ Found task:', task.title);
+                console.log('✅ FOUND TASK:', task.title);
+                console.log('Opening task modal in 100ms...');
                 shouldOpenTask = true;
                 // Set the task modal AFTER state is updated
                 setTimeout(() => {
+                  console.log('🎯 Opening task modal NOW');
                   setTaskModal({
                     task,
                     groupId: group.id,
@@ -146,14 +172,15 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                   });
                 }, 100);
               } else {
-                console.warn('❌ Task not found:', taskId);
+                console.error('❌ TASK NOT FOUND. Looking for taskId:', taskId);
               }
             } else {
-              console.warn('❌ Group not found:', groupId);
+              console.error('❌ GROUP NOT FOUND. Looking for groupId:', groupId);
             }
           } else {
-            console.warn('❌ Board not found:', boardId);
+            console.error('❌ BOARD NOT FOUND. Looking for boardId:', boardId);
           }
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
           localStorage.removeItem('openTaskModal');
         } catch (e) {
           console.error('Error opening task modal:', e);
