@@ -110,15 +110,12 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
     const loadData = async () => {
       setIsLoadingData(true);
       const [boards, profiles] = await Promise.all([fetchClientBoards(), fetchProfiles()]);
-      if (boards.length > 0) {
-        setClients(boards);
-        setSelectedClientId(boards[0].id);
-      }
-      setTeamProfiles(profiles);
-      setIsLoadingData(false);
 
-      // Check if we should open a task modal from notification
+      // Check if we should open a task modal from notification BEFORE setting default board
       const openTaskData = localStorage.getItem('openTaskModal');
+      let shouldOpenTask = false;
+      let targetBoardId = boards.length > 0 ? boards[0].id : '';
+
       if (openTaskData) {
         try {
           const { taskId, boardId, groupId } = JSON.parse(openTaskData);
@@ -127,26 +124,46 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
           // Find the board, group, and task
           const board = boards.find(b => b.id === boardId);
           if (board) {
+            console.log('✅ Found board:', board.name);
+            targetBoardId = board.id;
             const group = board.groups.find(g => g.id === groupId);
             if (group) {
+              console.log('✅ Found group:', group.title);
               const task = group.tasks.find(t => t.id === taskId);
               if (task) {
-                setTaskModal({
-                  task,
-                  groupId: group.id,
-                  clientId: board.id,
-                  groupTitle: group.title,
-                  groupColor: group.color
-                });
-                setSelectedClientId(board.id);
+                console.log('✅ Found task:', task.title);
+                shouldOpenTask = true;
+                // Set the task modal AFTER state is updated
+                setTimeout(() => {
+                  setTaskModal({
+                    task,
+                    groupId: group.id,
+                    clientId: board.id,
+                    groupTitle: group.title,
+                    groupColor: group.color
+                  });
+                }, 100);
+              } else {
+                console.warn('❌ Task not found:', taskId);
               }
+            } else {
+              console.warn('❌ Group not found:', groupId);
             }
+          } else {
+            console.warn('❌ Board not found:', boardId);
           }
           localStorage.removeItem('openTaskModal');
         } catch (e) {
           console.error('Error opening task modal:', e);
         }
       }
+
+      if (boards.length > 0) {
+        setClients(boards);
+        setSelectedClientId(targetBoardId);
+      }
+      setTeamProfiles(profiles);
+      setIsLoadingData(false);
     };
     loadData();
   }, []);
