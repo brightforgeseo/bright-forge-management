@@ -64,21 +64,34 @@ const App: React.FC = () => {
     let role = 'Team Member';
     let avatarUrl = undefined;
     const lowerEmail = email.toLowerCase();
-    
-    if (lowerEmail === 'bensocialbeemedia@gmail.com' || lowerEmail === 'bensocialbeesmedia@gmail.com') {
-        name = 'Ben Lowe';
-        role = 'Owner';
-    }
 
     try {
-        // Fetch latest profile data from DB to ensure sync
-        // We use the UID to fetch the profile to ensure we get the right one
-        const { data: profile } = await supabase.from('profiles').select('avatar_url, full_name').eq('id', uid).single();
+        // Fetch role from allowed_users table
+        const { data: allowedUser } = await supabase
+            .from('allowed_users')
+            .select('role, full_name')
+            .eq('email', lowerEmail)
+            .single();
+
+        if (allowedUser) {
+            role = allowedUser.role || 'Team Member';
+            if (allowedUser.full_name) name = allowedUser.full_name;
+        }
+
+        // Fetch avatar and profile data from profiles table
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('avatar_url, full_name')
+            .eq('id', uid)
+            .single();
+
         if (profile) {
             if (profile.avatar_url) avatarUrl = profile.avatar_url;
             if (profile.full_name) name = profile.full_name;
         }
-    } catch (e) {}
+    } catch (e) {
+        console.warn('Error fetching user data:', e);
+    }
 
     // IMPORTANT: Set ID to the real UUID (uid) so DMs work
     setCurrentUser({ id: uid, name, role, initials: name.substring(0, 2).toUpperCase(), email, avatarUrl });
