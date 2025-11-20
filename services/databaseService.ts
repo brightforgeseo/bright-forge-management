@@ -95,6 +95,8 @@ export const createNotification = async (
 
   if (error) {
     console.error('❌ Error creating notification:', error);
+    console.error('Error details:', JSON.stringify(error, null, 2));
+    console.error('Attempted to insert:', { userId, title, message, type, linkView, linkData });
     throw error;
   }
 
@@ -376,21 +378,25 @@ export const checkDueDateNotifications = async (currentUserId: string) => {
               continue;
             }
 
-            await createNotification(
-              currentUserId,
-              'Task Due Today',
-              `"${task.title}" is due today on ${boardData.name}`,
-              'alert',
-              'TASKS',
-              {
-                taskId: task.id,
-                boardId: boardData.id, // Use ClientBoard ID, not database row ID
-                groupId: group.id,
-                boardName: boardData.name
-              }
-            );
-            notificationCount++;
-            console.log('✉️ Created due date notification for task:', task.title);
+            try {
+              await createNotification(
+                currentUserId,
+                'Task Due Today',
+                `"${task.title}" is due today on ${boardData.name}`,
+                'alert',
+                'TASKS',
+                {
+                  taskId: task.id,
+                  boardId: boardData.id, // Use ClientBoard ID, not database row ID
+                  groupId: group.id,
+                  boardName: boardData.name
+                }
+              );
+              notificationCount++;
+              console.log('✉️ Created due date notification for task:', task.title);
+            } catch (notifError) {
+              console.error('Failed to create notification for task:', task.title, notifError);
+            }
           }
         }
       }
