@@ -301,9 +301,9 @@ export const uploadFile = async (file: File, bucket: string = 'uploads'): Promis
 
 // --- Due Date Notifications ---
 
-export const checkDueDateNotifications = async () => {
+export const checkDueDateNotifications = async (currentUserId: string) => {
   try {
-    console.log('🔔 Checking for due date notifications...');
+    console.log('🔔 Checking for due date notifications for user:', currentUserId);
 
     // Get today's date in YYYY-MM-DD format
     const today = new Date().toISOString().split('T')[0];
@@ -334,42 +334,44 @@ export const checkDueDateNotifications = async () => {
         if (!group.tasks) continue;
 
         for (const task of group.tasks) {
-          // Check if task is due today
+          // Check if task is due today AND assigned to current user
           if (task.dueDate === today && task.assignedTo) {
             const assignedIds = Array.isArray(task.assignedTo)
               ? task.assignedTo
               : [task.assignedTo];
 
-            console.log('⏰ Task due today:', task.title, 'assigned to:', assignedIds);
-
-            // Create notification for each assigned user
-            for (const userId of assignedIds) {
-              // Check if we already created this notification today
-              const { data: existingNotifications } = await supabase
-                .from('notifications')
-                .select('id')
-                .eq('user_id', userId)
-                .eq('title', 'Task Due Today')
-                .ilike('message', `%${task.title}%`)
-                .gte('created_at', todayStart)
-                .lte('created_at', todayEnd);
-
-              if (existingNotifications && existingNotifications.length > 0) {
-                console.log('⏭️ Notification already exists for:', task.title, 'user:', userId);
-                skippedCount++;
-                continue;
-              }
-
-              await createNotification(
-                userId,
-                'Task Due Today',
-                `"${task.title}" is due today on ${board.name}`,
-                'alert',
-                'TASKS'
-              );
-              notificationCount++;
-              console.log('✉️ Created due date notification for user:', userId);
+            // Only notify if this task is assigned to the current user
+            if (!assignedIds.includes(currentUserId)) {
+              continue; // Skip tasks not assigned to current user
             }
+
+            console.log('⏰ YOUR task due today:', task.title);
+
+            // Check if we already created this notification today
+            const { data: existingNotifications } = await supabase
+              .from('notifications')
+              .select('id')
+              .eq('user_id', currentUserId)
+              .eq('title', 'Task Due Today')
+              .ilike('message', `%${task.title}%`)
+              .gte('created_at', todayStart)
+              .lte('created_at', todayEnd);
+
+            if (existingNotifications && existingNotifications.length > 0) {
+              console.log('⏭️ Notification already exists for:', task.title);
+              skippedCount++;
+              continue;
+            }
+
+            await createNotification(
+              currentUserId,
+              'Task Due Today',
+              `"${task.title}" is due today on ${board.name}`,
+              'alert',
+              'TASKS'
+            );
+            notificationCount++;
+            console.log('✉️ Created due date notification for task:', task.title);
           }
         }
       }

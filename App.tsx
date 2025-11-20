@@ -56,17 +56,8 @@ const App: React.FC = () => {
       else setIsAuthenticated(false);
     });
 
-    // Set up periodic due date check (every hour)
-    const dueDateInterval = setInterval(() => {
-      if (isAuthenticated) {
-        console.log('🕐 Running scheduled due date check...');
-        checkDueDateNotifications().catch(err => console.error('Error in scheduled due date check:', err));
-      }
-    }, 60 * 60 * 1000); // Run every hour
-
     return () => {
       subscription.unsubscribe();
-      clearInterval(dueDateInterval);
     };
   }, [isAuthenticated]);
 
@@ -116,8 +107,8 @@ const App: React.FC = () => {
     setCurrentUser({ id: uid, name, role, initials: name.substring(0, 2).toUpperCase(), email, avatarUrl });
     setIsAuthenticated(true);
 
-    // Check for due date notifications
-    checkDueDateNotifications().catch(err => console.error('Error checking due dates:', err));
+    // Check for due date notifications for THIS user only
+    checkDueDateNotifications(uid).catch(err => console.error('Error checking due dates:', err));
   };
 
   const handleLogout = async () => {
