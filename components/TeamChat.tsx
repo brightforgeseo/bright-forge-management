@@ -404,9 +404,10 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
         setMessages(messageCache[activeChannelId]);
 
         // Also fetch fresh messages in background to update cache
+        // But DON'T replace UI messages - realtime handles that
         fetchChatMessages(activeChannelId).then(freshMsgs => {
-          console.log(`[TeamChat] Fetched ${freshMsgs.length} fresh messages for channel:`, activeChannelId);
-          setMessages(freshMsgs);
+          console.log(`[TeamChat] Fetched ${freshMsgs.length} fresh messages in background for channel:`, activeChannelId);
+          // Only update cache, don't replace messages (realtime keeps them up to date)
           setMessageCache(prev => ({ ...prev, [activeChannelId]: freshMsgs }));
         });
       } else {
