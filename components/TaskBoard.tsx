@@ -132,10 +132,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
 
     const checkForDeepLink = () => {
       const openTaskData = localStorage.getItem('openTaskModal');
-      console.log('🚨🚨🚨 DEEP LINK CHECK 🚨🚨🚨');
-      console.log('localStorage openTaskModal:', openTaskData);
-      console.log('clients.length:', clients.length);
-      console.log('clients:', clients);
+      console.log('🔍 Deep link check - data exists:', !!openTaskData, 'clients loaded:', clients.length);
 
       if (openTaskData) {
         // If clients aren't loaded yet, wait a bit and retry
@@ -225,28 +222,19 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
 
   // Also check when component first becomes visible (in case user switches to Tasks view)
   useEffect(() => {
-    console.log('🔴 TaskBoard MOUNTED/RENDERED!');
-
-    // Check immediately
-    const openTaskData = localStorage.getItem('openTaskModal');
-    if (openTaskData) {
-      console.log('🎯 Deep link detected on TaskBoard mount, will process...');
-      console.log('Data:', openTaskData);
-    }
-
     // Set up an interval to check repeatedly until we process it
     const interval = setInterval(() => {
       const data = localStorage.getItem('openTaskModal');
       if (data && clients.length > 0) {
-        console.log('🔥 Found deep link data AND clients loaded! Processing now...');
+        console.log('📍 Found pending deep link, triggering processing...');
         // Force trigger the check
         setClients(prev => [...prev]);
         clearInterval(interval);
       }
     }, 250);
 
-    // Clean up after 10 seconds
-    setTimeout(() => clearInterval(interval), 10000);
+    // Clean up after 5 seconds
+    setTimeout(() => clearInterval(interval), 5000);
 
     return () => clearInterval(interval);
   }, []);

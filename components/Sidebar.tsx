@@ -220,10 +220,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                                  key={n.id} 
                                  className={`p-3 border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer ${!n.isRead ? 'bg-blue-50/30' : ''}`}
                                  onClick={() => {
-                                     console.log('🔴🔴🔴 NOTIFICATION CLICKED 🔴🔴🔴');
-                                     console.log('Notification:', n);
-                                     console.log('linkView:', n.linkView);
-                                     console.log('linkData:', n.linkData);
+                                     console.log('🔔 Notification clicked:', n.title);
 
                                      if(!n.isRead) handleMarkRead(n.id);
                                      if(n.linkView) {
@@ -234,8 +231,14 @@ const Sidebar: React.FC<SidebarProps> = ({
                                        // If there's link data (task/board info), store it for TaskBoard to open
                                        if (n.linkData) {
                                          try {
-                                           const linkData = JSON.parse(n.linkData);
-                                           console.log('📍 Storing link data for task modal:', linkData);
+                                           // linkData is already a string from the database, no need to parse
+                                           console.log('📍 Storing link data for task modal (raw):', n.linkData);
+
+                                           // Validate it's valid JSON by parsing it
+                                           const validation = JSON.parse(n.linkData);
+                                           console.log('📍 Validated link data:', validation);
+
+                                           // Store the string directly
                                            localStorage.setItem('openTaskModal', n.linkData);
                                            console.log('✅ localStorage set successfully!');
 
@@ -243,7 +246,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                                            const check = localStorage.getItem('openTaskModal');
                                            console.log('Verification - localStorage now contains:', check);
                                          } catch (e) {
-                                           console.error('Error parsing link data:', e);
+                                           console.error('Error validating link data:', e);
+                                           console.error('Invalid linkData was:', n.linkData);
                                          }
                                        } else {
                                          console.log('⚠️ No linkData in notification!');
