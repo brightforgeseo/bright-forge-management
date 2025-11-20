@@ -518,16 +518,18 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                               {priorityDef.label}
                                            </button>
                                         </td>
-                                        <td className="py-2 px-2 text-center relative">
-                                           <input
-                                             type="date"
-                                             value={task.dueDate}
-                                             onChange={(e) => updateTaskField(activeClient.id, group.id, task.id, 'dueDate', e.target.value)}
-                                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                           />
-                                           <div className="text-xs text-slate-600 font-medium cursor-pointer hover:text-brand-600 pointer-events-none">
-                                             {new Date(task.dueDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}
-                                           </div>
+                                        <td className="py-2 px-2 text-center">
+                                           <label className="relative inline-block cursor-pointer">
+                                             <input
+                                               type="date"
+                                               value={task.dueDate}
+                                               onChange={(e) => updateTaskField(activeClient.id, group.id, task.id, 'dueDate', e.target.value)}
+                                               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                             />
+                                             <div className="text-xs text-slate-600 font-medium hover:text-brand-600 px-2 py-1">
+                                               {new Date(task.dueDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}
+                                             </div>
+                                           </label>
                                         </td>
                                         <td className="py-2 px-2 text-center">
                                            <div className="flex items-center justify-center gap-1">
