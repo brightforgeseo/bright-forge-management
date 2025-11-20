@@ -1297,7 +1297,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                                      text: '',
                                      timestamp: new Date().toISOString(),
                                      isAi: false,
-                                     avatar: currentUser.avatar || 'user',
+                                     avatar: currentUser.avatarUrl || 'user',
                                      attachmentUrl: gifUrl,
                                      attachmentType: 'image'
                                    };
