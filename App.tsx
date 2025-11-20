@@ -107,8 +107,12 @@ const App: React.FC = () => {
     setCurrentUser({ id: uid, name, role, initials: name.substring(0, 2).toUpperCase(), email, avatarUrl });
     setIsAuthenticated(true);
 
-    // Check for due date notifications (improved duplicate detection)
-    checkDueDateNotifications(uid).catch(err => console.error('Error checking due dates:', err));
+    // DUE DATE NOTIFICATIONS DISABLED
+    // Running this on login causes hundreds of duplicates because:
+    // 1. It runs every time you refresh/login
+    // 2. The duplicate check happens but notifications are still created
+    // 3. Need to implement as a Supabase cron job that runs once per day at midnight
+    // checkDueDateNotifications(uid).catch(err => console.error('Error checking due dates:', err));
   };
 
   const handleLogout = async () => {
