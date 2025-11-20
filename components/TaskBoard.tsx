@@ -457,6 +457,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                   <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-40">Priority</th>
                                   <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-40">Due Date</th>
                                   <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-48">Worksheet</th>
+                                  <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-48">Client Sheet</th>
                                   <th className="w-10"></th>
                                 </tr>
                               </thead>
@@ -550,6 +551,30 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                            </div>
                                         </td>
                                         <td className="py-2 px-2 text-center">
+                                           <div className="flex items-center justify-center gap-1">
+                                             {task.clientSheet ? (
+                                               <a
+                                                 href={task.clientSheet}
+                                                 target="_blank"
+                                                 rel="noopener noreferrer"
+                                                 className="text-brand-600 hover:text-brand-700"
+                                                 title="Open client sheet"
+                                                 onClick={(e) => e.stopPropagation()}
+                                               >
+                                                 <LinkIcon className="w-4 h-4" />
+                                               </a>
+                                             ) : null}
+                                             <input
+                                               type="text"
+                                               placeholder="Add URL"
+                                               value={task.clientSheet || ''}
+                                               onChange={(e) => updateTaskField(activeClient.id, group.id, task.id, 'clientSheet', e.target.value)}
+                                               className="flex-1 text-xs text-slate-600 bg-transparent outline-none text-center placeholder:text-slate-300 hover:bg-slate-50 px-2 py-1 rounded"
+                                               onClick={(e) => e.stopPropagation()}
+                                             />
+                                           </div>
+                                        </td>
+                                        <td className="py-2 px-2 text-center">
                                            <button onClick={() => deleteTask(activeClient.id, group.id, task.id)} className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-colors">
                                               <X className="w-4 h-4" />
                                            </button>
@@ -576,7 +601,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                          )}
                                       </div>
                                    </td>
-                                   <td colSpan={6} className="border-t border-slate-100"></td>
+                                   <td colSpan={7} className="border-t border-slate-100"></td>
                                  </tr>
                               </tbody>
                            </table>
@@ -762,20 +787,40 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                 </div>
               </div>
 
-              {/* Worksheet Link */}
-              {taskModal.task.worksheet && (
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Worksheet</label>
-                  <a
-                    href={taskModal.task.worksheet}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 p-3 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors group"
-                  >
-                    <LinkIcon className="w-4 h-4 text-brand-600" />
-                    <span className="text-sm font-medium text-brand-700 truncate flex-1">{taskModal.task.worksheet}</span>
-                    <span className="text-xs text-brand-500 opacity-0 group-hover:opacity-100 transition-opacity">Open →</span>
-                  </a>
+              {/* Links Section */}
+              {(taskModal.task.worksheet || taskModal.task.clientSheet) && (
+                <div className="grid grid-cols-1 gap-4">
+                  {taskModal.task.worksheet && (
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Worksheet</label>
+                      <a
+                        href={taskModal.task.worksheet}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 p-3 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors group"
+                      >
+                        <LinkIcon className="w-4 h-4 text-brand-600" />
+                        <span className="text-sm font-medium text-brand-700 truncate flex-1">{taskModal.task.worksheet}</span>
+                        <span className="text-xs text-brand-500 opacity-0 group-hover:opacity-100 transition-opacity">Open →</span>
+                      </a>
+                    </div>
+                  )}
+
+                  {taskModal.task.clientSheet && (
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Client Sheet</label>
+                      <a
+                        href={taskModal.task.clientSheet}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 p-3 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors group"
+                      >
+                        <LinkIcon className="w-4 h-4 text-brand-600" />
+                        <span className="text-sm font-medium text-brand-700 truncate flex-1">{taskModal.task.clientSheet}</span>
+                        <span className="text-xs text-brand-500 opacity-0 group-hover:opacity-100 transition-opacity">Open →</span>
+                      </a>
+                    </div>
+                  )}
                 </div>
               )}
 

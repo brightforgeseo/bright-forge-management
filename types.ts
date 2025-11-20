@@ -103,7 +103,8 @@ export interface Task {
   priority: string;
   dueDate: string;
   assignedTo?: string; // User ID or name of assigned person
-  worksheet?: string; // URL to worksheet/client sheet
+  worksheet?: string; // URL to worksheet
+  clientSheet?: string; // URL to client sheet
   comments?: TaskComment[];
 }
 
