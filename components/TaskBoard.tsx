@@ -197,6 +197,66 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
     loadData();
   }, []);
 
+  // Check for notification deep links when component becomes visible or clients change
+  useEffect(() => {
+    const checkForDeepLink = () => {
+      const openTaskData = localStorage.getItem('openTaskModal');
+      if (openTaskData && clients.length > 0) {
+        try {
+          const linkData = JSON.parse(openTaskData);
+          const { taskId, boardId, groupId, boardName } = linkData;
+
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.log('📂 NOTIFICATION DEEP LINK (from separate effect)');
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.log('Looking for:');
+          console.log('  boardId:', boardId);
+          console.log('  groupId:', groupId);
+          console.log('  taskId:', taskId);
+          console.log('  boardName:', boardName);
+          console.log('');
+          console.log('Available boards:');
+          clients.forEach((b, idx) => {
+            console.log(`  [${idx}] id: "${b.id}" name: "${b.name}"`);
+          });
+          console.log('');
+
+          const board = clients.find(b => b.id === boardId);
+          if (board) {
+            console.log('✅ FOUND BOARD:', board.name);
+            setSelectedClientId(board.id);
+
+            const group = board.groups.find(g => g.id === groupId);
+            if (group) {
+              console.log('✅ FOUND GROUP:', group.title);
+              const task = group.tasks.find(t => t.id === taskId);
+              if (task) {
+                console.log('✅ FOUND TASK:', task.title);
+                console.log('Opening task modal in 200ms...');
+                setTimeout(() => {
+                  console.log('🎯 Opening task modal NOW');
+                  setTaskModal({
+                    task,
+                    groupId: group.id,
+                    clientId: board.id,
+                    groupTitle: group.title,
+                    groupColor: group.color
+                  });
+                }, 200);
+              }
+            }
+          }
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          localStorage.removeItem('openTaskModal');
+        } catch (e) {
+          console.error('Error processing deep link:', e);
+        }
+      }
+    };
+
+    checkForDeepLink();
+  }, [clients]);
+
   // Debounced Save Logic
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
