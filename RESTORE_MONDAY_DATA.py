@@ -65,61 +65,74 @@ def parse_board_file(filepath):
     is_simple_format = header_row_idx is not None
 
     if is_simple_format:
-        # Single group format - use row 2 or row before headers as group name
-        # Need to detect column layout from header row
-        header_row = [str(sheet.cell(header_row_idx, col).value or '').lower() for col in range(1, 12)]
+        # Multi-group format - groups are separated by header rows
+        # Scan for group headers (rows with just text, followed by header row with "Name | Person | etc")
 
-        # Find column indices
-        name_col = 0
-        person_col = next((i for i, h in enumerate(header_row) if 'person' in h), None)
-        status_col = next((i for i, h in enumerate(header_row) if 'status' in h), None)
-        date_col = next((i for i, h in enumerate(header_row) if 'date' in h), None)
-        priority_col = next((i for i, h in enumerate(header_row) if 'priority' in h), None)
-        client_col = next((i for i, h in enumerate(header_row) if 'client' in h or 'file' in h), None)
-        item_col = next((i for i, h in enumerate(header_row) if 'item' in h and 'id' in h), None)
+        # Detect all header rows
+        header_rows = []
+        for row_idx in range(1, sheet.max_row + 1):
+            row_val = str(sheet.cell(row_idx, 1).value or '')
+            if row_val and 'Name' in row_val:
+                next_cells = [str(sheet.cell(row_idx, col).value or '') for col in range(2, 9)]
+                if any('Person' in cell for cell in next_cells):
+                    header_rows.append(row_idx)
 
-        # Get group name from row before headers
-        group_row_idx = header_row_idx - 1
-        group_name = str(sheet.cell(group_row_idx, 1).value or 'Tasks')
-        if group_name == board_name or 'http' in group_name.lower():
-            group_name = 'Tasks'
+        # Find column indices from first header row
+        if header_rows:
+            header_row = [str(sheet.cell(header_rows[0], col).value or '').lower() for col in range(1, 12)]
+            name_col = 0
+            person_col = next((i for i, h in enumerate(header_row) if 'person' in h), None)
+            status_col = next((i for i, h in enumerate(header_row) if 'status' in h), None)
+            date_col = next((i for i, h in enumerate(header_row) if 'date' in h), None)
+            priority_col = next((i for i, h in enumerate(header_row) if 'priority' in h), None)
+            client_col = next((i for i, h in enumerate(header_row) if 'client' in h or 'file' in h), None)
+            item_col = next((i for i, h in enumerate(header_row) if 'item' in h and 'id' in h), None)
+            worksheet_col = next((i for i, h in enumerate(header_row) if 'worksheet' in h), None)
 
-        current_group = clean_string(group_name)
-        current_group_tasks = []
+            # Process each group
+            for header_idx, header_row_pos in enumerate(header_rows):
+                # Get group name from row before header
+                group_name = str(sheet.cell(header_row_pos - 1, 1).value or 'Tasks')
+                if group_name == board_name or 'http' in group_name.lower() or group_name == 'Name':
+                    group_name = 'Tasks'
 
-        # Start parsing from row after headers
-        for row_idx in range(header_row_idx + 1, sheet.max_row + 1):
-            # Get all columns
-            row = [sheet.cell(row_idx, col).value for col in range(1, 12)]
+                # Determine where this group's tasks end (next header or end of sheet)
+                end_row = header_rows[header_idx + 1] - 2 if header_idx + 1 < len(header_rows) else sheet.max_row + 1
 
-            # Item ID indicates a valid task row
-            item_id = row[item_col] if item_col and len(row) > item_col else None
+                current_group_tasks = []
 
-            # Skip if no item ID or no task name
-            if not item_id or not row[name_col]:
-                continue
+                # Parse tasks for this group
+                for row_idx in range(header_row_pos + 1, end_row):
+                    row = [sheet.cell(row_idx, col).value for col in range(1, 12)]
 
-            # Get comments for this task from updates
-            task_comments = UPDATES.get(str(item_id), [])
+                    # Item ID indicates a valid task row
+                    item_id = row[item_col] if item_col and len(row) > item_col else None
 
-            task = {
-                'title': clean_string(row[name_col]),
-                'person': clean_string(row[person_col]) if person_col and len(row) > person_col else '',
-                'status': clean_string(row[status_col]) if status_col and len(row) > status_col else '',
-                'date': parse_date(row[date_col]) if date_col and len(row) > date_col else '2025-11-20',
-                'priority': clean_string(row[priority_col]) if priority_col and len(row) > priority_col else '',
-                'client_sheet': clean_string(row[client_col]) if client_col and len(row) > client_col else '',
-                'worksheet': '',  # Not in this format
-                'item_id': str(item_id),
-                'comments': task_comments
-            }
-            current_group_tasks.append(task)
+                    # Skip if no item ID or no task name
+                    if not item_id or not row[name_col]:
+                        continue
 
-        if current_group_tasks:
-            groups.append({
-                'title': current_group,
-                'tasks': current_group_tasks
-            })
+                    # Get comments for this task from updates
+                    task_comments = UPDATES.get(str(item_id), [])
+
+                    task = {
+                        'title': clean_string(row[name_col]),
+                        'person': clean_string(row[person_col]) if person_col and len(row) > person_col else '',
+                        'status': clean_string(row[status_col]) if status_col and len(row) > status_col else '',
+                        'date': parse_date(row[date_col]) if date_col and len(row) > date_col else '2025-11-20',
+                        'priority': clean_string(row[priority_col]) if priority_col and len(row) > priority_col else '',
+                        'client_sheet': clean_string(row[client_col]) if client_col and len(row) > client_col else '',
+                        'worksheet': clean_string(row[worksheet_col]) if worksheet_col and len(row) > worksheet_col else '',
+                        'item_id': str(item_id),
+                        'comments': task_comments
+                    }
+                    current_group_tasks.append(task)
+
+                if current_group_tasks:
+                    groups.append({
+                        'title': clean_string(group_name),
+                        'tasks': current_group_tasks
+                    })
 
     else:
         # Original multi-group format

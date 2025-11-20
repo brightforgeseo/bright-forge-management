@@ -32,11 +32,73 @@ def map_person_to_uuids(person_str):
     # Return array for multiple assignments
     return uuids[0] if len(uuids) == 1 else uuids
 
-def clean_for_json(s):
-    """Escape string for JSON"""
+def clean_string(s):
+    """Clean string for data - just normalize whitespace and remove problematic characters"""
     if s is None:
         return ''
-    return str(s).replace('\\', '\\\\').replace('"', '\\"').replace('\n', ' ').replace('\r', ' ')
+    s = str(s)
+    s = s.replace('\n', ' ')      # Replace newlines with spaces
+    s = s.replace('\r', ' ')      # Replace carriage returns
+    s = s.replace('\t', ' ')      # Replace tabs
+    # Remove any null bytes or other control characters
+    s = ''.join(char for char in s if ord(char) >= 32 or char in '\n\r\t')
+    return s.strip()
+
+def normalize_status(status):
+    """Normalize status values and convert to status IDs"""
+    if not status or status == 'Status':
+        return ''
+
+    status = status.strip()
+
+    # Normalize common variations to standard labels
+    status_map = {
+        'ben to check': 'Ben To Check',
+        'bent to check': 'Ben To Check',
+        'sent to client': 'Sent To Client',
+        'send to client': 'Sent To Client',
+        'sent to check': 'Ben To Check',
+        'required revisions': 'Revisions Required',
+        'live video': 'Working on it',
+        'need video for training': 'Working on it'
+    }
+
+    status_lower = status.lower()
+    if status_lower in status_map:
+        status = status_map[status_lower]
+
+    # Map status labels to their IDs (matching statusDefs in the board)
+    label_to_id = {
+        'To Do': 'status-1',
+        'Working on it': 'status-2',
+        'Review': 'status-3',
+        'QA': 'status-4',
+        'Ben To Check': 'status-5',
+        'Sent To Client': 'status-6',
+        'Revisions Required': 'status-7',
+        'Done': 'status-8'
+    }
+
+    # Return the ID if we have a match, otherwise return status-8 (Done) as default
+    return label_to_id.get(status, 'status-8' if status else '')
+
+def normalize_priority(priority):
+    """Normalize priority values and convert to priority IDs"""
+    if not priority or priority == 'Priority':
+        return ''
+
+    priority = priority.strip()
+
+    # Map priority labels to their IDs
+    label_to_id = {
+        'Low': 'priority-1',
+        'Medium': 'priority-2',
+        'High': 'priority-3',
+        'Critical ⚠️️': 'priority-4'
+    }
+
+    # Return the ID if we have a match, otherwise empty
+    return label_to_id.get(priority, '')
 
 def extract_url(s):
     """Extract just the URL from text that may contain labels"""
@@ -73,16 +135,16 @@ sql_lines.append('-- Clear existing boards (UNCOMMENT TO USE)')
 sql_lines.append('-- DELETE FROM client_boards;\n')
 
 for board_idx, board in enumerate(all_boards, 1):
-    board_name = clean_for_json(board['name'])
+    board_name = clean_string(board['name'])
     initials = ''.join([w[0].upper() for w in board_name.split()[:2] if w])[:2]
 
     sql_lines.append(f'-- Board {board_idx}: {board_name}')
 
-    groups_json = []
+    groups_list = []
     for group_idx, group in enumerate(board['groups']):
         group_color = GROUP_COLORS[group_idx % len(GROUP_COLORS)]
 
-        tasks_json = []
+        tasks_list = []
         for task_idx, task in enumerate(group['tasks']):
             assigned_value = map_person_to_uuids(task.get('person', ''))
 
@@ -91,40 +153,68 @@ for board_idx, board in enumerate(all_boards, 1):
             for comment_idx, comment in enumerate(task.get('comments', [])):
                 comments.append({
                     "id": f"comment-{board_idx}-{group_idx}-{task_idx}-{comment_idx}",
-                    "author": comment.get('author', 'Unknown'),
-                    "text": clean_for_json(comment.get('text', '')),
+                    "author": clean_string(comment.get('author', 'Unknown')),
+                    "text": clean_string(comment.get('text', '')),
                     "timestamp": comment.get('timestamp', ''),
                     "avatar": ""
                 })
 
+            # Skip header/template rows (tasks with title "Name" and no real data)
+            title = clean_string(task['title'])
+            if title in ['Name', 'Item', 'Task'] and task.get('status', '') in ['Status', ''] and not task.get('comments', []):
+                continue
+
             task_obj = {
                 "id": f"task-{board_idx}-{group_idx}-{task_idx}",
-                "title": clean_for_json(task['title']),
-                "status": clean_for_json(task.get('status', '')),
-                "priority": clean_for_json(task.get('priority', '')),
+                "title": title,
+                "status": normalize_status(task.get('status', '')),
+                "priority": normalize_priority(task.get('priority', '')),
                 "dueDate": task.get('date', '2025-11-20'),
                 "assignedTo": assigned_value,
-                "worksheet": clean_for_json(extract_url(task.get('worksheet', ''))),
-                "clientSheet": clean_for_json(extract_url(task.get('client_sheet', ''))),
+                "worksheet": clean_string(extract_url(task.get('worksheet', ''))),
+                "clientSheet": clean_string(extract_url(task.get('client_sheet', ''))),
                 "comments": comments
             }
-            tasks_json.append(json.dumps(task_obj, separators=(',', ':')))
+            tasks_list.append(task_obj)
 
         group_obj = {
             "id": f"group-{board_idx}-{group_idx}",
-            "title": clean_for_json(group['title']),
+            "title": clean_string(group['title']),
             "color": group_color,
-            "tasks": tasks_json
+            "tasks": tasks_list
         }
+        groups_list.append(group_obj)
 
-        # Manually build group JSON to embed task JSON strings
-        group_str = f'{{"id":"group-{board_idx}-{group_idx}","title":"{clean_for_json(group["title"])}","color":"{group_color}","tasks":[{",".join(tasks_json)}]}}'
-        groups_json.append(group_str)
+    # Build complete board object
+    board_obj = {
+        "id": f"board-{board_idx}",
+        "name": board_name,
+        "initials": initials,
+        "color": "#FF6B6B",
+        "groups": groups_list,
+        "statusDefs": [
+            {"id": "status-1", "label": "To Do", "color": "#C4C4C4"},
+            {"id": "status-2", "label": "Working on it", "color": "#FDAB3D"},
+            {"id": "status-3", "label": "Review", "color": "#A25DDC"},
+            {"id": "status-4", "label": "QA", "color": "#9CD326"},
+            {"id": "status-5", "label": "Ben To Check", "color": "#00C875"},
+            {"id": "status-6", "label": "Sent To Client", "color": "#579BFC"},
+            {"id": "status-7", "label": "Revisions Required", "color": "#E44258"},
+            {"id": "status-8", "label": "Done", "color": "#00D084"}
+        ],
+        "priorityDefs": [
+            {"id": "priority-1", "label": "Low", "color": "#C4C4C4"},
+            {"id": "priority-2", "label": "Medium", "color": "#FDAB3D"},
+            {"id": "priority-3", "label": "High", "color": "#E44258"},
+            {"id": "priority-4", "label": "Critical ⚠️️", "color": "#FF0000"}
+        ]
+    }
 
-    # Build board JSON
-    board_str = f'{{"id":"board-{board_idx}","name":"{board_name}","initials":"{initials}","color":"#FF6B6B","groups":[{",".join(groups_json)}],"statusDefs":[{{"id":"status-1","label":"To Do","color":"#C4C4C4"}},{{"id":"status-2","label":"In Progress","color":"#FDAB3D"}},{{"id":"status-3","label":"Ben To Check","color":"#00C875"}},{{"id":"status-4","label":"Sent To Client","color":"#579BFC"}},{{"id":"status-5","label":"Revisions Required","color":"#E44258"}},{{"id":"status-6","label":"Done","color":"#00D084"}}],"priorityDefs":[{{"id":"priority-1","label":"Low","color":"#C4C4C4"}},{{"id":"priority-2","label":"Medium","color":"#FDAB3D"}},{{"id":"priority-3","label":"High","color":"#E44258"}},{{"id":"priority-4","label":"Critical ⚠️️","color":"#FF0000"}}]}}'
+    # Use json.dumps for proper escaping, then wrap in dollar quotes
+    board_json = json.dumps(board_obj, ensure_ascii=False, separators=(',', ':'))
 
-    sql_lines.append(f"INSERT INTO client_boards (board_data) VALUES ('{board_str}'::jsonb);\n")
+    # Use dollar quoting to avoid escaping issues
+    sql_lines.append(f"INSERT INTO client_boards (board_data) VALUES ($${board_json}$$::jsonb);\n")
 
 output_file = '/Users/user/Downloads/bright-forge-portal/RESTORE_ALL_BOARDS.sql'
 with open(output_file, 'w') as f:

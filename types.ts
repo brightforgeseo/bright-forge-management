@@ -91,9 +91,11 @@ export interface ContentResult {
 export interface TaskComment {
   id: string;
   author: string;
+  authorId?: string; // Profile ID of comment author
   text: string;
   timestamp: string;
   avatar?: string;
+  mentions?: string[]; // Array of profile IDs mentioned in comment
 }
 
 export interface Task {

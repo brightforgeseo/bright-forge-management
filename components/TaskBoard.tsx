@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Plus, Sparkles, ChevronDown, ChevronUp, ChevronRight, Trash2, Briefcase, CheckCircle2, Settings, Mail, Phone, Globe, X, Image as ImageIcon, Edit3, Palette, Loader2, Upload, UserCircle, Link as LinkIcon, MessageCircle, Send } from 'lucide-react';
 import { Task, TaskGroup, User, ClientBoard, ToastType, LabelDefinition, Profile, TaskComment } from '../types';
 import { generateProjectTasks } from '../services/geminiService';
-import { fetchClientBoards, saveClientBoard, deleteClientBoard, uploadFile, fetchProfiles } from '../services/databaseService';
+import { fetchClientBoards, saveClientBoard, deleteClientBoard, uploadFile, fetchProfiles, createNotification } from '../services/databaseService';
 
 interface TaskBoardProps {
   currentUser: User;
@@ -32,6 +32,43 @@ const DEFAULT_PRIORITY_DEFS: LabelDefinition[] = [
 ];
 
 const generateId = () => Date.now().toString() + Math.random().toString(36).substr(2, 9);
+
+// Helper function to detect @mentions in text
+const detectMentions = (text: string, profiles: Profile[]): string[] => {
+  const mentionedIds: string[] = [];
+
+  // Check for @everyone
+  if (text.toLowerCase().includes('@everyone')) {
+    return profiles.map(p => p.id);
+  }
+
+  // Check for @name mentions
+  profiles.forEach(profile => {
+    const name = profile.full_name || '';
+    const firstName = name.split(' ')[0].toLowerCase();
+    const fullName = name.toLowerCase();
+
+    // Check if text mentions this person
+    if (text.toLowerCase().includes(`@${firstName}`) || text.toLowerCase().includes(`@${fullName}`)) {
+      mentionedIds.push(profile.id);
+    }
+  });
+
+  return mentionedIds;
+};
+
+// Play notification sound
+const playNotificationSound = () => {
+  // Use system notification sound
+  const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBji=');
+  audio.volume = 0.5;
+  audio.play().catch(() => {
+    // Fallback: use system notification
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('New Mention', { body: 'You were mentioned in a comment', silent: false });
+    }
+  });
+};
 
 const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   
@@ -1156,14 +1193,17 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                       type="text"
                       value={newComment}
                       onChange={(e) => setNewComment(e.target.value)}
-                      onKeyPress={(e) => {
+                      onKeyPress={async (e) => {
                         if (e.key === 'Enter' && newComment.trim()) {
+                          const mentions = detectMentions(newComment.trim(), teamProfiles);
                           const comment: TaskComment = {
                             id: Date.now().toString(),
                             author: currentUser.name,
+                            authorId: currentUser.id,
                             text: newComment.trim(),
                             timestamp: new Date().toISOString(),
-                            avatar: currentUser.avatarUrl
+                            avatar: currentUser.avatarUrl,
+                            mentions
                           };
                           const updatedTask = {
                             ...taskModal.task,
@@ -1172,20 +1212,40 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                           updateTaskField(taskModal.clientId, taskModal.groupId, taskModal.task.id, 'comments', updatedTask.comments);
                           setTaskModal({ ...taskModal, task: updatedTask });
                           setNewComment('');
+
+                          // Create notifications for mentioned users
+                          if (mentions.length > 0) {
+                            const client = clients.find(c => c.id === taskModal.clientId);
+                            for (const mentionedId of mentions) {
+                              if (mentionedId !== currentUser.id) { // Don't notify self
+                                await createNotification(
+                                  mentionedId,
+                                  `${currentUser.name} mentioned you`,
+                                  `In "${taskModal.task.title}": ${newComment.trim().substring(0, 100)}`,
+                                  'message',
+                                  'TASKS'
+                                );
+                              }
+                            }
+                            playNotificationSound();
+                          }
                         }
                       }}
                       placeholder="Add a comment..."
                       className="flex-1 p-2 border border-slate-300 rounded-lg outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 text-sm"
                     />
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         if (newComment.trim()) {
+                          const mentions = detectMentions(newComment.trim(), teamProfiles);
                           const comment: TaskComment = {
                             id: Date.now().toString(),
                             author: currentUser.name,
+                            authorId: currentUser.id,
                             text: newComment.trim(),
                             timestamp: new Date().toISOString(),
-                            avatar: currentUser.avatarUrl
+                            avatar: currentUser.avatarUrl,
+                            mentions
                           };
                           const updatedTask = {
                             ...taskModal.task,
@@ -1194,6 +1254,22 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                           updateTaskField(taskModal.clientId, taskModal.groupId, taskModal.task.id, 'comments', updatedTask.comments);
                           setTaskModal({ ...taskModal, task: updatedTask });
                           setNewComment('');
+
+                          // Create notifications for mentioned users
+                          if (mentions.length > 0) {
+                            for (const mentionedId of mentions) {
+                              if (mentionedId !== currentUser.id) { // Don't notify self
+                                await createNotification(
+                                  mentionedId,
+                                  `${currentUser.name} mentioned you`,
+                                  `In "${taskModal.task.title}": ${newComment.trim().substring(0, 100)}`,
+                                  'message',
+                                  'TASKS'
+                                );
+                              }
+                            }
+                            playNotificationSound();
+                          }
                         }
                       }}
                       className="p-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
