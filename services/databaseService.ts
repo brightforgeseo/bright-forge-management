@@ -309,6 +309,15 @@ export const checkDueDateNotifications = async () => {
     const today = new Date().toISOString().split('T')[0];
     console.log('📅 Today is:', today);
 
+    // Check if we've already run today by checking localStorage
+    const lastRunKey = 'last_due_date_check';
+    const lastRun = localStorage.getItem(lastRunKey);
+
+    if (lastRun === today) {
+      console.log('⏭️ Due date notifications already sent today, skipping...');
+      return;
+    }
+
     // Fetch all client boards
     const { data: boards, error: boardsError } = await supabase
       .from('client_boards')
@@ -320,6 +329,7 @@ export const checkDueDateNotifications = async () => {
     }
 
     console.log('📊 Found', boards.length, 'boards to check');
+    let notificationCount = 0;
 
     // Iterate through all boards and their tasks
     for (const board of boards) {
@@ -347,6 +357,7 @@ export const checkDueDateNotifications = async () => {
                 'alert',
                 'TASKS'
               );
+              notificationCount++;
               console.log('✉️ Created due date notification for user:', userId);
             }
           }
@@ -354,7 +365,9 @@ export const checkDueDateNotifications = async () => {
       }
     }
 
-    console.log('✅ Due date check completed');
+    // Mark that we've run today
+    localStorage.setItem(lastRunKey, today);
+    console.log(`✅ Due date check completed - sent ${notificationCount} notifications`);
   } catch (error) {
     console.error('Error checking due dates:', error);
   }

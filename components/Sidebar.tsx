@@ -169,9 +169,25 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <div className="absolute top-full left-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden z-50 animate-fadeIn text-slate-900 left-0 md:left-auto md:right-[-200px] lg:left-0 origin-top-left">
                    <div className="p-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
                        <h3 className="font-bold text-sm text-slate-700">Notifications</h3>
-                       {unreadCount > 0 && (
-                           <button onClick={handleMarkAllRead} className="text-xs text-brand-600 hover:text-brand-700 font-medium">Mark all read</button>
-                       )}
+                       <div className="flex gap-2">
+                           {unreadCount > 0 && (
+                               <button onClick={handleMarkAllRead} className="text-xs text-brand-600 hover:text-brand-700 font-medium">Mark all read</button>
+                           )}
+                           {notifications.length > 0 && (
+                               <button
+                                 onClick={async () => {
+                                   if (confirm('Clear all notifications?')) {
+                                     // Delete all notifications for this user
+                                     await supabase.from('notifications').delete().eq('user_id', currentUser.id);
+                                     setNotifications([]);
+                                   }
+                                 }}
+                                 className="text-xs text-red-600 hover:text-red-700 font-medium"
+                               >
+                                 Clear all
+                               </button>
+                           )}
+                       </div>
                    </div>
                    <div className="max-h-80 overflow-y-auto">
                        {notifications.length === 0 ? (
@@ -183,7 +199,10 @@ const Sidebar: React.FC<SidebarProps> = ({
                                  className={`p-3 border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer ${!n.isRead ? 'bg-blue-50/30' : ''}`}
                                  onClick={() => {
                                      if(!n.isRead) handleMarkRead(n.id);
-                                     if(n.linkView) onChangeView(n.linkView as ToolView);
+                                     if(n.linkView) {
+                                       onChangeView(n.linkView as ToolView);
+                                       setIsNotificationsOpen(false); // Close dropdown after clicking
+                                     }
                                  }}
                                >
                                   <div className="flex justify-between items-start gap-2">
