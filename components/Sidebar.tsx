@@ -97,13 +97,19 @@ const Sidebar: React.FC<SidebarProps> = ({
         
         {/* Notification Bell */}
         <div className="relative">
-            <button 
+            <button
                 onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-                className="p-2 rounded-lg hover:bg-slate-800 transition-colors relative"
+                className={`p-2 rounded-lg hover:bg-slate-800 transition-colors relative ${unreadCount > 0 ? 'animate-pulse' : ''}`}
+                style={unreadCount > 0 ? {
+                  boxShadow: '0 0 20px rgba(251, 146, 60, 0.8), 0 0 40px rgba(251, 146, 60, 0.4)',
+                  animation: 'glow 2s ease-in-out infinite'
+                } : {}}
             >
-                <Bell className="w-5 h-5 text-slate-400 hover:text-white" />
+                <Bell className={`w-5 h-5 transition-colors ${unreadCount > 0 ? 'text-orange-500' : 'text-slate-400 hover:text-white'}`} />
                 {unreadCount > 0 && (
-                    <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-slate-900 animate-pulse"></span>
+                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-orange-500 text-white text-[10px] font-bold rounded-full border-2 border-slate-900 flex items-center justify-center px-1 shadow-lg shadow-orange-500/50 animate-bounce">
+                        {unreadCount}
+                    </span>
                 )}
             </button>
 
