@@ -66,15 +66,22 @@ const App: React.FC = () => {
 
     try {
         // Fetch role from allowed_users table
-        const { data: allowedUser } = await supabase
+        console.log('[App] Checking role for email:', lowerEmail);
+        const { data: allowedUser, error: roleError } = await supabase
             .from('allowed_users')
             .select('role, full_name')
             .eq('email', lowerEmail)
             .single();
 
+        console.log('[App] allowed_users query result:', allowedUser);
+        console.log('[App] allowed_users query error:', roleError);
+
         if (allowedUser) {
             role = allowedUser.role || 'Team Member';
             if (allowedUser.full_name) name = allowedUser.full_name;
+            console.log('[App] Role set to:', role);
+        } else {
+            console.warn('[App] No allowed_user found for:', lowerEmail);
         }
 
         // Fetch avatar and profile data from profiles table
@@ -89,7 +96,7 @@ const App: React.FC = () => {
             if (profile.full_name) name = profile.full_name;
         }
     } catch (e) {
-        console.warn('Error fetching user data:', e);
+        console.error('[App] Error fetching user data:', e);
     }
 
     // IMPORTANT: Set ID to the real UUID (uid) so DMs work
