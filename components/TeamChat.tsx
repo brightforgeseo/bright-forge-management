@@ -280,6 +280,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
              // Update the messages state for current channel
              setMessages(prev => {
                  if (!prev.some(m => m.id === newMsg.id)) {
+                     console.log(`[TeamChat] Adding message to UI. Current count: ${prev.length}, New message:`, newMsg.text);
                      return [...prev, {
                          id: newMsg.id,
                          channelId: newMsg.channel_id,
@@ -295,6 +296,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                          editedAt: newMsg.edited_at
                      }];
                  }
+                 console.log(`[TeamChat] Message already exists, not adding. ID: ${newMsg.id}`);
                  return prev;
              });
              scrollToBottom();

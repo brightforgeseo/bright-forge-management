@@ -248,7 +248,7 @@ export const fetchChatMessages = async (channelId: string): Promise<ChatMessage[
     .select('*')
     .eq('channel_id', channelId)
     .order('created_at', { ascending: true })
-    .limit(100);
+    .limit(1000); // Increased from 100 to handle more messages
 
   if (error) {
     console.error('Error fetching messages:', error);
