@@ -518,17 +518,17 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                               {priorityDef.label}
                                            </button>
                                         </td>
-                                        <td className="py-2 px-2 text-center">
-                                           <label className="relative inline-block cursor-pointer">
+                                        <td className="py-0 px-0 text-center">
+                                           <label className="relative flex items-center justify-center cursor-pointer w-full h-full py-2 px-2">
                                              <input
                                                type="date"
                                                value={task.dueDate}
                                                onChange={(e) => updateTaskField(activeClient.id, group.id, task.id, 'dueDate', e.target.value)}
                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                                              />
-                                             <div className="text-xs text-slate-600 font-medium hover:text-brand-600 px-2 py-1">
+                                             <span className="text-xs text-slate-600 font-medium hover:text-brand-600">
                                                {new Date(task.dueDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}
-                                             </div>
+                                             </span>
                                            </label>
                                         </td>
                                         <td className="py-2 px-2 text-center">
