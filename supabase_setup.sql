@@ -1,8 +1,34 @@
 -- Bright Forge Portal Database Schema
 -- Run these commands in your Supabase SQL Editor
 
--- Enable UUID extension
+-- Step 1: Drop all existing policies (silent errors ignored)
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    -- Drop all policies on our tables
+    FOR r IN (SELECT schemaname, tablename, policyname
+              FROM pg_policies
+              WHERE schemaname = 'public'
+              AND tablename IN ('profiles', 'channels', 'chat_messages', 'client_boards', 'notifications'))
+    LOOP
+        EXECUTE 'DROP POLICY IF EXISTS ' || quote_ident(r.policyname) || ' ON ' || quote_ident(r.schemaname) || '.' || quote_ident(r.tablename);
+    END LOOP;
+
+    -- Drop storage policies
+    FOR r IN (SELECT policyname
+              FROM pg_policies
+              WHERE schemaname = 'storage'
+              AND tablename = 'objects')
+    LOOP
+        EXECUTE 'DROP POLICY IF EXISTS ' || quote_ident(r.policyname) || ' ON storage.objects';
+    END LOOP;
+END $$;
+
+-- Step 2: Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Step 3: Create tables
 
 -- Profiles table (extends auth.users)
 CREATE TABLE IF NOT EXISTS profiles (
@@ -12,20 +38,6 @@ CREATE TABLE IF NOT EXISTS profiles (
   email TEXT UNIQUE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
-
--- Enable RLS
-ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-
--- Profiles policies
-DO $$
-BEGIN
-    DROP POLICY IF EXISTS "Profiles are viewable by everyone" ON profiles;
-    DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
-EXCEPTION WHEN OTHERS THEN NULL;
-END $$;
-
-CREATE POLICY "Profiles are viewable by everyone" ON profiles FOR SELECT USING (true);
-CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
 
 -- Allowed users (invites)
 CREATE TABLE IF NOT EXISTS allowed_users (
@@ -45,22 +57,6 @@ CREATE TABLE IF NOT EXISTS channels (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Enable RLS
-ALTER TABLE channels ENABLE ROW LEVEL SECURITY;
-
--- Channels policies
-DO $$
-BEGIN
-    DROP POLICY IF EXISTS "Channels are viewable by everyone" ON channels;
-    DROP POLICY IF EXISTS "Only authenticated users can create channels" ON channels;
-    DROP POLICY IF EXISTS "Only authenticated users can delete channels" ON channels;
-EXCEPTION WHEN OTHERS THEN NULL;
-END $$;
-
-CREATE POLICY "Channels are viewable by everyone" ON channels FOR SELECT USING (true);
-CREATE POLICY "Only authenticated users can create channels" ON channels FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-CREATE POLICY "Only authenticated users can delete channels" ON channels FOR DELETE USING (auth.role() = 'authenticated');
-
 -- Chat messages table
 CREATE TABLE IF NOT EXISTS chat_messages (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
@@ -74,22 +70,6 @@ CREATE TABLE IF NOT EXISTS chat_messages (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Enable RLS
-ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
-
--- Chat messages policies
-DO $$
-BEGIN
-    DROP POLICY IF EXISTS "Messages are viewable by everyone" ON chat_messages;
-    DROP POLICY IF EXISTS "Authenticated users can send messages" ON chat_messages;
-    DROP POLICY IF EXISTS "Authenticated users can delete messages" ON chat_messages;
-EXCEPTION WHEN OTHERS THEN NULL;
-END $$;
-
-CREATE POLICY "Messages are viewable by everyone" ON chat_messages FOR SELECT USING (true);
-CREATE POLICY "Authenticated users can send messages" ON chat_messages FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-CREATE POLICY "Authenticated users can delete messages" ON chat_messages FOR DELETE USING (auth.role() = 'authenticated');
-
 -- Client boards table
 CREATE TABLE IF NOT EXISTS client_boards (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
@@ -97,24 +77,6 @@ CREATE TABLE IF NOT EXISTS client_boards (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
-
--- Enable RLS
-ALTER TABLE client_boards ENABLE ROW LEVEL SECURITY;
-
--- Client boards policies
-DO $$
-BEGIN
-    DROP POLICY IF EXISTS "Boards are viewable by everyone" ON client_boards;
-    DROP POLICY IF EXISTS "Authenticated users can create boards" ON client_boards;
-    DROP POLICY IF EXISTS "Authenticated users can update boards" ON client_boards;
-    DROP POLICY IF EXISTS "Authenticated users can delete boards" ON client_boards;
-EXCEPTION WHEN OTHERS THEN NULL;
-END $$;
-
-CREATE POLICY "Boards are viewable by everyone" ON client_boards FOR SELECT USING (true);
-CREATE POLICY "Authenticated users can create boards" ON client_boards FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-CREATE POLICY "Authenticated users can update boards" ON client_boards FOR UPDATE USING (auth.role() = 'authenticated');
-CREATE POLICY "Authenticated users can delete boards" ON client_boards FOR DELETE USING (auth.role() = 'authenticated');
 
 -- Notifications table
 CREATE TABLE IF NOT EXISTS notifications (
@@ -128,43 +90,53 @@ CREATE TABLE IF NOT EXISTS notifications (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Enable RLS
+-- Step 4: Enable RLS on all tables
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE channels ENABLE ROW LEVEL SECURITY;
+ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE client_boards ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 
--- Notifications policies
-DO $$
-BEGIN
-    DROP POLICY IF EXISTS "Users can view their own notifications" ON notifications;
-    DROP POLICY IF EXISTS "Authenticated users can create notifications" ON notifications;
-    DROP POLICY IF EXISTS "Users can update their own notifications" ON notifications;
-EXCEPTION WHEN OTHERS THEN NULL;
-END $$;
+-- Step 5: Create all policies (fresh, no conflicts)
 
+-- Profiles policies
+CREATE POLICY "Profiles are viewable by everyone" ON profiles FOR SELECT USING (true);
+CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
+
+-- Channels policies
+CREATE POLICY "Channels are viewable by everyone" ON channels FOR SELECT USING (true);
+CREATE POLICY "Only authenticated users can create channels" ON channels FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Only authenticated users can delete channels" ON channels FOR DELETE USING (auth.role() = 'authenticated');
+
+-- Chat messages policies
+CREATE POLICY "Messages are viewable by everyone" ON chat_messages FOR SELECT USING (true);
+CREATE POLICY "Authenticated users can send messages" ON chat_messages FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Authenticated users can delete messages" ON chat_messages FOR DELETE USING (auth.role() = 'authenticated');
+
+-- Client boards policies
+CREATE POLICY "Boards are viewable by everyone" ON client_boards FOR SELECT USING (true);
+CREATE POLICY "Authenticated users can create boards" ON client_boards FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Authenticated users can update boards" ON client_boards FOR UPDATE USING (auth.role() = 'authenticated');
+CREATE POLICY "Authenticated users can delete boards" ON client_boards FOR DELETE USING (auth.role() = 'authenticated');
+
+-- Notifications policies
 CREATE POLICY "Users can view their own notifications" ON notifications FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Authenticated users can create notifications" ON notifications FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 CREATE POLICY "Users can update their own notifications" ON notifications FOR UPDATE USING (auth.uid() = user_id);
 
--- Create default channels
-INSERT INTO channels (name, type) VALUES ('general', 'channel') ON CONFLICT (name) DO NOTHING;
-INSERT INTO channels (name, type) VALUES ('ask-ai', 'channel') ON CONFLICT (name) DO NOTHING;
-
--- Create storage bucket for uploads
+-- Step 6: Create storage bucket for uploads
 INSERT INTO storage.buckets (id, name, public) VALUES ('uploads', 'uploads', true) ON CONFLICT (id) DO NOTHING;
 
 -- Storage policies
-DO $$
-BEGIN
-    DROP POLICY IF EXISTS "Anyone can upload files" ON storage.objects;
-    DROP POLICY IF EXISTS "Anyone can view files" ON storage.objects;
-    DROP POLICY IF EXISTS "Authenticated users can delete files" ON storage.objects;
-EXCEPTION WHEN OTHERS THEN NULL;
-END $$;
-
 CREATE POLICY "Anyone can upload files" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'uploads');
 CREATE POLICY "Anyone can view files" ON storage.objects FOR SELECT USING (bucket_id = 'uploads');
 CREATE POLICY "Authenticated users can delete files" ON storage.objects FOR DELETE USING (bucket_id = 'uploads' AND auth.role() = 'authenticated');
 
--- Function to create profile on user signup
+-- Step 7: Create default channels
+INSERT INTO channels (name, type) VALUES ('general', 'channel') ON CONFLICT (name) DO NOTHING;
+INSERT INTO channels (name, type) VALUES ('ask-ai', 'channel') ON CONFLICT (name) DO NOTHING;
+
+-- Step 8: Function to create profile on user signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -178,7 +150,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Trigger to create profile on signup
+-- Step 9: Trigger to create profile on signup
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
