@@ -119,12 +119,26 @@ const App: React.FC = () => {
     const now = new Date();
     const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
-    // One-time fix: Clear old checks to force recreation with proper linkData
+    // One-time fix: Clear old checks and delete old notifications to force recreation with proper linkData
     const fixVersion = localStorage.getItem('notificationFixVersion');
-    if (fixVersion !== 'v2') {
+    if (fixVersion !== 'v3') {
       localStorage.removeItem('lastDueDateCheck');
-      localStorage.setItem('notificationFixVersion', 'v2');
-      console.log('🔧 Cleared old notification checks to fix linkData');
+      localStorage.setItem('notificationFixVersion', 'v3');
+      console.log('🔧 Clearing old notifications to fix linkData issue...');
+
+      // Delete old due date notifications that don't have proper linkData
+      supabase
+        .from('notifications')
+        .delete()
+        .eq('user_id', uid)
+        .eq('title', 'Task Due Today')
+        .then(({ error }) => {
+          if (error) {
+            console.error('Error deleting old notifications:', error);
+          } else {
+            console.log('✅ Deleted old notifications, new ones will be created with proper linkData');
+          }
+        });
     }
 
     const lastCheck = localStorage.getItem('lastDueDateCheck');
