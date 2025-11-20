@@ -88,6 +88,14 @@ export interface ContentResult {
   metaDescription: string;
 }
 
+export interface TaskComment {
+  id: string;
+  author: string;
+  text: string;
+  timestamp: string;
+  avatar?: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -95,6 +103,8 @@ export interface Task {
   priority: string;
   dueDate: string;
   assignedTo?: string; // User ID or name of assigned person
+  worksheet?: string; // URL to worksheet/client sheet
+  comments?: TaskComment[];
 }
 
 export interface TaskGroup {

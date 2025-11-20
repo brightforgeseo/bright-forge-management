@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Plus, Sparkles, ChevronDown, ChevronUp, ChevronRight, Trash2, Briefcase, CheckCircle2, Settings, Mail, Phone, Globe, X, Image as ImageIcon, Edit3, Palette, Loader2, Upload, UserCircle } from 'lucide-react';
-import { Task, TaskGroup, User, ClientBoard, ToastType, LabelDefinition, Profile } from '../types';
+import { Plus, Sparkles, ChevronDown, ChevronUp, ChevronRight, Trash2, Briefcase, CheckCircle2, Settings, Mail, Phone, Globe, X, Image as ImageIcon, Edit3, Palette, Loader2, Upload, UserCircle, Link as LinkIcon, MessageCircle, Send } from 'lucide-react';
+import { Task, TaskGroup, User, ClientBoard, ToastType, LabelDefinition, Profile, TaskComment } from '../types';
 import { generateProjectTasks } from '../services/geminiService';
 import { fetchClientBoards, saveClientBoard, deleteClientBoard, uploadFile, fetchProfiles } from '../services/databaseService';
 
@@ -87,6 +87,8 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   const [activePersonPicker, setActivePersonPicker] = useState<{ taskId: string, groupId: string, clientId: string, anchor: HTMLElement | null } | null>(null);
   const [isLabelEditorOpen, setIsLabelEditorOpen] = useState(false);
   const [labelEditorType, setLabelEditorType] = useState<'status' | 'priority'>('status');
+  const [taskModal, setTaskModal] = useState<{ task: Task, groupId: string, clientId: string, groupTitle: string, groupColor: string } | null>(null);
+  const [newComment, setNewComment] = useState('');
 
   const activeClient = clients.find(c => c.id === selectedClientId);
 
@@ -449,11 +451,12 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                            <table className="w-full min-w-[800px]">
                               <thead className="bg-slate-50 border-b border-slate-200">
                                 <tr>
-                                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-1/3 sticky left-0 bg-slate-50 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">Item</th>
+                                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-1/4 sticky left-0 bg-slate-50 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">Item</th>
                                   <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-40">Person</th>
                                   <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-40">Status</th>
                                   <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-40">Priority</th>
                                   <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-40">Due Date</th>
+                                  <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-48">Worksheet</th>
                                   <th className="w-10"></th>
                                 </tr>
                               </thead>
@@ -471,11 +474,15 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                                     <button onClick={() => moveTask(activeClient.id, group.id, task.id, 'down')}><ChevronDown className="w-3 h-3 text-slate-400 hover:text-brand-600" /></button>
                                                 </div>
                                                 <div className="w-1.5 h-8 rounded-full" style={{ backgroundColor: group.color }}></div>
-                                                <input 
+                                                <input
                                                   value={task.title}
                                                   onChange={(e) => updateTaskField(activeClient.id, group.id, task.id, 'title', e.target.value)}
-                                                  className="flex-1 bg-transparent outline-none text-sm font-medium text-slate-700"
+                                                  onClick={() => setTaskModal({ task, groupId: group.id, clientId: activeClient.id, groupTitle: group.title, groupColor: group.color })}
+                                                  className="flex-1 bg-transparent outline-none text-sm font-medium text-slate-700 cursor-pointer hover:text-brand-600"
                                                 />
+                                                {(task.comments && task.comments.length > 0) && (
+                                                  <MessageCircle className="w-4 h-4 text-slate-400" />
+                                                )}
                                             </div>
                                         </td>
                                         <td className="py-2 px-2 text-center">
@@ -519,6 +526,30 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                            />
                                         </td>
                                         <td className="py-2 px-2 text-center">
+                                           <div className="flex items-center justify-center gap-1">
+                                             {task.worksheet ? (
+                                               <a
+                                                 href={task.worksheet}
+                                                 target="_blank"
+                                                 rel="noopener noreferrer"
+                                                 className="text-brand-600 hover:text-brand-700"
+                                                 title="Open worksheet"
+                                                 onClick={(e) => e.stopPropagation()}
+                                               >
+                                                 <LinkIcon className="w-4 h-4" />
+                                               </a>
+                                             ) : null}
+                                             <input
+                                               type="text"
+                                               placeholder="Add URL"
+                                               value={task.worksheet || ''}
+                                               onChange={(e) => updateTaskField(activeClient.id, group.id, task.id, 'worksheet', e.target.value)}
+                                               className="flex-1 text-xs text-slate-600 bg-transparent outline-none text-center placeholder:text-slate-300 hover:bg-slate-50 px-2 py-1 rounded"
+                                               onClick={(e) => e.stopPropagation()}
+                                             />
+                                           </div>
+                                        </td>
+                                        <td className="py-2 px-2 text-center">
                                            <button onClick={() => deleteTask(activeClient.id, group.id, task.id)} className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-colors">
                                               <X className="w-4 h-4" />
                                            </button>
@@ -545,7 +576,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                          )}
                                       </div>
                                    </td>
-                                   <td colSpan={5} className="border-t border-slate-100"></td>
+                                   <td colSpan={6} className="border-t border-slate-100"></td>
                                  </tr>
                               </tbody>
                            </table>
@@ -646,6 +677,218 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
             </div>
          </div>
         </>
+      )}
+
+      {/* Task Details Modal */}
+      {taskModal && activeClient && (
+        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 animate-fadeIn backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-100 max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-slate-100 flex justify-between items-start bg-gradient-to-r from-slate-50 to-white">
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-1 h-8 rounded-full" style={{ backgroundColor: taskModal.groupColor }}></div>
+                  <h3 className="font-bold text-xl text-slate-900">{taskModal.task.title}</h3>
+                </div>
+                <p className="text-sm text-slate-500">{taskModal.groupTitle} • {activeClient.name}</p>
+              </div>
+              <button onClick={() => setTaskModal(null)} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body - Scrollable */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Task Details Grid */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Status</label>
+                  <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
+                    <div className="w-3 h-3 rounded-full" style={{
+                      backgroundColor: activeClient.statusDefs.find(s => s.label === taskModal.task.status)?.color || '#94a3b8'
+                    }}></div>
+                    <span className="text-sm font-medium text-slate-700">{taskModal.task.status}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Priority</label>
+                  <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
+                    <div className="w-3 h-3 rounded-full" style={{
+                      backgroundColor: activeClient.priorityDefs.find(p => p.label === taskModal.task.priority)?.color || '#94a3b8'
+                    }}></div>
+                    <span className="text-sm font-medium text-slate-700">{taskModal.task.priority}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Due Date</label>
+                  <div className="p-2 bg-slate-50 rounded-lg">
+                    <span className="text-sm font-medium text-slate-700">
+                      {new Date(taskModal.task.dueDate).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Assigned To</label>
+                  <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
+                    {taskModal.task.assignedTo ? (
+                      (() => {
+                        const person = teamProfiles.find(p => p.id === taskModal.task.assignedTo);
+                        return person ? (
+                          <>
+                            {person.avatar_url ? (
+                              <img src={person.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover" />
+                            ) : (
+                              <div className="w-5 h-5 rounded-full bg-brand-100 flex items-center justify-center text-[10px] font-bold text-brand-700">
+                                {person.full_name?.charAt(0) || '?'}
+                              </div>
+                            )}
+                            <span className="text-sm font-medium text-slate-700">{person.full_name || person.id.substring(0, 8)}</span>
+                          </>
+                        ) : (
+                          <span className="text-sm text-slate-400">Unknown user</span>
+                        );
+                      })()
+                    ) : (
+                      <span className="text-sm text-slate-400">Unassigned</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Worksheet Link */}
+              {taskModal.task.worksheet && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Worksheet</label>
+                  <a
+                    href={taskModal.task.worksheet}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 p-3 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors group"
+                  >
+                    <LinkIcon className="w-4 h-4 text-brand-600" />
+                    <span className="text-sm font-medium text-brand-700 truncate flex-1">{taskModal.task.worksheet}</span>
+                    <span className="text-xs text-brand-500 opacity-0 group-hover:opacity-100 transition-opacity">Open →</span>
+                  </a>
+                </div>
+              )}
+
+              {/* Comments Section */}
+              <div className="border-t border-slate-200 pt-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <MessageCircle className="w-5 h-5 text-slate-600" />
+                  <h4 className="font-bold text-slate-900">Comments</h4>
+                  <span className="text-xs text-slate-400">({taskModal.task.comments?.length || 0})</span>
+                </div>
+
+                {/* Comments List */}
+                <div className="space-y-4 mb-4 max-h-64 overflow-y-auto">
+                  {taskModal.task.comments && taskModal.task.comments.length > 0 ? (
+                    taskModal.task.comments.map(comment => (
+                      <div key={comment.id} className="flex gap-3 p-3 bg-slate-50 rounded-lg">
+                        {comment.avatar ? (
+                          <img src={comment.avatar} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-xs font-bold text-brand-700 flex-shrink-0">
+                            {comment.author.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-sm font-bold text-slate-900">{comment.author}</span>
+                            <span className="text-xs text-slate-400">
+                              {new Date(comment.timestamp).toLocaleString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: 'numeric',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          </div>
+                          <p className="text-sm text-slate-700 whitespace-pre-wrap">{comment.text}</p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-slate-400 text-sm">
+                      No comments yet. Be the first to comment!
+                    </div>
+                  )}
+                </div>
+
+                {/* Add Comment */}
+                <div className="flex gap-2">
+                  <div className="flex-shrink-0">
+                    {currentUser.avatarUrl ? (
+                      <img src={currentUser.avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-brand-600 flex items-center justify-center text-xs font-bold text-white">
+                        {currentUser.initials}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 flex gap-2">
+                    <input
+                      type="text"
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter' && newComment.trim()) {
+                          const comment: TaskComment = {
+                            id: Date.now().toString(),
+                            author: currentUser.name,
+                            text: newComment.trim(),
+                            timestamp: new Date().toISOString(),
+                            avatar: currentUser.avatarUrl
+                          };
+                          const updatedTask = {
+                            ...taskModal.task,
+                            comments: [...(taskModal.task.comments || []), comment]
+                          };
+                          updateTaskField(taskModal.clientId, taskModal.groupId, taskModal.task.id, 'comments', updatedTask.comments);
+                          setTaskModal({ ...taskModal, task: updatedTask });
+                          setNewComment('');
+                        }
+                      }}
+                      placeholder="Add a comment..."
+                      className="flex-1 p-2 border border-slate-300 rounded-lg outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 text-sm"
+                    />
+                    <button
+                      onClick={() => {
+                        if (newComment.trim()) {
+                          const comment: TaskComment = {
+                            id: Date.now().toString(),
+                            author: currentUser.name,
+                            text: newComment.trim(),
+                            timestamp: new Date().toISOString(),
+                            avatar: currentUser.avatarUrl
+                          };
+                          const updatedTask = {
+                            ...taskModal.task,
+                            comments: [...(taskModal.task.comments || []), comment]
+                          };
+                          updateTaskField(taskModal.clientId, taskModal.groupId, taskModal.task.id, 'comments', updatedTask.comments);
+                          setTaskModal({ ...taskModal, task: updatedTask });
+                          setNewComment('');
+                        }
+                      }}
+                      className="p-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={!newComment.trim()}
+                    >
+                      <Send className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Edit Client Modal */}
