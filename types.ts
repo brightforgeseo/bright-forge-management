@@ -102,7 +102,7 @@ export interface Task {
   status: string;
   priority: string;
   dueDate: string;
-  assignedTo?: string; // User ID or name of assigned person
+  assignedTo?: string | string[]; // User ID(s) - single UUID or array of UUIDs
   worksheet?: string; // URL to worksheet
   clientSheet?: string; // URL to client sheet
   comments?: TaskComment[];
