@@ -111,6 +111,11 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
       setIsLoadingData(true);
       const [boards, profiles] = await Promise.all([fetchClientBoards(), fetchProfiles()]);
 
+      console.log('🎯 Loaded boards:');
+      boards.forEach((b, idx) => {
+        console.log(`  [${idx}] Board ID: "${b.id}" Name: "${b.name}"`);
+      });
+
       // Don't check localStorage here - let the separate useEffect handle deep linking
       // Just set default board
       const defaultBoardId = boards.length > 0 ? boards[0].id : '';

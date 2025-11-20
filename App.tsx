@@ -121,22 +121,35 @@ const App: React.FC = () => {
 
     // One-time fix: Clear old checks and delete old notifications to force recreation with proper linkData
     const fixVersion = localStorage.getItem('notificationFixVersion');
-    if (fixVersion !== 'v4') {
+    if (fixVersion !== 'v5') {
       localStorage.removeItem('lastDueDateCheck');
-      localStorage.setItem('notificationFixVersion', 'v4');
-      console.log('🔧 Clearing old notifications to fix board ID issue...');
+      localStorage.removeItem('lastDueDateCheckInProgress');
+      localStorage.setItem('notificationFixVersion', 'v5');
+      console.log('🔧 FORCE clearing ALL due date notifications...');
 
-      // Delete old due date notifications that don't have proper linkData
+      // Delete ALL due date notifications for this user
       supabase
         .from('notifications')
         .delete()
         .eq('user_id', uid)
-        .eq('title', 'Task Due Today')
-        .then(({ error }) => {
+        .ilike('title', '%Due%')
+        .then(({ data, error }) => {
           if (error) {
             console.error('Error deleting old notifications:', error);
           } else {
-            console.log('✅ Deleted old notifications, new ones will be created with proper linkData');
+            console.log('✅ Deleted ALL due notifications, forcing complete recreation');
+          }
+        });
+
+      // Also delete by message pattern
+      supabase
+        .from('notifications')
+        .delete()
+        .eq('user_id', uid)
+        .ilike('message', '%due today%')
+        .then(({ data, error }) => {
+          if (!error) {
+            console.log('✅ Also deleted notifications by message pattern');
           }
         });
     }
