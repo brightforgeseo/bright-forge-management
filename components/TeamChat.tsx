@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check, Smile } from 'lucide-react';
+import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check, Smile, Film } from 'lucide-react';
 import { ChatChannel, ChatMessage, User, ToastType, Profile } from '../types';
 import { getChatResponse } from '../services/geminiService';
 import { fetchChatMessages, sendChatMessage, clearChatHistory, uploadFile, fetchChannels, createChannel, deleteChannel, fetchProfiles, getOrCreateDMChannel, createNotification, editChatMessage } from '../services/databaseService';
@@ -35,6 +35,12 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
 
   // Emoji picker state
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+
+  // GIF picker state
+  const [showGifPicker, setShowGifPicker] = useState(false);
+  const [gifSearch, setGifSearch] = useState('');
+  const [gifs, setGifs] = useState<any[]>([]);
+  const [gifLoading, setGifLoading] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -102,6 +108,37 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
       console.error('Failed to play notification sound:', error);
     }
   };
+
+  // Search GIFs using Tenor API
+  const searchGifs = async (query: string) => {
+    if (!query.trim()) {
+      // Show trending GIFs if no search query
+      query = 'trending';
+    }
+
+    setGifLoading(true);
+    try {
+      const apiKey = 'AIzaSyAkGgfmYk2gXEeBUmVi2LhCrPkz2YeqfXY'; // Tenor API key (public, safe to use client-side)
+      const limit = 20;
+      const response = await fetch(
+        `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(query)}&key=${apiKey}&limit=${limit}&media_filter=gif`
+      );
+      const data = await response.json();
+      setGifs(data.results || []);
+    } catch (error) {
+      console.error('Error fetching GIFs:', error);
+      setGifs([]);
+    } finally {
+      setGifLoading(false);
+    }
+  };
+
+  // Load trending GIFs when picker opens
+  useEffect(() => {
+    if (showGifPicker && gifs.length === 0) {
+      searchGifs('');
+    }
+  }, [showGifPicker]);
 
   // Sync Refs for listeners to avoid dependency loops
   useEffect(() => {
@@ -1149,11 +1186,26 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
 
                    {/* Emoji Picker Button */}
                    <button
-                     onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                     onClick={() => {
+                       setShowEmojiPicker(!showEmojiPicker);
+                       setShowGifPicker(false);
+                     }}
                      disabled={isChannelReadOnly}
                      className="p-2 hover:bg-slate-200 rounded-full text-slate-500 disabled:opacity-50 disabled:cursor-not-allowed"
                    >
                      <Smile className="w-5 h-5" />
+                   </button>
+
+                   {/* GIF Picker Button */}
+                   <button
+                     onClick={() => {
+                       setShowGifPicker(!showGifPicker);
+                       setShowEmojiPicker(false);
+                     }}
+                     disabled={isChannelReadOnly}
+                     className="p-2 hover:bg-slate-200 rounded-full text-slate-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                   >
+                     <Film className="w-5 h-5" />
                    </button>
 
                    {/* Emoji Picker Dropdown */}
@@ -1179,6 +1231,72 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                            </button>
                          ))}
                        </div>
+                     </div>
+                   )}
+
+                   {/* GIF Picker Dropdown */}
+                   {showGifPicker && (
+                     <div className="absolute bottom-full left-0 mb-2 bg-white rounded-lg shadow-xl border border-slate-200 p-3 z-[100] w-96">
+                       <div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-200">
+                         <p className="text-sm font-bold text-slate-700">GIFs</p>
+                         <button onClick={() => setShowGifPicker(false)} className="text-slate-400 hover:text-slate-600">
+                           <X className="w-4 h-4" />
+                         </button>
+                       </div>
+                       <div className="mb-3">
+                         <input
+                           type="text"
+                           placeholder="Search GIFs..."
+                           value={gifSearch}
+                           onChange={(e) => setGifSearch(e.target.value)}
+                           onKeyDown={(e) => {
+                             if (e.key === 'Enter') {
+                               searchGifs(gifSearch);
+                             }
+                           }}
+                           className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
+                         />
+                       </div>
+                       {gifLoading ? (
+                         <div className="flex justify-center items-center h-64">
+                           <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
+                         </div>
+                       ) : (
+                         <div className="grid grid-cols-2 gap-2 max-h-96 overflow-y-auto">
+                           {gifs.map((gif: any) => (
+                             <button
+                               key={gif.id}
+                               onClick={async () => {
+                                 const gifUrl = gif.media_formats?.gif?.url || gif.media_formats?.tinygif?.url;
+                                 if (gifUrl) {
+                                   const newMsg: ChatMessage = {
+                                     id: `${Date.now()}_${Math.random()}`,
+                                     channelId: activeChannelId,
+                                     sender: currentUser.name,
+                                     senderId: currentUser.id,
+                                     text: '',
+                                     timestamp: new Date().toISOString(),
+                                     isAi: false,
+                                     avatar: currentUser.avatar || 'user',
+                                     attachmentUrl: gifUrl,
+                                     attachmentType: 'image'
+                                   };
+                                   await sendChatMessage(newMsg);
+                                   setShowGifPicker(false);
+                                   setGifSearch('');
+                                 }
+                               }}
+                               className="hover:opacity-75 transition-opacity rounded overflow-hidden"
+                             >
+                               <img
+                                 src={gif.media_formats?.tinygif?.url || gif.media_formats?.gif?.url}
+                                 alt={gif.content_description || 'GIF'}
+                                 className="w-full h-auto"
+                               />
+                             </button>
+                           ))}
+                         </div>
+                       )}
                      </div>
                    )}
                 </div>
