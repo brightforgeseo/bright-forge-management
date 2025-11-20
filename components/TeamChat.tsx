@@ -109,24 +109,26 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
     }
   };
 
-  // Search GIFs using Tenor API
+  // Search GIFs using Giphy API
   const searchGifs = async (query: string) => {
     if (!query.trim()) {
-      // Show trending GIFs if no search query
       query = 'trending';
     }
 
     setGifLoading(true);
     try {
-      const apiKey = 'AIzaSyAkGgfmYk2gXEeBUmVi2LhCrPkz2YeqfXY'; // Tenor API key (public, safe to use client-side)
+      const apiKey = 'sXpGFDGZs0Dv1mmNFvYaGUvYwKX0PWIh'; // Giphy public API key
       const limit = 20;
-      const url = `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(query)}&key=${apiKey}&limit=${limit}&media_filter=gif`;
-      console.log('[GIF] Fetching:', url);
-      const response = await fetch(url);
+      const endpoint = query === 'trending'
+        ? `https://api.giphy.com/v1/gifs/trending?api_key=${apiKey}&limit=${limit}`
+        : `https://api.giphy.com/v1/gifs/search?api_key=${apiKey}&q=${encodeURIComponent(query)}&limit=${limit}`;
+
+      console.log('[GIF] Fetching from Giphy:', endpoint);
+      const response = await fetch(endpoint);
       const data = await response.json();
       console.log('[GIF] Response:', data);
-      console.log('[GIF] Results count:', data.results?.length || 0);
-      setGifs(data.results || []);
+      console.log('[GIF] Results count:', data.data?.length || 0);
+      setGifs(data.data || []);
     } catch (error) {
       console.error('[GIF] Error fetching GIFs:', error);
       setGifs([]);
@@ -1284,7 +1286,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                              <button
                                key={gif.id}
                                onClick={async () => {
-                                 const gifUrl = gif.media_formats?.gif?.url || gif.media_formats?.tinygif?.url;
+                                 // Giphy response format: images.original.url or images.downsized.url
+                                 const gifUrl = gif.images?.original?.url || gif.images?.downsized?.url;
                                  if (gifUrl) {
                                    const newMsg: ChatMessage = {
                                      id: `${Date.now()}_${Math.random()}`,
@@ -1306,8 +1309,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                                className="hover:opacity-75 transition-opacity rounded overflow-hidden"
                              >
                                <img
-                                 src={gif.media_formats?.tinygif?.url || gif.media_formats?.gif?.url}
-                                 alt={gif.content_description || 'GIF'}
+                                 src={gif.images?.fixed_height?.url || gif.images?.downsized_small?.url || gif.images?.original?.url}
+                                 alt={gif.title || 'GIF'}
                                  className="w-full h-auto"
                                />
                              </button>
