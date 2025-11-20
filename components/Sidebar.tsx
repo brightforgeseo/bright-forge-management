@@ -26,6 +26,41 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
+  // Play notification sound - LOUD bell sound
+  const playNotificationSound = () => {
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator1 = audioContext.createOscillator();
+      const oscillator2 = audioContext.createOscillator();
+      const oscillator3 = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator1.frequency.value = 800;
+      oscillator2.frequency.value = 1000;
+      oscillator3.frequency.value = 1200;
+
+      oscillator1.connect(gainNode);
+      oscillator2.connect(gainNode);
+      oscillator3.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      gainNode.gain.value = 0.8;
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+
+      oscillator1.start(audioContext.currentTime);
+      oscillator2.start(audioContext.currentTime);
+      oscillator3.start(audioContext.currentTime);
+
+      oscillator1.stop(audioContext.currentTime + 0.5);
+      oscillator2.stop(audioContext.currentTime + 0.5);
+      oscillator3.stop(audioContext.currentTime + 0.5);
+
+      console.log('🔔 Notification sound played!');
+    } catch (error) {
+      console.error('Failed to play notification sound:', error);
+    }
+  };
+
   // Notification listener
   useEffect(() => {
       if (!currentUser || currentUser.id === 'guest') return;
@@ -38,13 +73,15 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       // Subscribe to new notifications
       const sub = supabase.channel('public:notifications')
-          .on('postgres_changes', { 
-              event: 'INSERT', 
-              schema: 'public', 
-              table: 'notifications', 
+          .on('postgres_changes', {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'notifications',
               filter: `user_id=eq.${currentUser.id}`
           }, (payload) => {
               const newNote = payload.new as any;
+              console.log('🔔 New notification received!', newNote);
+
               setNotifications(prev => [{
                   id: newNote.id,
                   userId: newNote.user_id,
@@ -55,6 +92,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                   isRead: newNote.is_read,
                   createdAt: newNote.created_at
               }, ...prev]);
+
+              // Play notification sound
+              playNotificationSound();
           })
           .subscribe();
 
