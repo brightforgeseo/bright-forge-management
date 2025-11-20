@@ -120,13 +120,15 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
     try {
       const apiKey = 'AIzaSyAkGgfmYk2gXEeBUmVi2LhCrPkz2YeqfXY'; // Tenor API key (public, safe to use client-side)
       const limit = 20;
-      const response = await fetch(
-        `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(query)}&key=${apiKey}&limit=${limit}&media_filter=gif`
-      );
+      const url = `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(query)}&key=${apiKey}&limit=${limit}&media_filter=gif`;
+      console.log('[GIF] Fetching:', url);
+      const response = await fetch(url);
       const data = await response.json();
+      console.log('[GIF] Response:', data);
+      console.log('[GIF] Results count:', data.results?.length || 0);
       setGifs(data.results || []);
     } catch (error) {
-      console.error('Error fetching GIFs:', error);
+      console.error('[GIF] Error fetching GIFs:', error);
       setGifs([]);
     } finally {
       setGifLoading(false);
