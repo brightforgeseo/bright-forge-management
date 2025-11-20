@@ -99,15 +99,25 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div className="relative">
             <button
                 onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-                className={`p-2 rounded-lg hover:bg-slate-800 transition-colors relative ${unreadCount > 0 ? 'animate-pulse' : ''}`}
+                className="p-2 rounded-lg hover:bg-slate-800 transition-colors relative"
                 style={unreadCount > 0 ? {
-                  boxShadow: '0 0 20px rgba(251, 146, 60, 0.8), 0 0 40px rgba(251, 146, 60, 0.4)',
-                  animation: 'glow 2s ease-in-out infinite'
+                  boxShadow: '0 0 25px rgba(251, 146, 60, 1), 0 0 50px rgba(251, 146, 60, 0.6), 0 0 75px rgba(251, 146, 60, 0.3)',
+                  animation: 'glow 1.5s ease-in-out infinite',
+                  backgroundColor: 'rgba(251, 146, 60, 0.1)'
                 } : {}}
             >
-                <Bell className={`w-5 h-5 transition-colors ${unreadCount > 0 ? 'text-orange-500' : 'text-slate-400 hover:text-white'}`} />
+                <Bell
+                  className={`w-5 h-5 transition-colors ${unreadCount > 0 ? 'text-orange-500' : 'text-slate-400 hover:text-white'}`}
+                  style={unreadCount > 0 ? { filter: 'drop-shadow(0 0 8px rgba(251, 146, 60, 0.8))' } : {}}
+                />
                 {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-orange-500 text-white text-[10px] font-bold rounded-full border-2 border-slate-900 flex items-center justify-center px-1 shadow-lg shadow-orange-500/50 animate-bounce">
+                    <span
+                      className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-orange-500 text-white text-[10px] font-bold rounded-full border-2 border-slate-900 flex items-center justify-center px-1"
+                      style={{
+                        boxShadow: '0 0 15px rgba(251, 146, 60, 0.8)',
+                        animation: 'pulse 1s ease-in-out infinite'
+                      }}
+                    >
                         {unreadCount}
                     </span>
                 )}

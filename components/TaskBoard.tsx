@@ -1302,7 +1302,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
 
                     {/* Mention Dropdown */}
                     {mentionDropdown?.show && (
-                      <div className="absolute bottom-full left-0 mb-2 w-64 bg-white rounded-lg shadow-xl border border-slate-200 overflow-hidden z-50 animate-fadeIn">
+                      <div className="absolute bottom-full left-0 mb-2 w-64 bg-white rounded-lg shadow-xl border border-slate-200 overflow-hidden z-[100] animate-fadeIn">
                         <div className="p-2 bg-slate-50 border-b border-slate-200">
                           <p className="text-xs font-bold text-slate-500 uppercase">Mention Someone</p>
                         </div>
