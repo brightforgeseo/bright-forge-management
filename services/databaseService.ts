@@ -106,21 +106,8 @@ export const fetchProfiles = async (): Promise<Profile[]> => {
         .from('profiles')
         .select('*')
         .order('full_name', { ascending: true });
-    
-    const profiles = (data as Profile[]) || [];
 
-    // CRITICAL FIX: Inject Master Profile if it doesn't exist in DB
-    // This ensures Ben Lowe (Owner) is visible even if logged in via Master Password
-    if (!profiles.find(p => p.id === 'master-override-id')) {
-        profiles.unshift({
-            id: 'master-override-id',
-            full_name: 'Ben Lowe',
-            avatar_url: undefined, // Can add a hardcoded URL here if desired
-            email: 'bensocialbeesmedia@gmail.com'
-        });
-    }
-
-    return profiles;
+    return (data as Profile[]) || [];
 };
 
 export const updateUserProfile = async (fullName: string) => {
