@@ -111,85 +111,13 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
       setIsLoadingData(true);
       const [boards, profiles] = await Promise.all([fetchClientBoards(), fetchProfiles()]);
 
-      // Check if we should open a task modal from notification BEFORE setting default board
-      const openTaskData = localStorage.getItem('openTaskModal');
-      let shouldOpenTask = false;
-      let targetBoardId = boards.length > 0 ? boards[0].id : '';
-
-      if (openTaskData) {
-        try {
-          const linkData = JSON.parse(openTaskData);
-          const { taskId, boardId, groupId, boardName } = linkData;
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-          console.log('📂 NOTIFICATION DEEP LINK DEBUG');
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-          console.log('Looking for:');
-          console.log('  boardId:', boardId);
-          console.log('  groupId:', groupId);
-          console.log('  taskId:', taskId);
-          console.log('  boardName:', boardName);
-          console.log('');
-          console.log('Available boards:');
-          boards.forEach((b, idx) => {
-            console.log(`  [${idx}] id: "${b.id}" name: "${b.name}"`);
-          });
-          console.log('');
-
-          // Find the board, group, and task
-          const board = boards.find(b => b.id === boardId);
-          if (board) {
-            console.log('✅ FOUND BOARD:', board.name);
-            targetBoardId = board.id;
-
-            console.log('Available groups in this board:');
-            board.groups.forEach((g, idx) => {
-              console.log(`  [${idx}] id: "${g.id}" title: "${g.title}"`);
-            });
-
-            const group = board.groups.find(g => g.id === groupId);
-            if (group) {
-              console.log('✅ FOUND GROUP:', group.title);
-
-              console.log('Available tasks in this group:');
-              group.tasks.forEach((t, idx) => {
-                console.log(`  [${idx}] id: "${t.id}" title: "${t.title}"`);
-              });
-
-              const task = group.tasks.find(t => t.id === taskId);
-              if (task) {
-                console.log('✅ FOUND TASK:', task.title);
-                console.log('Opening task modal in 100ms...');
-                shouldOpenTask = true;
-                // Set the task modal AFTER state is updated
-                setTimeout(() => {
-                  console.log('🎯 Opening task modal NOW');
-                  setTaskModal({
-                    task,
-                    groupId: group.id,
-                    clientId: board.id,
-                    groupTitle: group.title,
-                    groupColor: group.color
-                  });
-                }, 100);
-              } else {
-                console.error('❌ TASK NOT FOUND. Looking for taskId:', taskId);
-              }
-            } else {
-              console.error('❌ GROUP NOT FOUND. Looking for groupId:', groupId);
-            }
-          } else {
-            console.error('❌ BOARD NOT FOUND. Looking for boardId:', boardId);
-          }
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-          localStorage.removeItem('openTaskModal');
-        } catch (e) {
-          console.error('Error opening task modal:', e);
-        }
-      }
+      // Don't check localStorage here - let the separate useEffect handle deep linking
+      // Just set default board
+      const defaultBoardId = boards.length > 0 ? boards[0].id : '';
 
       if (boards.length > 0) {
         setClients(boards);
-        setSelectedClientId(targetBoardId);
+        setSelectedClientId(defaultBoardId);
       }
       setTeamProfiles(profiles);
       setIsLoadingData(false);
