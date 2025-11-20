@@ -26,6 +26,9 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
   // Store message drafts for each channel
   const [messageDrafts, setMessageDrafts] = useState<Record<string, string>>({});
 
+  // Cache messages for each channel to prevent losing messages when switching
+  const [messageCache, setMessageCache] = useState<Record<string, ChatMessage[]>>({});
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const activeChannelRef = useRef<string>('');
@@ -192,31 +195,55 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
          const newMsg = payload.new as any;
          console.log('[TeamChat] Realtime message received:', newMsg);
 
-         // 1. Is this for the channel I'm looking at?
+         // Always update cache for ALL incoming messages (regardless of channel)
+         setMessageCache(prev => {
+             const channelMessages = prev[newMsg.channel_id] || [];
+             // Prevent duplicates
+             if (!channelMessages.some(m => m.id === newMsg.id)) {
+                 return {
+                     ...prev,
+                     [newMsg.channel_id]: [...channelMessages, {
+                         id: newMsg.id,
+                         channelId: newMsg.channel_id,
+                         sender: newMsg.sender,
+                         text: newMsg.text,
+                         timestamp: newMsg.created_at,
+                         isAi: newMsg.is_ai,
+                         avatar: newMsg.avatar,
+                         attachmentUrl: newMsg.attachment_url,
+                         attachmentType: newMsg.attachment_type
+                     }]
+                 };
+             }
+             return prev;
+         });
+
+         // Check if this message is for the currently active channel
          if (newMsg.channel_id === activeChannelRef.current) {
-             console.log('[TeamChat] Message is for active channel, adding to messages');
+             // Update the messages state for current channel
              setMessages(prev => {
-                 // Prevent duplicates
-                 if (prev.some(m => m.id === newMsg.id)) return prev;
-                 return [...prev, {
-                     id: newMsg.id,
-                     channelId: newMsg.channel_id,
-                     sender: newMsg.sender,
-                     text: newMsg.text,
-                     timestamp: newMsg.created_at,
-                     isAi: newMsg.is_ai,
-                     avatar: newMsg.avatar,
-                     attachmentUrl: newMsg.attachment_url,
-                     attachmentType: newMsg.attachment_type
-                 }];
+                 if (!prev.some(m => m.id === newMsg.id)) {
+                     return [...prev, {
+                         id: newMsg.id,
+                         channelId: newMsg.channel_id,
+                         sender: newMsg.sender,
+                         text: newMsg.text,
+                         timestamp: newMsg.created_at,
+                         isAi: newMsg.is_ai,
+                         avatar: newMsg.avatar,
+                         attachmentUrl: newMsg.attachment_url,
+                         attachmentType: newMsg.attachment_type
+                     }];
+                 }
+                 return prev;
              });
              scrollToBottom();
          } else {
+             // Message is for a different channel - handle notifications
              console.log('[TeamChat] Message is for different channel, looking up channel');
-             // 2. It's for a different channel
              let targetChannel = channelsRef.current.find(c => c.id === newMsg.channel_id);
              console.log('[TeamChat] Target channel:', targetChannel);
-             
+
              // CRITICAL FIX: If we don't know about this channel, fetch all channels
              if (!targetChannel) {
                  const updatedChannels = await fetchChannels();
@@ -224,14 +251,14 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                  targetChannel = updatedChannels.find(c => c.id === newMsg.channel_id);
              }
 
-             // 3. Notify appropriately
+             // Notify appropriately
              if (targetChannel && !newMsg.is_ai && newMsg.sender !== currentUser.name) {
                  // Privacy check: For DMs, only notify if I'm a participant
                  if (targetChannel.type === 'dm') {
                      if (!isUserInDM(targetChannel, currentUser.id)) {
                          return; // Not my DM, ignore
                      }
-                     
+
                      // Get sender info for notification
                      const dmInfo = getDMInfo(targetChannel);
                      addToast('info', `${newMsg.sender}: ${newMsg.text.substring(0, 50)}${newMsg.text.length > 50 ? '...' : ''}`);
@@ -239,9 +266,9 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                      // Public channel notification
                      addToast('info', `New message in #${targetChannel.name}`);
                  }
-                 
+
                  // Update unread count
-                 setChannels(prev => prev.map(c => 
+                 setChannels(prev => prev.map(c =>
                      c.id === targetChannel?.id ? { ...c, unread: (c.unread || 0) + 1 } : c
                  ));
              }
@@ -257,9 +284,32 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
     if (!activeChannelId) return;
     activeChannelRef.current = activeChannelId;
 
+    // First, save current messages to cache before switching
+    if (messages.length > 0 && activeChannelId) {
+      const previousChannelId = channelsRef.current.find(c => c.id !== activeChannelId)?.id;
+      if (previousChannelId) {
+        setMessageCache(prev => ({ ...prev, [previousChannelId]: messages }));
+      }
+    }
+
     const loadMsgs = async () => {
-      const msgs = await fetchChatMessages(activeChannelId);
-      setMessages(msgs);
+      // Check if we have cached messages for this channel
+      if (messageCache[activeChannelId]) {
+        console.log('Loading messages from cache for channel:', activeChannelId);
+        setMessages(messageCache[activeChannelId]);
+
+        // Also fetch fresh messages in background to update cache
+        fetchChatMessages(activeChannelId).then(freshMsgs => {
+          setMessages(freshMsgs);
+          setMessageCache(prev => ({ ...prev, [activeChannelId]: freshMsgs }));
+        });
+      } else {
+        // No cache, fetch from database
+        const msgs = await fetchChatMessages(activeChannelId);
+        setMessages(msgs);
+        setMessageCache(prev => ({ ...prev, [activeChannelId]: msgs }));
+      }
+
       scrollToBottom();
       // Reset unread
       setChannels(prev => prev.map(c => c.id === activeChannelId ? { ...c, unread: 0 } : c));
