@@ -197,12 +197,25 @@ const Sidebar: React.FC<SidebarProps> = ({
                            )}
                            {notifications.length > 0 && (
                                <button
-                                 onClick={async () => {
-                                   if (confirm('Clear all notifications?')) {
-                                     // Delete all notifications for this user
-                                     await supabase.from('notifications').delete().eq('user_id', currentUser.id);
-                                     setNotifications([]);
-                                   }
+                                 onClick={() => {
+                                   // Use setTimeout to prevent blocking the UI
+                                   setTimeout(async () => {
+                                     const shouldClear = window.confirm('Clear all notifications?');
+                                     if (shouldClear) {
+                                       // Clear UI immediately for responsiveness
+                                       setNotifications([]);
+
+                                       // Delete from database in background
+                                       try {
+                                         await supabase.from('notifications').delete().eq('user_id', currentUser.id);
+                                       } catch (error) {
+                                         console.error('Error clearing notifications:', error);
+                                         // Reload notifications if delete failed
+                                         const freshNotifications = await fetchNotifications(currentUser.id);
+                                         setNotifications(freshNotifications);
+                                       }
+                                     }
+                                   }, 0);
                                  }}
                                  className="text-xs text-red-600 hover:text-red-700 font-medium"
                                >
