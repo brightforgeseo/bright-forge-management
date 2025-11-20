@@ -373,7 +373,14 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
       setActivePicker({ type, taskId: tid, groupId: gid, clientId: cid, anchor: e.currentTarget as HTMLElement });
   };
   const handleSelectLabel = (defId: string) => {
-      if(activePicker) { updateTaskField(activePicker.clientId, activePicker.groupId, activePicker.taskId, activePicker.type as keyof Task, defId); setActivePicker(null); }
+      if(activePicker) {
+        updateTaskField(activePicker.clientId, activePicker.groupId, activePicker.taskId, activePicker.type as keyof Task, defId);
+        // Update modal if it's open for this task
+        if (taskModal && taskModal.task.id === activePicker.taskId) {
+          setTaskModal({ ...taskModal, task: { ...taskModal.task, [activePicker.type]: defId } });
+        }
+        setActivePicker(null);
+      }
   };
   const handlePersonClick = (e: React.MouseEvent, tid: string, gid: string, cid: string) => {
       e.stopPropagation();
@@ -402,6 +409,11 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
               }
 
               updateTaskField(activePersonPicker.clientId, activePersonPicker.groupId, activePersonPicker.taskId, 'assignedTo', newAssigned as string);
+
+              // Update modal if it's open for this task
+              if (taskModal && taskModal.task.id === activePersonPicker.taskId) {
+                setTaskModal({ ...taskModal, task: { ...taskModal.task, assignedTo: newAssigned } });
+              }
           }
           // Don't close picker so user can select multiple people
       }
@@ -912,62 +924,77 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Status</label>
-                  <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
-                    <div className="w-3 h-3 rounded-full" style={{
-                      backgroundColor: activeClient.statusDefs.find(s => s.id === taskModal.task.status)?.color || '#94a3b8'
-                    }}></div>
-                    <span className="text-sm font-medium text-slate-700">{activeClient.statusDefs.find((s: LabelDefinition) => s.id === taskModal.task.status)?.label || taskModal.task.status}</span>
-                  </div>
+                  <button
+                    onClick={(e) => handleLabelClick(e, 'status', taskModal.task.id, taskModal.groupId, taskModal.clientId)}
+                    className="w-full py-2.5 px-3 text-sm font-bold text-white rounded-lg shadow-sm hover:opacity-90 transition-opacity flex items-center gap-2"
+                    style={{ backgroundColor: activeClient.statusDefs.find(s => s.id === taskModal.task.status)?.color || '#94a3b8' }}
+                  >
+                    <div className="w-3 h-3 rounded-full bg-white/30"></div>
+                    {activeClient.statusDefs.find((s: LabelDefinition) => s.id === taskModal.task.status)?.label || taskModal.task.status}
+                  </button>
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Priority</label>
-                  <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
-                    <div className="w-3 h-3 rounded-full" style={{
-                      backgroundColor: activeClient.priorityDefs.find(p => p.id === taskModal.task.priority)?.color || '#94a3b8'
-                    }}></div>
-                    <span className="text-sm font-medium text-slate-700">{activeClient.priorityDefs.find((p: LabelDefinition) => p.id === taskModal.task.priority)?.label || taskModal.task.priority}</span>
-                  </div>
+                  <button
+                    onClick={(e) => handleLabelClick(e, 'priority', taskModal.task.id, taskModal.groupId, taskModal.clientId)}
+                    className="w-full py-2.5 px-3 text-sm font-bold text-white rounded-lg shadow-sm hover:opacity-90 transition-opacity flex items-center gap-2"
+                    style={{ backgroundColor: activeClient.priorityDefs.find(p => p.id === taskModal.task.priority)?.color || '#94a3b8' }}
+                  >
+                    <div className="w-3 h-3 rounded-full bg-white/30"></div>
+                    {activeClient.priorityDefs.find((p: LabelDefinition) => p.id === taskModal.task.priority)?.label || taskModal.task.priority}
+                  </button>
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Due Date</label>
-                  <div className="p-2 bg-slate-50 rounded-lg">
-                    <span className="text-sm font-medium text-slate-700">
-                      {new Date(taskModal.task.dueDate).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric'
-                      })}
-                    </span>
-                  </div>
+                  <input
+                    type="date"
+                    value={taskModal.task.dueDate}
+                    onChange={(e) => {
+                      updateTaskField(taskModal.clientId, taskModal.groupId, taskModal.task.id, 'dueDate', e.target.value);
+                      setTaskModal({ ...taskModal, task: { ...taskModal.task, dueDate: e.target.value } });
+                    }}
+                    className="w-full p-2.5 text-sm text-slate-700 font-medium bg-slate-50 border border-slate-200 rounded-lg outline-none hover:border-brand-500 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 cursor-pointer"
+                    style={{
+                      colorScheme: 'light',
+                      WebkitAppearance: 'none',
+                      MozAppearance: 'textfield'
+                    }}
+                    onFocus={(e) => e.target.showPicker?.()}
+                  />
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Assigned To</label>
-                  <div className="flex flex-wrap items-center gap-2 p-2 bg-slate-50 rounded-lg min-h-[2.5rem]">
-                    {(() => {
-                      const assignedIds = Array.isArray(taskModal.task.assignedTo) ? taskModal.task.assignedTo : (taskModal.task.assignedTo ? [taskModal.task.assignedTo] : []);
-                      const assignedProfiles = assignedIds.map((id: string) => teamProfiles.find((p: any) => p.id === id)).filter(Boolean);
+                  <button
+                    onClick={(e) => handlePersonClick(e, taskModal.task.id, taskModal.groupId, taskModal.clientId)}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg hover:border-brand-500 transition-colors min-h-[2.75rem] flex items-center"
+                  >
+                    <div className="flex flex-wrap items-center gap-2 w-full">
+                      {(() => {
+                        const assignedIds = Array.isArray(taskModal.task.assignedTo) ? taskModal.task.assignedTo : (taskModal.task.assignedTo ? [taskModal.task.assignedTo] : []);
+                        const assignedProfiles = assignedIds.map((id: string) => teamProfiles.find((p: any) => p.id === id)).filter(Boolean);
 
-                      if (assignedProfiles.length === 0) {
-                        return <span className="text-sm text-slate-400">Unassigned</span>;
-                      }
+                        if (assignedProfiles.length === 0) {
+                          return <span className="text-sm text-slate-400">Click to assign</span>;
+                        }
 
-                      return assignedProfiles.map((person: any) => (
-                        <div key={person.id} className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-md border border-slate-200">
-                          {person.avatar_url ? (
-                            <img src={person.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover" />
-                          ) : (
-                            <div className="w-5 h-5 rounded-full bg-brand-100 flex items-center justify-center text-[10px] font-bold text-brand-700">
-                              {person.full_name?.charAt(0) || '?'}
-                            </div>
-                          )}
-                          <span className="text-xs font-medium text-slate-700">{person.full_name || person.id.substring(0, 8)}</span>
-                        </div>
-                      ));
-                    })()}
-                  </div>
+                        return assignedProfiles.map((person: any) => (
+                          <div key={person.id} className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-md border border-slate-200">
+                            {person.avatar_url ? (
+                              <img src={person.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover" />
+                            ) : (
+                              <div className="w-5 h-5 rounded-full bg-brand-100 flex items-center justify-center text-[10px] font-bold text-brand-700">
+                                {person.full_name?.charAt(0) || '?'}
+                              </div>
+                            )}
+                            <span className="text-xs font-medium text-slate-700">{person.full_name || person.id.substring(0, 8)}</span>
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  </button>
                 </div>
               </div>
 
