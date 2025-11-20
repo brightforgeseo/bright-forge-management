@@ -118,13 +118,15 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
 
       if (openTaskData) {
         try {
-          const { taskId, boardId, groupId } = JSON.parse(openTaskData);
-          console.log('📂 Opening task from notification:', { taskId, boardId, groupId });
+          const linkData = JSON.parse(openTaskData);
+          const { taskId, boardId, groupId, boardName } = linkData;
+          console.log('📂 Opening task from notification:', linkData);
+          console.log('📋 Available boards:', boards.map(b => ({ id: b.id, name: b.name })));
 
           // Find the board, group, and task
           const board = boards.find(b => b.id === boardId);
           if (board) {
-            console.log('✅ Found board:', board.name);
+            console.log('✅ Found board:', board.name, 'with ID:', board.id);
             targetBoardId = board.id;
             const group = board.groups.find(g => g.id === groupId);
             if (group) {

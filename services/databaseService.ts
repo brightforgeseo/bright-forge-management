@@ -369,13 +369,14 @@ export const checkDueDateNotifications = async (currentUserId: string) => {
             await createNotification(
               currentUserId,
               'Task Due Today',
-              `"${task.title}" is due today on ${board.name}`,
+              `"${task.title}" is due today on ${boardData.name}`,
               'alert',
               'TASKS',
               {
                 taskId: task.id,
-                boardId: board.id,
-                groupId: group.id
+                boardId: boardData.id, // Use ClientBoard ID, not database row ID
+                groupId: group.id,
+                boardName: boardData.name
               }
             );
             notificationCount++;
