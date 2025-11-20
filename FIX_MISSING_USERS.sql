@@ -17,10 +17,9 @@ LEFT JOIN profiles p ON u.id = p.id
 ORDER BY u.created_at DESC;
 
 -- Step 2: Create profiles for users that don't have one
-INSERT INTO profiles (id, email, full_name)
+INSERT INTO profiles (id, full_name)
 SELECT
     u.id,
-    u.email,
     COALESCE(
         u.raw_user_meta_data->>'full_name',
         split_part(u.email, '@', 1)
@@ -37,7 +36,10 @@ SELECT
 FROM auth.users u
 LEFT JOIN profiles p ON u.id = p.id;
 
--- Step 4: Show all profiles
-SELECT id, email, full_name FROM profiles ORDER BY full_name;
+-- Step 4: Show all profiles with their auth email
+SELECT p.id, u.email, p.full_name
+FROM profiles p
+JOIN auth.users u ON p.id = u.id
+ORDER BY p.full_name;
 
 -- Expected: All users should have profiles now!
