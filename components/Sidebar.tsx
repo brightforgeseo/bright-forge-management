@@ -27,37 +27,58 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
   // Play notification sound - LOUD bell sound
-  const playNotificationSound = () => {
+  const playNotificationSound = async () => {
     try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const oscillator1 = audioContext.createOscillator();
-      const oscillator2 = audioContext.createOscillator();
-      const oscillator3 = audioContext.createOscillator();
+      // Check if audio is allowed (user interaction or permission)
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContext) {
+        console.warn('Web Audio API not supported');
+        return;
+      }
+
+      const audioContext = new AudioContext();
+
+      // Resume context if suspended (Chrome autoplay policy)
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+
+      // Create a more pleasant notification sound
+      const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
 
-      oscillator1.frequency.value = 800;
-      oscillator2.frequency.value = 1000;
-      oscillator3.frequency.value = 1200;
+      // Use a sine wave for a softer sound
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(880, audioContext.currentTime); // A5 note
+      oscillator.frequency.exponentialRampToValueAtTime(440, audioContext.currentTime + 0.15); // Drop to A4
 
-      oscillator1.connect(gainNode);
-      oscillator2.connect(gainNode);
-      oscillator3.connect(gainNode);
+      oscillator.connect(gainNode);
       gainNode.connect(audioContext.destination);
 
-      gainNode.gain.value = 0.8;
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+      // Envelope for a quick bell-like sound
+      gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.01); // Quick attack
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3); // Decay
 
-      oscillator1.start(audioContext.currentTime);
-      oscillator2.start(audioContext.currentTime);
-      oscillator3.start(audioContext.currentTime);
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.3);
 
-      oscillator1.stop(audioContext.currentTime + 0.5);
-      oscillator2.stop(audioContext.currentTime + 0.5);
-      oscillator3.stop(audioContext.currentTime + 0.5);
+      // Clean up after sound finishes
+      oscillator.onended = () => {
+        audioContext.close();
+      };
 
-      console.log('🔔 Notification sound played!');
+      console.log('🔔 Notification sound played successfully');
     } catch (error) {
-      console.error('Failed to play notification sound:', error);
+      console.warn('Could not play notification sound:', error);
+      // Fallback: Try to use HTML5 audio if available
+      try {
+        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhCCuBzvLZiTcIG2m98OScTgwOUavnzbllHAUyjN3w0');
+        audio.volume = 0.3;
+        audio.play();
+      } catch (fallbackError) {
+        console.warn('Fallback audio also failed:', fallbackError);
+      }
     }
   };
 

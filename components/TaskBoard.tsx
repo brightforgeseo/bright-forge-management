@@ -127,9 +127,28 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
 
   // Check for notification deep links when component becomes visible or clients change
   useEffect(() => {
+    let retryCount = 0;
+    const maxRetries = 10;
+
     const checkForDeepLink = () => {
       const openTaskData = localStorage.getItem('openTaskModal');
-      if (openTaskData && clients.length > 0) {
+      console.log('🔍 Checking for deep link. openTaskData exists:', !!openTaskData, 'clients.length:', clients.length);
+
+      if (openTaskData) {
+        // If clients aren't loaded yet, wait a bit and retry
+        if (clients.length === 0 && retryCount < maxRetries) {
+          retryCount++;
+          console.log(`⏳ Clients not loaded yet, retry ${retryCount}/${maxRetries} in 500ms...`);
+          setTimeout(checkForDeepLink, 500);
+          return;
+        }
+
+        if (clients.length === 0) {
+          console.error('❌ Failed to load clients after maximum retries');
+          addToast('Unable to open task - boards not loaded. Please try again.', 'error');
+          localStorage.removeItem('openTaskModal');
+          return;
+        }
         try {
           const linkData = JSON.parse(openTaskData);
           const { taskId, boardId, groupId, boardName } = linkData;
@@ -160,30 +179,63 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
               const task = group.tasks.find(t => t.id === taskId);
               if (task) {
                 console.log('✅ FOUND TASK:', task.title);
-                console.log('Opening task modal in 200ms...');
-                setTimeout(() => {
-                  console.log('🎯 Opening task modal NOW');
-                  setTaskModal({
-                    task,
-                    groupId: group.id,
-                    clientId: board.id,
-                    groupTitle: group.title,
-                    groupColor: group.color
+                // Use requestAnimationFrame for more reliable DOM updates
+                requestAnimationFrame(() => {
+                  requestAnimationFrame(() => {
+                    console.log('🎯 Opening task modal NOW');
+                    setTaskModal({
+                      task,
+                      groupId: group.id,
+                      clientId: board.id,
+                      groupTitle: group.title,
+                      groupColor: group.color
+                    });
                   });
-                }, 200);
+                });
+              } else {
+                console.warn('⚠️ Task not found, navigating to board only');
+                addToast('Task not found. Showing board instead.', 'error');
               }
+            } else {
+              console.warn('⚠️ Group not found, navigating to board only');
+              addToast('Task group not found. Showing board instead.', 'error');
             }
+          } else {
+            console.error('❌ Board not found!');
+            addToast('Board not found. The board may have been deleted.', 'error');
           }
           console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
           localStorage.removeItem('openTaskModal');
         } catch (e) {
           console.error('Error processing deep link:', e);
+          addToast('Failed to open notification link. Please try again.', 'error');
+          localStorage.removeItem('openTaskModal');
         }
       }
     };
 
+    // Check immediately when component mounts
     checkForDeepLink();
+
+    // Also check whenever clients change
   }, [clients]);
+
+  // Also check when component first becomes visible (in case user switches to Tasks view)
+  useEffect(() => {
+    const checkForDeepLinkOnMount = () => {
+      const openTaskData = localStorage.getItem('openTaskModal');
+      if (openTaskData) {
+        console.log('🎯 Deep link detected on TaskBoard mount, will process...');
+        // Trigger a re-check after a brief delay to allow clients to load
+        setTimeout(() => {
+          // This will trigger the clients useEffect above
+          setClients(prev => [...prev]);
+        }, 100);
+      }
+    };
+
+    checkForDeepLinkOnMount();
+  }, []);
 
   // Debounced Save Logic
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);

@@ -63,6 +63,13 @@ const App: React.FC = () => {
 
   const handleUserSession = async (uid: string, email: string | undefined, fullName?: string) => {
     if (!email) return;
+
+    // Debounce to prevent multiple rapid calls
+    if (userSessionDebounceRef.current) {
+      clearTimeout(userSessionDebounceRef.current);
+    }
+
+    userSessionDebounceRef.current = setTimeout(async () => {
     let name = fullName || email.split('@')[0];
     let role = 'Team Member';
     let avatarUrl = undefined;
@@ -108,20 +115,35 @@ const App: React.FC = () => {
     setIsAuthenticated(true);
 
     // Check due dates only ONCE per day using localStorage
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    // Use local date to avoid timezone issues
+    const now = new Date();
+    const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const lastCheck = localStorage.getItem('lastDueDateCheck');
+    const checkInProgress = localStorage.getItem('lastDueDateCheckInProgress');
 
-    if (lastCheck !== today) {
-      console.log('🗓️ First login today - checking for due date notifications');
+    if (lastCheck !== localDate && !checkInProgress) {
+      console.log('🗓️ First login today - checking for due date notifications (local date:', localDate, ')');
+      // Set in-progress flag IMMEDIATELY to prevent duplicate checks
+      localStorage.setItem('lastDueDateCheckInProgress', 'true');
+
       checkDueDateNotifications(uid)
         .then(() => {
-          localStorage.setItem('lastDueDateCheck', today);
+          localStorage.setItem('lastDueDateCheck', localDate);
+          localStorage.removeItem('lastDueDateCheckInProgress');
           console.log('✅ Due date check complete - will not run again until tomorrow');
         })
-        .catch(err => console.error('Error checking due dates:', err));
+        .catch(err => {
+          console.error('Error checking due dates:', err);
+          localStorage.removeItem('lastDueDateCheckInProgress');
+        });
     } else {
-      console.log('⏭️ Already checked due dates today - skipping');
+      if (checkInProgress) {
+        console.log('⏳ Due date check already in progress - skipping');
+      } else {
+        console.log('⏭️ Already checked due dates today - skipping (local date:', localDate, ')');
+      }
     }
+    }, 100); // 100ms debounce
   };
 
   const handleLogout = async () => {
@@ -139,6 +161,7 @@ const App: React.FC = () => {
   useEffect(() => { localStorage.setItem('bf_branding', JSON.stringify(branding)); document.title = branding.companyName; }, [branding]);
 
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
+  const userSessionDebounceRef = React.useRef<NodeJS.Timeout | null>(null);
   const addToast = (type: ToastType, message: string) => setToasts(prev => [...prev, { id: Date.now().toString(), type, message }]);
   const removeToast = (id: string) => setToasts(prev => prev.filter(t => t.id !== id));
 

@@ -310,11 +310,12 @@ export const checkDueDateNotifications = async (currentUserId: string) => {
   try {
     console.log('🔔 Checking for due date notifications for user:', currentUserId);
 
-    // Get today's date in YYYY-MM-DD format
-    const today = new Date().toISOString().split('T')[0];
+    // Get today's date in local timezone YYYY-MM-DD format
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const todayStart = new Date(today + 'T00:00:00').toISOString();
     const todayEnd = new Date(today + 'T23:59:59').toISOString();
-    console.log('📅 Today is:', today);
+    console.log('📅 Today is (local timezone):', today);
 
     // Fetch all client boards
     const { data: boards, error: boardsError } = await supabase
@@ -352,46 +353,24 @@ export const checkDueDateNotifications = async (currentUserId: string) => {
 
             console.log('⏰ YOUR task due today:', task.title);
 
-            // Check if we already created this notification today for this specific task
-            // We check linkData to ensure we match the exact task, not just similar titles
-            const { data: existingNotifications } = await supabase
-              .from('notifications')
-              .select('id, link_data, message')
-              .eq('user_id', currentUserId)
-              .eq('title', 'Task Due Today')
-              .gte('created_at', todayStart)
-              .lte('created_at', todayEnd);
-
-            console.log(`🔍 Checking for duplicates: found ${existingNotifications?.length || 0} notifications with title "Task Due Today" today`);
-
-            // Check if any existing notification has this exact task ID in linkData
-            // OR if the message contains this exact task title (for backwards compatibility)
-            const alreadyNotified = existingNotifications?.some(n => {
-              try {
-                // First try to match by linkData (most accurate)
-                if (n.link_data) {
-                  const linkData = JSON.parse(n.link_data);
-                  console.log(`  Comparing: linkData.taskId=${linkData.taskId} vs task.id=${task.id}, linkData.boardId=${linkData.boardId} vs boardData.id=${boardData.id}`);
-                  if (linkData.taskId === task.id && linkData.boardId === boardData.id) {
-                    console.log('  ✅ MATCH FOUND via linkData');
-                    return true;
-                  }
-                }
-                // Fallback: check if message contains this exact task title and board name
-                const expectedMessage = `"${task.title}" is due today on ${boardData.name}`;
-                console.log(`  Comparing messages: "${n.message}" vs "${expectedMessage}"`);
-                if (n.message === expectedMessage) {
-                  console.log('  ✅ MATCH FOUND via message');
-                  return true;
-                }
-              } catch (e) {
-                console.error('  Error comparing notification:', e);
-                return false;
-              }
-              return false;
+            // Check if we already created this notification for this specific task
+            // Use a composite key approach: taskId + boardId uniquely identifies a task
+            const notificationLinkData = JSON.stringify({
+              taskId: task.id,
+              boardId: boardData.id,
+              groupId: group.id,
+              boardName: boardData.name
             });
 
-            if (alreadyNotified) {
+            const { data: existingNotifications } = await supabase
+              .from('notifications')
+              .select('id, link_data')
+              .eq('user_id', currentUserId)
+              .eq('title', 'Task Due Today')
+              .eq('link_data', notificationLinkData)
+              .gte('created_at', todayStart);
+
+            if (existingNotifications && existingNotifications.length > 0) {
               console.log('⏭️ Notification already exists for task:', task.title);
               skippedCount++;
               continue;
@@ -406,12 +385,7 @@ export const checkDueDateNotifications = async (currentUserId: string) => {
                 `"${task.title}" is due today on ${boardData.name}`,
                 'alert',
                 'TASKS',
-                {
-                  taskId: task.id,
-                  boardId: boardData.id, // Use ClientBoard ID, not database row ID
-                  groupId: group.id,
-                  boardName: boardData.name
-                }
+                JSON.parse(notificationLinkData) // Use the same linkData object for consistency
               );
               notificationCount++;
               console.log('✉️ Created due date notification for task:', task.title);
