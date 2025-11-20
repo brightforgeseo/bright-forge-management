@@ -634,8 +634,11 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
 
   const handlePaste = async (e: React.ClipboardEvent) => {
       const items = e.clipboardData.items;
+
+      // Check if pasting an image
       for (let i = 0; i < items.length; i++) {
           if (items[i].type.indexOf('image') !== -1) {
+              // Only prevent default and handle specially for images
               e.preventDefault();
               const file = items[i].getAsFile();
               if (file) {
@@ -647,13 +650,14 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                           id: Date.now().toString(),
                           channelId: activeChannelId,
                           sender: currentUser.name,
+                          senderId: currentUser.id,
                           text: 'Sent an image from clipboard',
                           timestamp: new Date().toISOString(),
                           avatar: currentUser.avatarUrl || 'user',
                           attachmentUrl: url,
                           attachmentType: 'image'
                       });
-                      
+
                       // Notify DM participant
                       const currentCh = channels.find(c => c.id === activeChannelId);
                       if (currentCh?.type === 'dm') {
@@ -667,8 +671,12 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                       addToast('error', 'Failed to upload image from clipboard');
                   }
               }
+              return; // Exit after handling image
           }
       }
+
+      // For text paste: allow default behavior, don't auto-send
+      // Text will be inserted into textarea normally
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
