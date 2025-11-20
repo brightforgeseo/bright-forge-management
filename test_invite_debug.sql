@@ -4,9 +4,8 @@
 -- ===== SECTION 1: Check if you're authenticated =====
 SELECT
   auth.uid() as my_user_id,
-  auth.role() as my_role,
-  auth.email() as my_email;
--- Expected: Should show your user ID, 'authenticated', and your email
+  auth.role() as my_role;
+-- Expected: Should show your user ID and 'authenticated'
 -- If NULL, you're not logged in!
 
 
@@ -52,5 +51,5 @@ DELETE FROM allowed_users WHERE email = 'debug-test@example.com';
 -- ===== SECTION 8: Check auth.users table =====
 SELECT id, email, raw_user_meta_data
 FROM auth.users
-WHERE email = auth.email();
+WHERE id = auth.uid();
 -- This shows your current user info
