@@ -1361,6 +1361,10 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                           // Create notifications for mentioned users
                           if (mentions.length > 0) {
                             console.log('📢 Creating notifications for', mentions.length, 'users');
+                            // Get the board name for the notification
+                            const currentBoard = clients.find(c => c.id === taskModal.clientId);
+                            const boardName = currentBoard?.name || 'Project';
+
                             for (const mentionedId of mentions) {
                               if (mentionedId !== currentUser.id) { // Don't notify self
                                 console.log('✉️ Notifying user:', mentionedId);
@@ -1369,7 +1373,13 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                   `${currentUser.name} mentioned you`,
                                   `In "${taskModal.task.title}": ${newComment.trim().substring(0, 100)}`,
                                   'message',
-                                  'TASKS'
+                                  'TASKS',
+                                  {
+                                    taskId: taskModal.task.id,
+                                    boardId: taskModal.clientId,
+                                    groupId: taskModal.groupId,
+                                    boardName: boardName
+                                  }
                                 );
                               }
                             }
@@ -1478,6 +1488,10 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                           // Create notifications for mentioned users
                           if (mentions.length > 0) {
                             console.log('📢 Creating notifications for', mentions.length, 'users');
+                            // Get the board name for the notification
+                            const currentBoard = clients.find(c => c.id === taskModal.clientId);
+                            const boardName = currentBoard?.name || 'Project';
+
                             for (const mentionedId of mentions) {
                               if (mentionedId !== currentUser.id) { // Don't notify self
                                 console.log('✉️ Notifying user:', mentionedId);
@@ -1486,7 +1500,13 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                   `${currentUser.name} mentioned you`,
                                   `In "${taskModal.task.title}": ${newComment.trim().substring(0, 100)}`,
                                   'message',
-                                  'TASKS'
+                                  'TASKS',
+                                  {
+                                    taskId: taskModal.task.id,
+                                    boardId: taskModal.clientId,
+                                    groupId: taskModal.groupId,
+                                    boardName: boardName
+                                  }
                                 );
                               }
                             }
