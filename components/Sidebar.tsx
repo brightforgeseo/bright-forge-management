@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Search, PenTool, BarChart, Settings, TableProperties, MessageSquare, Hexagon, LogOut, UserPlus, MoreVertical, Bell, X, Check } from 'lucide-react';
+import { LayoutDashboard, Search, PenTool, BarChart, Settings, TableProperties, MessageSquare, Hexagon, LogOut, UserPlus, MoreVertical, Bell, X, Check, CheckSquare } from 'lucide-react';
 import { ToolView, BrandingConfig, User, AppNotification } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { fetchNotifications, markNotificationRead, markAllNotificationsRead } from '../services/databaseService';
@@ -79,6 +79,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: ToolView.CONTENT_GENERATOR, label: 'Content Generator', icon: PenTool },
     { id: ToolView.SITE_AUDIT, label: 'SEO Audit', icon: BarChart },
     { id: ToolView.TASKS, label: 'Project Tasks', icon: TableProperties },
+    { id: ToolView.MY_WORK, label: 'My Work', icon: CheckSquare },
     { id: ToolView.TEAM_CHAT, label: 'Team Chat', icon: MessageSquare },
     { id: ToolView.SETTINGS, label: 'Settings', icon: Settings },
   ];
