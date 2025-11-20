@@ -137,10 +137,14 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
 
   // Load trending GIFs when picker opens
   useEffect(() => {
-    if (showGifPicker && gifs.length === 0) {
-      searchGifs('');
+    if (showGifPicker) {
+      console.log('[GIF] Picker opened, current gifs count:', gifs.length);
+      if (gifs.length === 0) {
+        console.log('[GIF] Loading trending GIFs...');
+        searchGifs('');
+      }
     }
-  }, [showGifPicker]);
+  }, [showGifPicker, gifs.length]);
 
   // Sync Refs for listeners to avoid dependency loops
   useEffect(() => {
@@ -1262,6 +1266,10 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                        {gifLoading ? (
                          <div className="flex justify-center items-center h-64">
                            <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
+                         </div>
+                       ) : gifs.length === 0 ? (
+                         <div className="flex justify-center items-center h-64 text-slate-500">
+                           No GIFs found. Try searching for something!
                          </div>
                        ) : (
                          <div className="grid grid-cols-2 gap-2 max-h-96 overflow-y-auto">
