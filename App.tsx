@@ -107,8 +107,21 @@ const App: React.FC = () => {
     setCurrentUser({ id: uid, name, role, initials: name.substring(0, 2).toUpperCase(), email, avatarUrl });
     setIsAuthenticated(true);
 
-    // TEMPORARILY ENABLED FOR DEBUGGING - will disable after seeing logs
-    checkDueDateNotifications(uid).catch(err => console.error('Error checking due dates:', err));
+    // Check due dates only ONCE per day using localStorage
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const lastCheck = localStorage.getItem('lastDueDateCheck');
+
+    if (lastCheck !== today) {
+      console.log('🗓️ First login today - checking for due date notifications');
+      checkDueDateNotifications(uid)
+        .then(() => {
+          localStorage.setItem('lastDueDateCheck', today);
+          console.log('✅ Due date check complete - will not run again until tomorrow');
+        })
+        .catch(err => console.error('Error checking due dates:', err));
+    } else {
+      console.log('⏭️ Already checked due dates today - skipping');
+    }
   };
 
   const handleLogout = async () => {
