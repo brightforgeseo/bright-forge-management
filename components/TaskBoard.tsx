@@ -805,12 +805,12 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
       {/* Label Picker Popover */}
       {activePicker && (
         <>
-         <div className="fixed inset-0 z-30" onClick={() => setActivePicker(null)}></div>
-         <div 
-           className="fixed z-40 bg-white rounded-xl shadow-xl border border-slate-200 w-48 p-2 animate-fadeIn"
-           style={{ 
-             top: activePicker.anchor?.getBoundingClientRect().bottom ?? 0, 
-             left: activePicker.anchor?.getBoundingClientRect().left ?? 0 
+         <div className="fixed inset-0 z-[55]" onClick={() => setActivePicker(null)}></div>
+         <div
+           className="fixed z-[60] bg-white rounded-xl shadow-xl border border-slate-200 w-48 p-2 animate-fadeIn"
+           style={{
+             top: activePicker.anchor?.getBoundingClientRect().bottom ?? 0,
+             left: activePicker.anchor?.getBoundingClientRect().left ?? 0
            }}
          >
             <div className="space-y-1 max-h-48 overflow-y-auto">
@@ -846,9 +846,9 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
 
         return (
           <>
-           <div className="fixed inset-0 z-30" onClick={() => setActivePersonPicker(null)}></div>
+           <div className="fixed inset-0 z-[55]" onClick={() => setActivePersonPicker(null)}></div>
            <div
-             className="fixed z-40 bg-white rounded-xl shadow-xl border border-slate-200 w-64 p-2 animate-fadeIn"
+             className="fixed z-[60] bg-white rounded-xl shadow-xl border border-slate-200 w-64 p-2 animate-fadeIn"
              style={{
                top: activePersonPicker.anchor?.getBoundingClientRect().bottom ?? 0,
                left: activePersonPicker.anchor?.getBoundingClientRect().left ?? 0
