@@ -17,10 +17,14 @@ CREATE TABLE IF NOT EXISTS profiles (
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
 -- Profiles policies
-DROP POLICY IF EXISTS "Profiles are viewable by everyone" ON profiles;
-CREATE POLICY "Profiles are viewable by everyone" ON profiles FOR SELECT USING (true);
+DO $$
+BEGIN
+    DROP POLICY IF EXISTS "Profiles are viewable by everyone" ON profiles;
+    DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
 
-DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
+CREATE POLICY "Profiles are viewable by everyone" ON profiles FOR SELECT USING (true);
 CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
 
 -- Allowed users (invites)
@@ -45,13 +49,16 @@ CREATE TABLE IF NOT EXISTS channels (
 ALTER TABLE channels ENABLE ROW LEVEL SECURITY;
 
 -- Channels policies
-DROP POLICY IF EXISTS "Channels are viewable by everyone" ON channels;
+DO $$
+BEGIN
+    DROP POLICY IF EXISTS "Channels are viewable by everyone" ON channels;
+    DROP POLICY IF EXISTS "Only authenticated users can create channels" ON channels;
+    DROP POLICY IF EXISTS "Only authenticated users can delete channels" ON channels;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
 CREATE POLICY "Channels are viewable by everyone" ON channels FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Only authenticated users can create channels" ON channels;
 CREATE POLICY "Only authenticated users can create channels" ON channels FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-
-DROP POLICY IF EXISTS "Only authenticated users can delete channels" ON channels;
 CREATE POLICY "Only authenticated users can delete channels" ON channels FOR DELETE USING (auth.role() = 'authenticated');
 
 -- Chat messages table
@@ -71,13 +78,16 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
 
 -- Chat messages policies
-DROP POLICY IF EXISTS "Messages are viewable by everyone" ON chat_messages;
+DO $$
+BEGIN
+    DROP POLICY IF EXISTS "Messages are viewable by everyone" ON chat_messages;
+    DROP POLICY IF EXISTS "Authenticated users can send messages" ON chat_messages;
+    DROP POLICY IF EXISTS "Authenticated users can delete messages" ON chat_messages;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
 CREATE POLICY "Messages are viewable by everyone" ON chat_messages FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Authenticated users can send messages" ON chat_messages;
 CREATE POLICY "Authenticated users can send messages" ON chat_messages FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-
-DROP POLICY IF EXISTS "Authenticated users can delete messages" ON chat_messages;
 CREATE POLICY "Authenticated users can delete messages" ON chat_messages FOR DELETE USING (auth.role() = 'authenticated');
 
 -- Client boards table
@@ -92,16 +102,18 @@ CREATE TABLE IF NOT EXISTS client_boards (
 ALTER TABLE client_boards ENABLE ROW LEVEL SECURITY;
 
 -- Client boards policies
-DROP POLICY IF EXISTS "Boards are viewable by everyone" ON client_boards;
+DO $$
+BEGIN
+    DROP POLICY IF EXISTS "Boards are viewable by everyone" ON client_boards;
+    DROP POLICY IF EXISTS "Authenticated users can create boards" ON client_boards;
+    DROP POLICY IF EXISTS "Authenticated users can update boards" ON client_boards;
+    DROP POLICY IF EXISTS "Authenticated users can delete boards" ON client_boards;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
 CREATE POLICY "Boards are viewable by everyone" ON client_boards FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Authenticated users can create boards" ON client_boards;
 CREATE POLICY "Authenticated users can create boards" ON client_boards FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-
-DROP POLICY IF EXISTS "Authenticated users can update boards" ON client_boards;
 CREATE POLICY "Authenticated users can update boards" ON client_boards FOR UPDATE USING (auth.role() = 'authenticated');
-
-DROP POLICY IF EXISTS "Authenticated users can delete boards" ON client_boards;
 CREATE POLICY "Authenticated users can delete boards" ON client_boards FOR DELETE USING (auth.role() = 'authenticated');
 
 -- Notifications table
@@ -120,13 +132,16 @@ CREATE TABLE IF NOT EXISTS notifications (
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 
 -- Notifications policies
-DROP POLICY IF EXISTS "Users can view their own notifications" ON notifications;
+DO $$
+BEGIN
+    DROP POLICY IF EXISTS "Users can view their own notifications" ON notifications;
+    DROP POLICY IF EXISTS "Authenticated users can create notifications" ON notifications;
+    DROP POLICY IF EXISTS "Users can update their own notifications" ON notifications;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
 CREATE POLICY "Users can view their own notifications" ON notifications FOR SELECT USING (auth.uid() = user_id);
-
-DROP POLICY IF EXISTS "Authenticated users can create notifications" ON notifications;
 CREATE POLICY "Authenticated users can create notifications" ON notifications FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-
-DROP POLICY IF EXISTS "Users can update their own notifications" ON notifications;
 CREATE POLICY "Users can update their own notifications" ON notifications FOR UPDATE USING (auth.uid() = user_id);
 
 -- Create default channels
@@ -137,13 +152,16 @@ INSERT INTO channels (name, type) VALUES ('ask-ai', 'channel') ON CONFLICT (name
 INSERT INTO storage.buckets (id, name, public) VALUES ('uploads', 'uploads', true) ON CONFLICT (id) DO NOTHING;
 
 -- Storage policies
-DROP POLICY IF EXISTS "Anyone can upload files" ON storage.objects;
+DO $$
+BEGIN
+    DROP POLICY IF EXISTS "Anyone can upload files" ON storage.objects;
+    DROP POLICY IF EXISTS "Anyone can view files" ON storage.objects;
+    DROP POLICY IF EXISTS "Authenticated users can delete files" ON storage.objects;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
 CREATE POLICY "Anyone can upload files" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'uploads');
-
-DROP POLICY IF EXISTS "Anyone can view files" ON storage.objects;
 CREATE POLICY "Anyone can view files" ON storage.objects FOR SELECT USING (bucket_id = 'uploads');
-
-DROP POLICY IF EXISTS "Authenticated users can delete files" ON storage.objects;
 CREATE POLICY "Authenticated users can delete files" ON storage.objects FOR DELETE USING (bucket_id = 'uploads' AND auth.role() = 'authenticated');
 
 -- Function to create profile on user signup
