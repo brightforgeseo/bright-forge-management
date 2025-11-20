@@ -513,7 +513,24 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                  </div>
             )}
           </div>
-          {activeChannelId && <button onClick={() => clearChatHistory(activeChannelId)} title="Clear History"><Trash2 className="w-4 h-4 text-slate-300 hover:text-red-500" /></button>}
+          {activeChannelId && (
+            <button
+              onClick={async () => {
+                if (window.confirm("Are you sure you want to delete all messages in this chat? This cannot be undone.")) {
+                  try {
+                    await clearChatHistory(activeChannelId);
+                    setMessages([]);
+                    addToast('success', 'Chat history cleared');
+                  } catch (error) {
+                    addToast('error', 'Failed to clear chat history');
+                  }
+                }
+              }}
+              title="Clear History"
+            >
+              <Trash2 className="w-4 h-4 text-slate-300 hover:text-red-500" />
+            </button>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
