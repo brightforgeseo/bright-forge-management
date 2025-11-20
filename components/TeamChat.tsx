@@ -402,14 +402,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
       if (messageCache[activeChannelId] && messageCache[activeChannelId].length > 0) {
         console.log(`[TeamChat] Loading ${messageCache[activeChannelId].length} messages from cache for channel:`, activeChannelId);
         setMessages(messageCache[activeChannelId]);
-
-        // Also fetch fresh messages in background to update cache
-        // But DON'T replace UI messages - realtime handles that
-        fetchChatMessages(activeChannelId).then(freshMsgs => {
-          console.log(`[TeamChat] Fetched ${freshMsgs.length} fresh messages in background for channel:`, activeChannelId);
-          // Only update cache, don't replace messages (realtime keeps them up to date)
-          setMessageCache(prev => ({ ...prev, [activeChannelId]: freshMsgs }));
-        });
+        // Don't fetch in background - realtime keeps cache updated
       } else {
         // No cache, fetch from database
         console.log('[TeamChat] No cache found, fetching from database for channel:', activeChannelId);
