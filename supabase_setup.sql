@@ -10,7 +10,7 @@ BEGIN
     FOR r IN (SELECT schemaname, tablename, policyname
               FROM pg_policies
               WHERE schemaname = 'public'
-              AND tablename IN ('profiles', 'channels', 'chat_messages', 'client_boards', 'notifications'))
+              AND tablename IN ('profiles', 'allowed_users', 'channels', 'chat_messages', 'client_boards', 'notifications'))
     LOOP
         EXECUTE 'DROP POLICY IF EXISTS ' || quote_ident(r.policyname) || ' ON ' || quote_ident(r.schemaname) || '.' || quote_ident(r.tablename);
     END LOOP;
@@ -48,6 +48,9 @@ CREATE TABLE IF NOT EXISTS allowed_users (
   temp_password TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Enable RLS on allowed_users
+ALTER TABLE allowed_users ENABLE ROW LEVEL SECURITY;
 
 -- Channels table (for team chat and DMs)
 CREATE TABLE IF NOT EXISTS channels (
@@ -102,6 +105,11 @@ ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 -- Profiles policies
 CREATE POLICY "Profiles are viewable by everyone" ON profiles FOR SELECT USING (true);
 CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
+
+-- Allowed users policies (for invites)
+CREATE POLICY "Anyone can check allowlist" ON allowed_users FOR SELECT USING (true);
+CREATE POLICY "Authenticated users can add to allowlist" ON allowed_users FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Authenticated users can update allowlist" ON allowed_users FOR UPDATE USING (auth.role() = 'authenticated');
 
 -- Channels policies
 CREATE POLICY "Channels are viewable by everyone" ON channels FOR SELECT USING (true);
