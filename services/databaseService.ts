@@ -307,16 +307,9 @@ export const checkDueDateNotifications = async () => {
 
     // Get today's date in YYYY-MM-DD format
     const today = new Date().toISOString().split('T')[0];
+    const todayStart = new Date(today + 'T00:00:00').toISOString();
+    const todayEnd = new Date(today + 'T23:59:59').toISOString();
     console.log('📅 Today is:', today);
-
-    // Check if we've already run today by checking localStorage
-    const lastRunKey = 'last_due_date_check';
-    const lastRun = localStorage.getItem(lastRunKey);
-
-    if (lastRun === today) {
-      console.log('⏭️ Due date notifications already sent today, skipping...');
-      return;
-    }
 
     // Fetch all client boards
     const { data: boards, error: boardsError } = await supabase
@@ -330,6 +323,7 @@ export const checkDueDateNotifications = async () => {
 
     console.log('📊 Found', boards.length, 'boards to check');
     let notificationCount = 0;
+    let skippedCount = 0;
 
     // Iterate through all boards and their tasks
     for (const board of boards) {
@@ -350,6 +344,22 @@ export const checkDueDateNotifications = async () => {
 
             // Create notification for each assigned user
             for (const userId of assignedIds) {
+              // Check if we already created this notification today
+              const { data: existingNotifications } = await supabase
+                .from('notifications')
+                .select('id')
+                .eq('user_id', userId)
+                .eq('title', 'Task Due Today')
+                .ilike('message', `%${task.title}%`)
+                .gte('created_at', todayStart)
+                .lte('created_at', todayEnd);
+
+              if (existingNotifications && existingNotifications.length > 0) {
+                console.log('⏭️ Notification already exists for:', task.title, 'user:', userId);
+                skippedCount++;
+                continue;
+              }
+
               await createNotification(
                 userId,
                 'Task Due Today',
@@ -365,9 +375,7 @@ export const checkDueDateNotifications = async () => {
       }
     }
 
-    // Mark that we've run today
-    localStorage.setItem(lastRunKey, today);
-    console.log(`✅ Due date check completed - sent ${notificationCount} notifications`);
+    console.log(`✅ Due date check completed - sent ${notificationCount} new notifications, skipped ${skippedCount} duplicates`);
   } catch (error) {
     console.error('Error checking due dates:', error);
   }
