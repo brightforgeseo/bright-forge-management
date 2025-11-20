@@ -389,7 +389,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
   const activeChannel = channels.find(c => c.id === activeChannelId);
   
   // Determine if the current channel is Read-Only
-  const isChannelReadOnly = activeChannel?.type === 'channel' && activeChannel.name !== 'ask-ai' && currentUser.role !== 'Owner';
+  // Everyone can post in all channels (removed role restriction)
+  const isChannelReadOnly = false;
   
   // Filter Lists with robust UUID matching
   const publicChannels = channels.filter(c => c.type !== 'dm');
