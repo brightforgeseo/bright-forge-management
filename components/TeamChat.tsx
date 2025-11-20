@@ -961,27 +961,12 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                 {msg.isAi ? <Bot className="w-6 h-6 text-white" /> : msg.avatar && msg.avatar !== 'user' && msg.avatar.startsWith('http') ? <img src={msg.avatar} alt="" className="w-full h-full rounded-lg object-cover" /> : <UserIcon className="w-6 h-6 text-slate-500" />}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-baseline gap-2">
-                    <span className="font-bold text-slate-900">{msg.sender}</span>
-                    <span className="text-xs text-slate-400">
-                      {new Date(msg.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
-                      {msg.isEdited && <span className="ml-1 italic">(edited)</span>}
-                    </span>
-                  </div>
-                  {/* Show edit button only for own messages that aren't AI */}
-                  {!msg.isAi && msg.senderId === currentUser.id && editingMessageId !== msg.id && (
-                    <button
-                      onClick={() => {
-                        setEditingMessageId(msg.id);
-                        setEditingText(msg.text);
-                      }}
-                      className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-brand-600 transition-opacity flex-shrink-0"
-                      title="Edit message"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                  )}
+                <div className="flex items-baseline gap-2">
+                  <span className="font-bold text-slate-900">{msg.sender}</span>
+                  <span className="text-xs text-slate-400">
+                    {new Date(msg.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                    {msg.isEdited && <span className="ml-1 italic">(edited)</span>}
+                  </span>
                 </div>
                 {msg.attachmentUrl && (
                   <div className="mt-2 mb-1">
@@ -1030,7 +1015,22 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                     </div>
                   </div>
                 ) : (
-                  <div className="text-slate-700 whitespace-pre-wrap mt-1">{msg.text}</div>
+                  <div className="flex items-start gap-2 mt-1">
+                    <div className="text-slate-700 whitespace-pre-wrap flex-1">{msg.text}</div>
+                    {/* Show edit button only for own messages that aren't AI */}
+                    {!msg.isAi && msg.senderId === currentUser.id && editingMessageId !== msg.id && (
+                      <button
+                        onClick={() => {
+                          setEditingMessageId(msg.id);
+                          setEditingText(msg.text);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-brand-600 transition-opacity flex-shrink-0 mt-0.5"
+                        title="Edit message"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
