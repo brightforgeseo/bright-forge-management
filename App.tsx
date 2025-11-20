@@ -118,6 +118,15 @@ const App: React.FC = () => {
     // Use local date to avoid timezone issues
     const now = new Date();
     const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    // One-time fix: Clear old checks to force recreation with proper linkData
+    const fixVersion = localStorage.getItem('notificationFixVersion');
+    if (fixVersion !== 'v2') {
+      localStorage.removeItem('lastDueDateCheck');
+      localStorage.setItem('notificationFixVersion', 'v2');
+      console.log('🔧 Cleared old notification checks to fix linkData');
+    }
+
     const lastCheck = localStorage.getItem('lastDueDateCheck');
     const checkInProgress = localStorage.getItem('lastDueDateCheckInProgress');
 

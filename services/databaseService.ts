@@ -354,23 +354,26 @@ export const checkDueDateNotifications = async (currentUserId: string) => {
             console.log('⏰ YOUR task due today:', task.title);
 
             // Check if we already created this notification for this specific task
-            // Use a composite key approach: taskId + boardId uniquely identifies a task
-            const notificationLinkData = JSON.stringify({
-              taskId: task.id,
-              boardId: boardData.id,
-              groupId: group.id,
-              boardName: boardData.name
-            });
-
+            // Check by matching the task ID in the link_data
             const { data: existingNotifications } = await supabase
               .from('notifications')
               .select('id, link_data')
               .eq('user_id', currentUserId)
               .eq('title', 'Task Due Today')
-              .eq('link_data', notificationLinkData)
               .gte('created_at', todayStart);
 
-            if (existingNotifications && existingNotifications.length > 0) {
+            // Check if any existing notification has this exact task
+            const alreadyExists = existingNotifications?.some(n => {
+              try {
+                if (n.link_data) {
+                  const data = JSON.parse(n.link_data);
+                  return data.taskId === task.id && data.boardId === boardData.id;
+                }
+              } catch (e) {}
+              return false;
+            });
+
+            if (alreadyExists) {
               console.log('⏭️ Notification already exists for task:', task.title);
               skippedCount++;
               continue;
@@ -379,13 +382,19 @@ export const checkDueDateNotifications = async (currentUserId: string) => {
             console.log('✨ No duplicate found, will create notification for:', task.title);
 
             try {
+              // Pass the parsed object - createNotification will stringify it
               await createNotification(
                 currentUserId,
                 'Task Due Today',
                 `"${task.title}" is due today on ${boardData.name}`,
                 'alert',
                 'TASKS',
-                JSON.parse(notificationLinkData) // Use the same linkData object for consistency
+                {
+                  taskId: task.id,
+                  boardId: boardData.id,
+                  groupId: group.id,
+                  boardName: boardData.name
+                }
               );
               notificationCount++;
               console.log('✉️ Created due date notification for task:', task.title);
