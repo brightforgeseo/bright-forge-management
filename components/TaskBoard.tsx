@@ -226,7 +226,78 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
       updateClient(cid, c => ({ ...c, groups: c.groups.map(g => g.id === gid ? { ...g, tasks: [...g.tasks, newTask] } : g) }));
       setNewItemText(prev => ({ ...prev, [gid]: '' }));
   };
-  const updateTaskField = (cid: string, gid: string, tid: string, f: keyof Task, v: string) => updateClient(cid, c => ({ ...c, groups: c.groups.map(g => g.id === gid ? { ...g, tasks: g.tasks.map(t => t.id === tid ? { ...t, [f]: v } : t) } : g) }));
+  const updateTaskField = (cid: string, gid: string, tid: string, f: keyof Task, v: string) => {
+    console.log('updateTaskField called:', { f, v, tid });
+
+    updateClient(cid, c => {
+      // Find the Done status ID from status definitions
+      const doneStatusId = c.statusDefs.find(s => s.label === 'Done')?.id;
+      console.log('Done status ID:', doneStatusId, 'Selected value:', v);
+
+      // If changing status to "Done", move task to "Done" group
+      if (f === 'status' && doneStatusId && v === doneStatusId) {
+        console.log('Moving task to Done group');
+
+        // Find the task to move
+        let taskToMove: Task | undefined;
+        let sourceGroupId: string | undefined;
+
+        for (const group of c.groups) {
+          const task = group.tasks.find(t => t.id === tid);
+          if (task) {
+            taskToMove = { ...task, [f]: v };
+            sourceGroupId = group.id;
+            break;
+          }
+        }
+
+        if (!taskToMove) {
+          console.log('Task not found!');
+          return c; // Task not found
+        }
+
+        console.log('Found task to move:', taskToMove.title, 'from group:', sourceGroupId);
+
+        // Find or create "Done" group
+        let doneGroupExists = false;
+        const updatedGroups = c.groups.map(g => {
+          if (g.title === 'Done') {
+            doneGroupExists = true;
+            console.log('Adding task to existing Done group');
+            // Add task to existing Done group, remove from source
+            return {
+              ...g,
+              tasks: [...g.tasks, taskToMove!]
+            };
+          } else if (g.id === sourceGroupId) {
+            console.log('Removing task from source group');
+            // Remove task from source group
+            return {
+              ...g,
+              tasks: g.tasks.filter(t => t.id !== tid)
+            };
+          }
+          return g;
+        });
+
+        // If Done group doesn't exist, create it
+        if (!doneGroupExists) {
+          console.log('Creating new Done group');
+          updatedGroups.push({
+            id: generateId(),
+            title: 'Done',
+            color: '#00D084',
+            tasks: [taskToMove]
+          });
+        }
+
+        return { ...c, groups: updatedGroups };
+      }
+
+      // Normal field update (not moving to Done)
+      return { ...c, groups: c.groups.map(g => g.id === gid ? { ...g, tasks: g.tasks.map(t => t.id === tid ? { ...t, [f]: v } : t) } : g) };
+    });
+  };
   const deleteTask = (cid: string, gid: string, tid: string) => updateClient(cid, c => ({ ...c, groups: c.groups.map(g => g.id === gid ? { ...g, tasks: g.tasks.filter(t => t.id !== tid) } : g) }));
   const moveTask = (cid: string, gid: string, tid: string, dir: 'up'|'down') => {
       updateClient(cid, c => {
@@ -788,9 +859,9 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Status</label>
                   <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
                     <div className="w-3 h-3 rounded-full" style={{
-                      backgroundColor: activeClient.statusDefs.find(s => s.label === taskModal.task.status)?.color || '#94a3b8'
+                      backgroundColor: activeClient.statusDefs.find(s => s.id === taskModal.task.status)?.color || '#94a3b8'
                     }}></div>
-                    <span className="text-sm font-medium text-slate-700">{taskModal.task.status}</span>
+                    <span className="text-sm font-medium text-slate-700">{activeClient.statusDefs.find((s: LabelDefinition) => s.id === taskModal.task.status)?.label || taskModal.task.status}</span>
                   </div>
                 </div>
 
@@ -798,9 +869,9 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Priority</label>
                   <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
                     <div className="w-3 h-3 rounded-full" style={{
-                      backgroundColor: activeClient.priorityDefs.find(p => p.label === taskModal.task.priority)?.color || '#94a3b8'
+                      backgroundColor: activeClient.priorityDefs.find(p => p.id === taskModal.task.priority)?.color || '#94a3b8'
                     }}></div>
-                    <span className="text-sm font-medium text-slate-700">{taskModal.task.priority}</span>
+                    <span className="text-sm font-medium text-slate-700">{activeClient.priorityDefs.find((p: LabelDefinition) => p.id === taskModal.task.priority)?.label || taskModal.task.priority}</span>
                   </div>
                 </div>
 
