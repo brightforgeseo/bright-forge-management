@@ -107,8 +107,9 @@ const App: React.FC = () => {
     setCurrentUser({ id: uid, name, role, initials: name.substring(0, 2).toUpperCase(), email, avatarUrl });
     setIsAuthenticated(true);
 
-    // Check for due date notifications for THIS user only
-    checkDueDateNotifications(uid).catch(err => console.error('Error checking due dates:', err));
+    // TEMPORARILY DISABLED: Due date check creating too many duplicates
+    // TODO: Fix duplicate detection logic
+    // checkDueDateNotifications(uid).catch(err => console.error('Error checking due dates:', err));
   };
 
   const handleLogout = async () => {
