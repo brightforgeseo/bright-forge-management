@@ -227,51 +227,61 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
       setNewItemText(prev => ({ ...prev, [gid]: '' }));
   };
   const updateTaskField = (cid: string, gid: string, tid: string, f: keyof Task, v: string) => {
-    console.log('updateTaskField called:', { f, v, tid });
+    console.log('updateTaskField called:', { f, v, tid, gid });
 
     updateClient(cid, c => {
       // Find the Done status ID from status definitions
       const doneStatusId = c.statusDefs.find(s => s.label === 'Done')?.id;
       console.log('Done status ID:', doneStatusId, 'Selected value:', v);
 
-      // If changing status to "Done", move task to "Done" group
-      if (f === 'status' && doneStatusId && v === doneStatusId) {
+      // Find the task and current group
+      let currentTask: Task | undefined;
+      let currentGroupId: string | undefined;
+      let currentGroup: TaskGroup | undefined;
+
+      for (const group of c.groups) {
+        const task = group.tasks.find(t => t.id === tid);
+        if (task) {
+          currentTask = task;
+          currentGroupId = group.id;
+          currentGroup = group;
+          break;
+        }
+      }
+
+      if (!currentTask) {
+        console.log('Task not found!');
+        return c;
+      }
+
+      const isCurrentlyDone = currentTask.status === doneStatusId;
+      const isChangingToDone = f === 'status' && v === doneStatusId;
+      const isChangingFromDone = f === 'status' && isCurrentlyDone && v !== doneStatusId;
+
+      console.log('Task status check:', { isCurrentlyDone, isChangingToDone, isChangingFromDone, currentGroup: currentGroup?.title });
+
+      // CASE 1: Moving TO Done group
+      if (isChangingToDone && currentGroup?.title !== 'Done') {
         console.log('Moving task to Done group');
 
-        // Find the task to move
-        let taskToMove: Task | undefined;
-        let sourceGroupId: string | undefined;
+        // Store original group ID in task metadata
+        const taskToMove = {
+          ...currentTask,
+          [f]: v,
+          originalGroupId: currentGroupId // Remember where it came from
+        };
 
-        for (const group of c.groups) {
-          const task = group.tasks.find(t => t.id === tid);
-          if (task) {
-            taskToMove = { ...task, [f]: v };
-            sourceGroupId = group.id;
-            break;
-          }
-        }
-
-        if (!taskToMove) {
-          console.log('Task not found!');
-          return c; // Task not found
-        }
-
-        console.log('Found task to move:', taskToMove.title, 'from group:', sourceGroupId);
-
-        // Find or create "Done" group
         let doneGroupExists = false;
         const updatedGroups = c.groups.map(g => {
           if (g.title === 'Done') {
             doneGroupExists = true;
             console.log('Adding task to existing Done group');
-            // Add task to existing Done group, remove from source
             return {
               ...g,
-              tasks: [...g.tasks, taskToMove!]
+              tasks: [...g.tasks, taskToMove]
             };
-          } else if (g.id === sourceGroupId) {
+          } else if (g.id === currentGroupId) {
             console.log('Removing task from source group');
-            // Remove task from source group
             return {
               ...g,
               tasks: g.tasks.filter(t => t.id !== tid)
@@ -280,7 +290,6 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
           return g;
         });
 
-        // If Done group doesn't exist, create it
         if (!doneGroupExists) {
           console.log('Creating new Done group');
           updatedGroups.push({
@@ -294,7 +303,53 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
         return { ...c, groups: updatedGroups };
       }
 
-      // Normal field update (not moving to Done)
+      // CASE 2: Moving FROM Done group back to original
+      if (isChangingFromDone && currentGroup?.title === 'Done') {
+        console.log('Moving task back from Done group');
+
+        const taskToMove = { ...currentTask, [f]: v };
+        const originalGroupId = (currentTask as any).originalGroupId;
+
+        console.log('Original group ID:', originalGroupId);
+
+        // Find the original group, or use first non-Done group
+        let targetGroupId = originalGroupId;
+        if (!targetGroupId || !c.groups.find(g => g.id === targetGroupId)) {
+          const firstNonDoneGroup = c.groups.find(g => g.title !== 'Done');
+          targetGroupId = firstNonDoneGroup?.id;
+          console.log('Original group not found, using first non-Done group:', targetGroupId);
+        }
+
+        if (!targetGroupId) {
+          console.log('No target group found, keeping in Done');
+          // Just update status in place
+          return { ...c, groups: c.groups.map(g => g.id === gid ? { ...g, tasks: g.tasks.map(t => t.id === tid ? { ...t, [f]: v } : t) } : g) };
+        }
+
+        // Remove originalGroupId from task when moving back
+        delete (taskToMove as any).originalGroupId;
+
+        const updatedGroups = c.groups.map(g => {
+          if (g.id === targetGroupId) {
+            console.log('Adding task to target group:', g.title);
+            return {
+              ...g,
+              tasks: [...g.tasks, taskToMove]
+            };
+          } else if (g.id === currentGroupId) {
+            console.log('Removing task from Done group');
+            return {
+              ...g,
+              tasks: g.tasks.filter(t => t.id !== tid)
+            };
+          }
+          return g;
+        });
+
+        return { ...c, groups: updatedGroups };
+      }
+
+      // CASE 3: Normal field update (not related to Done group moves)
       return { ...c, groups: c.groups.map(g => g.id === gid ? { ...g, tasks: g.tasks.map(t => t.id === tid ? { ...t, [f]: v } : t) } : g) };
     });
   };
