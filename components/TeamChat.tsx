@@ -340,6 +340,38 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
              }
          }
       })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chat_messages' }, async (payload) => {
+         const updatedMsg = payload.new as any;
+         console.log('[TeamChat] Realtime message UPDATE received:', updatedMsg);
+
+         // Update in cache
+         setMessageCache(prev => {
+             const channelMessages = prev[updatedMsg.channel_id] || [];
+             return {
+                 ...prev,
+                 [updatedMsg.channel_id]: channelMessages.map(m =>
+                     m.id === updatedMsg.id ? {
+                         ...m,
+                         text: updatedMsg.text,
+                         isEdited: updatedMsg.is_edited,
+                         editedAt: updatedMsg.edited_at
+                     } : m
+                 )
+             };
+         });
+
+         // Update in current messages if this is the active channel
+         if (updatedMsg.channel_id === activeChannelRef.current) {
+             setMessages(prev => prev.map(m =>
+                 m.id === updatedMsg.id ? {
+                     ...m,
+                     text: updatedMsg.text,
+                     isEdited: updatedMsg.is_edited,
+                     editedAt: updatedMsg.edited_at
+                 } : m
+             ));
+         }
+      })
       .subscribe();
 
     return () => { supabase.removeChannel(msgSub); };
