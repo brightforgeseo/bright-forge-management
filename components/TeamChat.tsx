@@ -1205,8 +1205,15 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                    {/* GIF Picker Button */}
                    <button
                      onClick={() => {
-                       setShowGifPicker(!showGifPicker);
+                       const isOpening = !showGifPicker;
+                       setShowGifPicker(isOpening);
                        setShowEmojiPicker(false);
+
+                       // Load GIFs immediately when opening
+                       if (isOpening && gifs.length === 0) {
+                         console.log('[GIF] Button clicked, loading GIFs...');
+                         searchGifs('');
+                       }
                      }}
                      disabled={isChannelReadOnly}
                      className="p-2 hover:bg-slate-200 rounded-full text-slate-500 disabled:opacity-50 disabled:cursor-not-allowed"
