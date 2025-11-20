@@ -46,16 +46,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, branding }) => {
               return;
           }
 
-          // 2. Master Fallback (Case Insensitive)
-          const lowerEmail = email.trim().toLowerCase();
-          if ((lowerEmail === 'bensocialbeemedia@gmail.com' || lowerEmail === 'bensocialbeesmedia@gmail.com') && password === 'bjorn2021') {
-              localStorage.setItem('bf_auth_override', 'true');
-              localStorage.setItem('bf_auth_email', lowerEmail);
-              onLogin(email);
-              return;
-          }
-
-          // 3. Smart Login (Pre-provisioned User)
+          // 2. Smart Login (Pre-provisioned User)
           // If login failed, check if this is a pre-provisioned user with a temp password
           if (loginError) {
               const preUser = await verifyPreProvisionedUser(email, password);

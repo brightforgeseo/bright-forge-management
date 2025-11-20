@@ -38,11 +38,10 @@ const App: React.FC = () => {
   useEffect(() => {
     const checkSession = async () => {
       try {
-        // Master override check (Local storage only)
-        if (localStorage.getItem('bf_auth_override')) {
-          handleUserSession('master-override-id', localStorage.getItem('bf_auth_email') || 'bensocialbeesmedia@gmail.com');
-          return;
-        }
+        // Clear any old master password sessions
+        localStorage.removeItem('bf_auth_override');
+        localStorage.removeItem('bf_auth_email');
+
         const { data } = await supabase.auth.getSession();
         if (data?.session?.user) {
           handleUserSession(data.session.user.id, data.session.user.email, data.session.user.user_metadata?.full_name);
@@ -53,7 +52,7 @@ const App: React.FC = () => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) handleUserSession(session.user.id, session.user.email, session.user.user_metadata?.full_name);
-      else if (!localStorage.getItem('bf_auth_override')) setIsAuthenticated(false);
+      else setIsAuthenticated(false);
     });
     return () => subscription.unsubscribe();
   }, []);
