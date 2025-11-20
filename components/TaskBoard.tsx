@@ -76,6 +76,8 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   const [loading, setLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [newItemText, setNewItemText] = useState<{ [key: string]: string }>({});
+  const [selectedPersonFilter, setSelectedPersonFilter] = useState<string>(''); // '' = all, or profile ID
+  const [isPersonFilterOpen, setIsPersonFilterOpen] = useState(false);
   
   const [isEditingClient, setIsEditingClient] = useState(false);
   const [editForm, setEditForm] = useState<{name: string, email: string, phone: string, website: string, logoUrl: string}>({
@@ -540,9 +542,54 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
 
          {activeClient && (
              <div className="flex items-center gap-2">
+               {/* Person Filter Dropdown */}
+               <div className="relative">
+                 <button
+                   onClick={() => setIsPersonFilterOpen(!isPersonFilterOpen)}
+                   className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors text-sm font-semibold text-slate-700"
+                 >
+                   <UserCircle className="w-4 h-4" />
+                   {selectedPersonFilter ? teamProfiles.find(p => p.id === selectedPersonFilter)?.full_name || 'All Tasks' : 'All Tasks'}
+                   <ChevronDown className="w-4 h-4 text-slate-400" />
+                 </button>
+                 {isPersonFilterOpen && (
+                   <>
+                     <div className="fixed inset-0 z-30" onClick={() => setIsPersonFilterOpen(false)}></div>
+                     <div className="absolute top-full right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden z-40 animate-fadeIn">
+                       <div className="p-2 max-h-64 overflow-y-auto">
+                         <button
+                           onClick={() => { setSelectedPersonFilter(''); setIsPersonFilterOpen(false); }}
+                           className={`w-full text-left px-4 py-2 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium ${selectedPersonFilter === '' ? 'bg-brand-50 text-brand-700' : 'text-slate-700'}`}
+                         >
+                           All Tasks
+                           {selectedPersonFilter === '' && <CheckCircle2 className="w-4 h-4 text-brand-600 ml-auto inline" />}
+                         </button>
+                         {teamProfiles.map((profile) => (
+                           <button
+                             key={profile.id}
+                             onClick={() => { setSelectedPersonFilter(profile.id); setIsPersonFilterOpen(false); }}
+                             className={`w-full text-left px-4 py-2 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium flex items-center gap-2 ${selectedPersonFilter === profile.id ? 'bg-brand-50 text-brand-700' : 'text-slate-700'}`}
+                           >
+                             {profile.avatar_url ? (
+                               <img src={profile.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover" />
+                             ) : (
+                               <div className="w-5 h-5 rounded-full bg-brand-100 flex items-center justify-center text-[10px] font-bold text-brand-700">
+                                 {profile.full_name?.charAt(0) || '?'}
+                               </div>
+                             )}
+                             <span className="flex-1">{profile.full_name || profile.id.substring(0, 8)}</span>
+                             {selectedPersonFilter === profile.id && <CheckCircle2 className="w-4 h-4 text-brand-600" />}
+                           </button>
+                         ))}
+                       </div>
+                     </div>
+                   </>
+                 )}
+               </div>
+
                {isGenerating ? (
                  <div className="flex items-center gap-2 bg-white shadow-lg border border-brand-100 rounded-xl p-1 pr-2 animate-slideIn">
-                    <input 
+                    <input
                       autoFocus
                       value={goal}
                       onChange={(e) => setGoal(e.target.value)}
@@ -550,8 +597,8 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                       placeholder="e.g. Launch Q4 Campaign"
                       className="outline-none text-sm px-3 py-1.5 w-64"
                     />
-                    <button 
-                      onClick={() => handleGenerateGroup(activeClient.id)} 
+                    <button
+                      onClick={() => handleGenerateGroup(activeClient.id)}
                       disabled={loading}
                       className="bg-brand-600 text-white p-1.5 rounded-lg hover:bg-brand-700 disabled:opacity-50"
                     >
@@ -560,7 +607,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                     <button onClick={() => setIsGenerating(false)} className="text-slate-400 hover:text-slate-600 p-1"><X className="w-4 h-4" /></button>
                  </div>
                ) : (
-                 <button 
+                 <button
                    onClick={() => setIsGenerating(true)}
                    className="flex items-center gap-2 px-4 py-2 bg-brand-50 text-brand-700 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors text-sm font-semibold"
                  >
@@ -568,7 +615,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                     AI Plan Generator
                  </button>
                )}
-               <button 
+               <button
                   onClick={() => handleAddGroup(activeClient.id)}
                   className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors text-sm font-semibold shadow-lg shadow-slate-900/20"
                >
@@ -582,7 +629,19 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
       <div className="flex-1 overflow-y-auto custom-scrollbar p-8 pt-2 bg-white">
         {activeClient ? (
             <div className="space-y-8 pb-20">
-               {activeClient.groups.map((group) => (
+               {activeClient.groups.map((group) => {
+                 // Filter tasks by selected person
+                 const filteredTasks = selectedPersonFilter
+                   ? group.tasks.filter(task => {
+                       const assignedIds = Array.isArray(task.assignedTo) ? task.assignedTo : (task.assignedTo ? [task.assignedTo] : []);
+                       return assignedIds.includes(selectedPersonFilter);
+                     })
+                   : group.tasks;
+
+                 // Don't show group if no tasks match filter
+                 if (selectedPersonFilter && filteredTasks.length === 0) return null;
+
+                 return (
                  <div key={group.id} className="animate-fadeIn">
                     {/* Group Header */}
                     <div className="flex items-center gap-2 mb-2 group cursor-pointer">
@@ -590,13 +649,15 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                           {group.isCollapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                        </button>
                        <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors flex-1">
-                           <input 
+                           <input
                              value={group.title}
                              onChange={(e) => updateGroupTitle(activeClient.id, group.id, e.target.value)}
                              className={`font-bold text-lg bg-transparent outline-none text-[${group.color}] w-full`}
                              style={{ color: group.color }}
                            />
-                           <span className="text-xs font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{group.tasks.length} items</span>
+                           <span className="text-xs font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                             {filteredTasks.length}{selectedPersonFilter && ` of ${group.tasks.length}`} items
+                           </span>
                        </div>
                        <button onClick={(e) => { e.stopPropagation(); handleDeleteGroup(activeClient.id, group.id); }} className="opacity-0 group-hover:opacity-100 p-2 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded transition-all">
                            <Trash2 className="w-4 h-4" />
@@ -621,7 +682,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100">
-                                 {group.tasks.map((task) => {
+                                 {filteredTasks.map((task) => {
                                     const statusDef = getLabelDef(activeClient.id, task.status, 'status');
                                     const priorityDef = getLabelDef(activeClient.id, task.priority, 'priority');
                                     
@@ -782,7 +843,8 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                       </div>
                     )}
                  </div>
-               ))}
+               );
+               })}
 
                {activeClient.groups.length === 0 && (
                  <div className="flex flex-col items-center justify-center py-20 text-slate-400">
