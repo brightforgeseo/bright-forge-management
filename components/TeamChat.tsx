@@ -22,7 +22,10 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
-  
+
+  // Store message drafts for each channel
+  const [messageDrafts, setMessageDrafts] = useState<Record<string, string>>({});
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const activeChannelRef = useRef<string>('');
@@ -376,6 +379,12 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
     console.log('👥 Detected mentions:', mentions);
 
     setMessage('');
+    // Also clear the draft for this channel since message was sent
+    setMessageDrafts(prev => {
+      const newDrafts = { ...prev };
+      delete newDrafts[activeChannelId];
+      return newDrafts;
+    });
     setMentionDropdown(null); // Close dropdown
 
     await sendChatMessage(userMsg);
@@ -555,9 +564,18 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
             </div>
             <ul>
               {publicChannels.map(channel => (
-                <li 
+                <li
                   key={channel.id}
-                  onClick={() => setActiveChannelId(channel.id)}
+                  onClick={() => {
+                    // Save current message as draft for current channel
+                    if (activeChannelId && message) {
+                      setMessageDrafts(prev => ({ ...prev, [activeChannelId]: message }));
+                    }
+                    // Switch to new channel
+                    setActiveChannelId(channel.id);
+                    // Restore draft for new channel (if any)
+                    setMessage(messageDrafts[channel.id] || '');
+                  }}
                   className={`px-4 py-1 flex items-center justify-between cursor-pointer mx-2 rounded-md group ${activeChannelId === channel.id ? 'bg-[#1164A3] text-white' : 'text-[#bcabbc] hover:bg-[#350d36]'}`}
                 >
                   <div className="flex items-center truncate">
@@ -601,7 +619,16 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                             >
                                 <div
                                     className="relative w-4 h-4 flex-shrink-0 cursor-pointer"
-                                    onClick={() => setActiveChannelId(channel.id)}
+                                    onClick={() => {
+                                      // Save current message as draft for current channel
+                                      if (activeChannelId && message) {
+                                        setMessageDrafts(prev => ({ ...prev, [activeChannelId]: message }));
+                                      }
+                                      // Switch to new channel
+                                      setActiveChannelId(channel.id);
+                                      // Restore draft for new channel (if any)
+                                      setMessage(messageDrafts[channel.id] || '');
+                                    }}
                                 >
                                     {avatar ? <img src={avatar} alt="" className="w-4 h-4 rounded-full object-cover" /> : <div className="w-4 h-4 rounded-full bg-green-600 flex items-center justify-center text-[8px] text-white font-bold">{name.charAt(0)}</div>}
                                     {channel.unread ? <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border border-[#3F0E40]"></div> : null}
