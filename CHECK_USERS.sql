@@ -18,9 +18,9 @@ SELECT
     'PROFILES' as section,
     p.id,
     p.full_name,
-    p.created_at
+    p.updated_at
 FROM profiles p
-ORDER BY p.created_at;
+ORDER BY p.full_name;
 
 -- Step 3: Show which users are MISSING profiles
 SELECT
