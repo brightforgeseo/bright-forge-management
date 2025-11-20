@@ -246,20 +246,31 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
 
   // Direct Messaging - Improved with retry logic
   const handleStartDM = async (targetProfileId: string) => {
-      console.log('[TeamChat] Starting DM with user:', targetProfileId);
+      console.log('[TeamChat] ========== STARTING DM ==========');
+      console.log('[TeamChat] Target user ID:', targetProfileId);
       console.log('[TeamChat] Current user ID:', currentUser.id);
+      console.log('[TeamChat] Current user email:', currentUser.email);
+      console.log('[TeamChat] Current user name:', currentUser.name);
 
       try {
           // Don't allow DM with yourself
           if (targetProfileId === currentUser.id) {
+              console.log('[TeamChat] ERROR: Trying to DM yourself');
               addToast('info', 'Cannot message yourself!');
               return;
           }
 
           // Create or get DM channel
           console.log('[TeamChat] Calling getOrCreateDMChannel...');
+          console.log('[TeamChat] Parameters: user1=' + currentUser.id + ', user2=' + targetProfileId);
+
           const dmChannel = await getOrCreateDMChannel(currentUser.id, targetProfileId);
-          console.log('[TeamChat] DM Channel created/found:', dmChannel);
+
+          console.log('[TeamChat] DM Channel result:', JSON.stringify(dmChannel, null, 2));
+
+          if (!dmChannel || !dmChannel.id) {
+              throw new Error('DM channel creation returned null or invalid channel');
+          }
 
           // Ensure it's in our local state
           setChannels(prev => {
@@ -275,9 +286,14 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
           console.log('[TeamChat] Switching to DM channel:', dmChannel.id);
           setActiveChannelId(dmChannel.id);
           addToast('success', 'DM conversation opened!');
-      } catch (e) {
-          console.error('[TeamChat] DM creation error:', e);
-          addToast('error', 'Could not start DM. Please try again.');
+          console.log('[TeamChat] ========== DM OPENED SUCCESSFULLY ==========');
+      } catch (e: any) {
+          console.error('[TeamChat] ========== DM ERROR ==========');
+          console.error('[TeamChat] Error type:', e?.constructor?.name);
+          console.error('[TeamChat] Error message:', e?.message);
+          console.error('[TeamChat] Full error:', e);
+          console.error('[TeamChat] Stack:', e?.stack);
+          addToast('error', 'Could not start DM: ' + (e?.message || 'Unknown error'));
       }
   };
 
