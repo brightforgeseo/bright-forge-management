@@ -220,8 +220,14 @@ const Sidebar: React.FC<SidebarProps> = ({
                                  key={n.id} 
                                  className={`p-3 border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer ${!n.isRead ? 'bg-blue-50/30' : ''}`}
                                  onClick={() => {
+                                     console.log('🔴🔴🔴 NOTIFICATION CLICKED 🔴🔴🔴');
+                                     console.log('Notification:', n);
+                                     console.log('linkView:', n.linkView);
+                                     console.log('linkData:', n.linkData);
+
                                      if(!n.isRead) handleMarkRead(n.id);
                                      if(n.linkView) {
+                                       console.log('📍 Changing view to:', n.linkView);
                                        onChangeView(n.linkView as ToolView);
                                        setIsNotificationsOpen(false); // Close dropdown after clicking
 
@@ -231,10 +237,19 @@ const Sidebar: React.FC<SidebarProps> = ({
                                            const linkData = JSON.parse(n.linkData);
                                            console.log('📍 Storing link data for task modal:', linkData);
                                            localStorage.setItem('openTaskModal', n.linkData);
+                                           console.log('✅ localStorage set successfully!');
+
+                                           // Double-check it was stored
+                                           const check = localStorage.getItem('openTaskModal');
+                                           console.log('Verification - localStorage now contains:', check);
                                          } catch (e) {
                                            console.error('Error parsing link data:', e);
                                          }
+                                       } else {
+                                         console.log('⚠️ No linkData in notification!');
                                        }
+                                     } else {
+                                       console.log('⚠️ No linkView in notification!');
                                      }
                                  }}
                                >
