@@ -356,17 +356,26 @@ export const checkDueDateNotifications = async (currentUserId: string) => {
             // We check linkData to ensure we match the exact task, not just similar titles
             const { data: existingNotifications } = await supabase
               .from('notifications')
-              .select('id, link_data')
+              .select('id, link_data, message')
               .eq('user_id', currentUserId)
               .eq('title', 'Task Due Today')
               .gte('created_at', todayStart)
               .lte('created_at', todayEnd);
 
             // Check if any existing notification has this exact task ID in linkData
+            // OR if the message contains this exact task title (for backwards compatibility)
             const alreadyNotified = existingNotifications?.some(n => {
               try {
-                const linkData = JSON.parse(n.link_data || '{}');
-                return linkData.taskId === task.id && linkData.boardId === boardData.id;
+                // First try to match by linkData (most accurate)
+                if (n.link_data) {
+                  const linkData = JSON.parse(n.link_data);
+                  if (linkData.taskId === task.id && linkData.boardId === boardData.id) {
+                    return true;
+                  }
+                }
+                // Fallback: check if message contains this exact task title and board name
+                const expectedMessage = `"${task.title}" is due today on ${boardData.name}`;
+                return n.message === expectedMessage;
               } catch {
                 return false;
               }

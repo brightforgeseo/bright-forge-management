@@ -107,9 +107,8 @@ const App: React.FC = () => {
     setCurrentUser({ id: uid, name, role, initials: name.substring(0, 2).toUpperCase(), email, avatarUrl });
     setIsAuthenticated(true);
 
-    // DISABLED: Due date notifications creating too many duplicates on every login
-    // Need to implement a daily cron job instead of checking on login
-    // checkDueDateNotifications(uid).catch(err => console.error('Error checking due dates:', err));
+    // Check for due date notifications (improved duplicate detection)
+    checkDueDateNotifications(uid).catch(err => console.error('Error checking due dates:', err));
   };
 
   const handleLogout = async () => {
