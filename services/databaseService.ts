@@ -75,19 +75,28 @@ export const fetchNotifications = async (userId: string): Promise<AppNotificatio
 };
 
 export const createNotification = async (
-  userId: string, 
-  title: string, 
-  message: string, 
-  type: 'info' | 'success' | 'alert' | 'message', 
+  userId: string,
+  title: string,
+  message: string,
+  type: 'info' | 'success' | 'alert' | 'message',
   linkView?: string
 ) => {
-  await supabase.from('notifications').insert({
+  console.log('📬 Creating notification:', { userId, title, message, type, linkView });
+  const { data, error } = await supabase.from('notifications').insert({
     user_id: userId,
     title,
     message,
     type,
     link_view: linkView
   });
+
+  if (error) {
+    console.error('❌ Error creating notification:', error);
+    throw error;
+  }
+
+  console.log('✅ Notification created successfully:', data);
+  return data;
 };
 
 export const markNotificationRead = async (id: string) => {
@@ -287,5 +296,66 @@ export const uploadFile = async (file: File, bucket: string = 'uploads'): Promis
     return data.publicUrl;
   } catch {
     return null;
+  }
+};
+
+// --- Due Date Notifications ---
+
+export const checkDueDateNotifications = async () => {
+  try {
+    console.log('🔔 Checking for due date notifications...');
+
+    // Get today's date in YYYY-MM-DD format
+    const today = new Date().toISOString().split('T')[0];
+    console.log('📅 Today is:', today);
+
+    // Fetch all client boards
+    const { data: boards, error: boardsError } = await supabase
+      .from('client_boards')
+      .select('*');
+
+    if (boardsError || !boards) {
+      console.error('Error fetching boards:', boardsError);
+      return;
+    }
+
+    console.log('📊 Found', boards.length, 'boards to check');
+
+    // Iterate through all boards and their tasks
+    for (const board of boards) {
+      const boardData = board.board_data as any;
+      if (!boardData.groups) continue;
+
+      for (const group of boardData.groups) {
+        if (!group.tasks) continue;
+
+        for (const task of group.tasks) {
+          // Check if task is due today
+          if (task.dueDate === today && task.assignedTo) {
+            const assignedIds = Array.isArray(task.assignedTo)
+              ? task.assignedTo
+              : [task.assignedTo];
+
+            console.log('⏰ Task due today:', task.title, 'assigned to:', assignedIds);
+
+            // Create notification for each assigned user
+            for (const userId of assignedIds) {
+              await createNotification(
+                userId,
+                'Task Due Today',
+                `"${task.title}" is due today on ${board.name}`,
+                'alert',
+                'TASKS'
+              );
+              console.log('✉️ Created due date notification for user:', userId);
+            }
+          }
+        }
+      }
+    }
+
+    console.log('✅ Due date check completed');
+  } catch (error) {
+    console.error('Error checking due dates:', error);
   }
 };

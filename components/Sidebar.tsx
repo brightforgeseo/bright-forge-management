@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { LayoutDashboard, Search, PenTool, BarChart, Settings, TableProperties, MessageSquare, Hexagon, LogOut, UserPlus, MoreVertical, Bell, X, Check, CheckSquare } from 'lucide-react';
 import { ToolView, BrandingConfig, User, AppNotification } from '../types';
 import { supabase } from '../lib/supabaseClient';
-import { fetchNotifications, markNotificationRead, markAllNotificationsRead } from '../services/databaseService';
+import { fetchNotifications, markNotificationRead, markAllNotificationsRead, createNotification } from '../services/databaseService';
 
 interface SidebarProps {
   currentView: ToolView;
@@ -200,6 +200,32 @@ const Sidebar: React.FC<SidebarProps> = ({
       </nav>
 
       <div className="p-4 border-t border-slate-800 space-y-4">
+        {/* DEBUG: Test Notification Button */}
+        {currentUser.role === 'Owner' && (
+          <button
+            onClick={async () => {
+              console.log('🧪 Creating test notification for user:', currentUser.id);
+              try {
+                await createNotification(
+                  currentUser.id,
+                  'Test Notification',
+                  'This is a test notification to verify the system works!',
+                  'info',
+                  'DASHBOARD'
+                );
+                console.log('✅ Test notification created successfully');
+                alert('Test notification created! Check the bell icon.');
+              } catch (err) {
+                console.error('❌ Error creating test notification:', err);
+                alert('Error: ' + err);
+              }
+            }}
+            className="w-full px-3 py-2 bg-purple-600 text-white rounded-lg text-xs font-medium hover:bg-purple-700 transition-colors"
+          >
+            🧪 Test Notification
+          </button>
+        )}
+
         {/* User Profile */}
         <div className="relative">
             <button 

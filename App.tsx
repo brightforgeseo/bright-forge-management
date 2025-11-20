@@ -13,7 +13,7 @@ import ToastContainer from './components/ToastContainer';
 import Login from './components/Login';
 import { ToolView, BrandingConfig, User, ToastNotification, ToastType } from './types';
 import { supabase } from './lib/supabaseClient';
-import { addToAllowlist, updateUserProfile } from './services/databaseService';
+import { addToAllowlist, updateUserProfile, checkDueDateNotifications } from './services/databaseService';
 import { Copy, X, UserPlus, Check, Mail, RefreshCw, AlertTriangle, MessageSquare } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -55,8 +55,20 @@ const App: React.FC = () => {
       if (session?.user) handleUserSession(session.user.id, session.user.email, session.user.user_metadata?.full_name);
       else setIsAuthenticated(false);
     });
-    return () => subscription.unsubscribe();
-  }, []);
+
+    // Set up periodic due date check (every hour)
+    const dueDateInterval = setInterval(() => {
+      if (isAuthenticated) {
+        console.log('🕐 Running scheduled due date check...');
+        checkDueDateNotifications().catch(err => console.error('Error in scheduled due date check:', err));
+      }
+    }, 60 * 60 * 1000); // Run every hour
+
+    return () => {
+      subscription.unsubscribe();
+      clearInterval(dueDateInterval);
+    };
+  }, [isAuthenticated]);
 
   const handleUserSession = async (uid: string, email: string | undefined, fullName?: string) => {
     if (!email) return;
@@ -103,6 +115,9 @@ const App: React.FC = () => {
     // IMPORTANT: Set ID to the real UUID (uid) so DMs work
     setCurrentUser({ id: uid, name, role, initials: name.substring(0, 2).toUpperCase(), email, avatarUrl });
     setIsAuthenticated(true);
+
+    // Check for due date notifications
+    checkDueDateNotifications().catch(err => console.error('Error checking due dates:', err));
   };
 
   const handleLogout = async () => {

@@ -1230,16 +1230,23 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                         const textBeforeCursor = value.substring(0, cursorPos);
                         const lastAtIndex = textBeforeCursor.lastIndexOf('@');
 
+                        console.log('🔍 Input changed:', { value, cursorPos, lastAtIndex, textBeforeCursor });
+
                         if (lastAtIndex !== -1 && cursorPos > lastAtIndex) {
                           const searchText = textBeforeCursor.substring(lastAtIndex + 1);
-                          // Only show if @ is at start or after space
                           const charBeforeAt = lastAtIndex > 0 ? textBeforeCursor[lastAtIndex - 1] : ' ';
+                          console.log('📝 @ detected:', { searchText, charBeforeAt, lastAtIndex });
+
+                          // Only show if @ is at start or after space
                           if (charBeforeAt === ' ' || lastAtIndex === 0) {
+                            console.log('✅ Showing mention dropdown');
                             setMentionDropdown({ show: true, search: searchText.toLowerCase(), position: cursorPos });
                           } else {
+                            console.log('❌ @ not at valid position');
                             setMentionDropdown(null);
                           }
                         } else {
+                          console.log('❌ No @ found or cursor not after @');
                           setMentionDropdown(null);
                         }
                       }}
@@ -1301,7 +1308,9 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                     />
 
                     {/* Mention Dropdown */}
-                    {mentionDropdown?.show && (
+                    {mentionDropdown?.show && (() => {
+                      console.log('🎨 Rendering mention dropdown:', mentionDropdown, 'profiles:', teamProfiles.length);
+                      return (
                       <div className="absolute bottom-full left-0 mb-2 w-64 bg-white rounded-lg shadow-xl border border-slate-200 overflow-hidden z-[100] animate-fadeIn">
                         <div className="p-2 bg-slate-50 border-b border-slate-200">
                           <p className="text-xs font-bold text-slate-500 uppercase">Mention Someone</p>
@@ -1362,7 +1371,8 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                             ))}
                         </div>
                       </div>
-                    )}
+                      );
+                    })()}
 
                     <button
                       onClick={async () => {

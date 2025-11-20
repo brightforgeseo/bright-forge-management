@@ -25,9 +25,69 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const activeChannelRef = useRef<string>(''); 
+  const activeChannelRef = useRef<string>('');
   const channelsRef = useRef<ChatChannel[]>([]);
   const profilesRef = useRef<Profile[]>([]);
+  const [mentionDropdown, setMentionDropdown] = useState<{ show: boolean; search: string; position: number } | null>(null);
+
+  // Helper function to detect @mentions in text
+  const detectMentions = (text: string): string[] => {
+    const mentionedIds: string[] = [];
+
+    // Check for @everyone
+    if (text.toLowerCase().includes('@everyone')) {
+      return profiles.map(p => p.id);
+    }
+
+    // Check for @name mentions
+    profiles.forEach(profile => {
+      const name = profile.full_name || '';
+      const firstName = name.split(' ')[0].toLowerCase();
+      const fullName = name.toLowerCase();
+
+      // Check if text mentions this person
+      if (text.toLowerCase().includes(`@${firstName}`) || text.toLowerCase().includes(`@${fullName}`)) {
+        mentionedIds.push(profile.id);
+      }
+    });
+
+    return mentionedIds;
+  };
+
+  // Play notification sound - LOUD bell sound
+  const playNotificationSound = () => {
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator1 = audioContext.createOscillator();
+      const oscillator2 = audioContext.createOscillator();
+      const oscillator3 = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator1.frequency.value = 800;
+      oscillator2.frequency.value = 1000;
+      oscillator3.frequency.value = 1200;
+
+      oscillator1.connect(gainNode);
+      oscillator2.connect(gainNode);
+      oscillator3.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      gainNode.gain.value = 0.8;
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+
+      oscillator1.start(audioContext.currentTime);
+      oscillator2.start(audioContext.currentTime);
+      oscillator3.start(audioContext.currentTime);
+
+      oscillator1.stop(audioContext.currentTime + 0.5);
+      oscillator2.stop(audioContext.currentTime + 0.5);
+      oscillator3.stop(audioContext.currentTime + 0.5);
+
+      console.log('🔔 Notification sound played!');
+    } catch (error) {
+      console.error('Failed to play notification sound:', error);
+    }
+  };
 
   // Sync Refs for listeners to avoid dependency loops
   useEffect(() => {
@@ -300,7 +360,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
   const handleSendMessage = async () => {
     if (!message.trim()) return;
     const currentCh = channels.find(c => c.id === activeChannelId);
-    
+
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
       channelId: activeChannelId,
@@ -310,8 +370,14 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
       avatar: currentUser.avatarUrl || 'user'
     };
 
+    // Detect @mentions
+    const mentions = detectMentions(message.trim());
+    console.log('💬 Team Chat message:', message);
+    console.log('👥 Detected mentions:', mentions);
+
     setMessage('');
-    
+    setMentionDropdown(null); // Close dropdown
+
     await sendChatMessage(userMsg);
 
     // Create Notification if DM
@@ -320,13 +386,32 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
         const otherId = ids.find(id => id !== currentUser.id);
         if (otherId && otherId !== currentUser.id) {
             await createNotification(
-                otherId, 
-                'New Message', 
-                `${currentUser.name}: ${userMsg.text.substring(0, 100)}`, 
-                'message', 
+                otherId,
+                'New Message',
+                `${currentUser.name}: ${userMsg.text.substring(0, 100)}`,
+                'message',
                 'TEAM_CHAT'
             );
         }
+    }
+
+    // Create notifications for @mentions in channels
+    if (currentCh?.type === 'channel' && mentions.length > 0) {
+        console.log('📢 Creating notifications for', mentions.length, 'mentioned users');
+        for (const mentionedId of mentions) {
+            if (mentionedId !== currentUser.id) { // Don't notify self
+                console.log('✉️ Notifying user:', mentionedId);
+                await createNotification(
+                    mentionedId,
+                    `${currentUser.name} mentioned you in #${currentCh.name}`,
+                    userMsg.text.substring(0, 100),
+                    'message',
+                    'TEAM_CHAT'
+                );
+            }
+        }
+        console.log('🔔 Playing notification sound');
+        playNotificationSound();
     }
 
     // AI Response
@@ -641,19 +726,102 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
         </div>
 
         <div className="p-6 pt-2 flex-shrink-0 bg-white border-t border-slate-100">
-           <div className={`border rounded-xl shadow-sm bg-white flex flex-col ${isChannelReadOnly ? 'border-slate-200 bg-slate-50' : 'border-slate-300'}`}>
+           <div className={`border rounded-xl shadow-sm bg-white flex flex-col relative ${isChannelReadOnly ? 'border-slate-200 bg-slate-50' : 'border-slate-300'}`}>
+             {/* Mention Dropdown */}
+             {mentionDropdown?.show && (
+               <div className="absolute bottom-full left-0 mb-2 w-64 bg-white rounded-lg shadow-xl border border-slate-200 overflow-hidden z-[100] animate-fadeIn">
+                 <div className="p-2 bg-slate-50 border-b border-slate-200">
+                   <p className="text-xs font-bold text-slate-500 uppercase">Mention Someone</p>
+                 </div>
+                 <div className="max-h-48 overflow-y-auto">
+                   {/* @everyone option */}
+                   {(!mentionDropdown.search || 'everyone'.includes(mentionDropdown.search)) && (
+                     <button
+                       onClick={() => {
+                         const lastAtIndex = message.lastIndexOf('@');
+                         const newText = message.substring(0, lastAtIndex) + '@everyone ' + message.substring(mentionDropdown.position);
+                         setMessage(newText);
+                         setMentionDropdown(null);
+                       }}
+                       className="w-full text-left px-3 py-2 hover:bg-brand-50 transition-colors flex items-center gap-2 text-sm"
+                     >
+                       <div className="w-8 h-8 rounded-full bg-brand-600 flex items-center justify-center text-white font-bold text-xs">
+                         ALL
+                       </div>
+                       <div>
+                         <p className="font-medium text-slate-900">@everyone</p>
+                         <p className="text-xs text-slate-500">Notify all team members</p>
+                       </div>
+                     </button>
+                   )}
+
+                   {/* Team members */}
+                   {profiles
+                     .filter(profile => {
+                       if (!mentionDropdown.search) return true;
+                       const name = (profile.full_name || '').toLowerCase();
+                       return name.includes(mentionDropdown.search);
+                     })
+                     .map(profile => (
+                       <button
+                         key={profile.id}
+                         onClick={() => {
+                           const lastAtIndex = message.lastIndexOf('@');
+                           const mentionText = profile.full_name?.split(' ')[0] || 'User';
+                           const newText = message.substring(0, lastAtIndex) + '@' + mentionText + ' ' + message.substring(mentionDropdown.position);
+                           setMessage(newText);
+                           setMentionDropdown(null);
+                         }}
+                         className="w-full text-left px-3 py-2 hover:bg-brand-50 transition-colors flex items-center gap-2 text-sm"
+                       >
+                         {profile.avatar_url ? (
+                           <img src={profile.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover" />
+                         ) : (
+                           <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-bold text-xs">
+                             {profile.full_name?.charAt(0) || '?'}
+                           </div>
+                         )}
+                         <div>
+                           <p className="font-medium text-slate-900">{profile.full_name || 'Unknown'}</p>
+                           <p className="text-xs text-slate-500">@{profile.full_name?.split(' ')[0] || 'user'}</p>
+                         </div>
+                       </button>
+                     ))}
+                 </div>
+               </div>
+             )}
+
              <textarea
                 value={message}
-                onChange={e => setMessage(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setMessage(value);
+
+                  const cursorPos = e.target.selectionStart || 0;
+                  const textBeforeCursor = value.substring(0, cursorPos);
+                  const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+
+                  if (lastAtIndex !== -1 && cursorPos > lastAtIndex) {
+                    const searchText = textBeforeCursor.substring(lastAtIndex + 1);
+                    const charBeforeAt = lastAtIndex > 0 ? textBeforeCursor[lastAtIndex - 1] : ' ';
+                    if (charBeforeAt === ' ' || lastAtIndex === 0 || charBeforeAt === '\n') {
+                      setMentionDropdown({ show: true, search: searchText.toLowerCase(), position: cursorPos });
+                    } else {
+                      setMentionDropdown(null);
+                    }
+                  } else {
+                    setMentionDropdown(null);
+                  }
+                }}
                 onKeyDown={e => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSendMessage())}
                 onPaste={handlePaste}
                 disabled={isChannelReadOnly}
                 placeholder={
-                    isChannelReadOnly 
-                    ? "Only the Owner can post in this channel." 
-                    : activeChannel?.type === 'dm' 
-                        ? `Message ${getDMInfo(activeChannel!).name}` 
-                        : `Message #${activeChannel?.name}`
+                    isChannelReadOnly
+                    ? "Only the Owner can post in this channel."
+                    : activeChannel?.type === 'dm'
+                        ? `Message ${getDMInfo(activeChannel!).name}... (Use @name or @everyone to mention)`
+                        : `Message #${activeChannel?.name}... (Use @name or @everyone to mention)`
                 }
                 className={`w-full max-h-40 min-h-[60px] p-3 outline-none resize-none rounded-t-xl ${isChannelReadOnly ? 'bg-slate-50 text-slate-400 cursor-not-allowed' : ''}`}
              />
