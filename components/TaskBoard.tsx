@@ -57,17 +57,45 @@ const detectMentions = (text: string, profiles: Profile[]): string[] => {
   return mentionedIds;
 };
 
-// Play notification sound
+// Play notification sound - LOUD bell sound
 const playNotificationSound = () => {
-  // Use system notification sound
-  const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBji=');
-  audio.volume = 0.5;
-  audio.play().catch(() => {
-    // Fallback: use system notification
-    if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification('New Mention', { body: 'You were mentioned in a comment', silent: false });
-    }
-  });
+  try {
+    // Create oscillator for a loud bell-like sound
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+
+    // Create three oscillators for a rich bell sound
+    const oscillator1 = audioContext.createOscillator();
+    const oscillator2 = audioContext.createOscillator();
+    const oscillator3 = audioContext.createOscillator();
+
+    const gainNode = audioContext.createGain();
+
+    // Bell frequencies
+    oscillator1.frequency.value = 800;
+    oscillator2.frequency.value = 1000;
+    oscillator3.frequency.value = 1200;
+
+    oscillator1.connect(gainNode);
+    oscillator2.connect(gainNode);
+    oscillator3.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    // Loud volume with decay
+    gainNode.gain.value = 0.8;
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+
+    oscillator1.start(audioContext.currentTime);
+    oscillator2.start(audioContext.currentTime);
+    oscillator3.start(audioContext.currentTime);
+
+    oscillator1.stop(audioContext.currentTime + 0.5);
+    oscillator2.stop(audioContext.currentTime + 0.5);
+    oscillator3.stop(audioContext.currentTime + 0.5);
+
+    console.log('🔔 Notification sound played!');
+  } catch (error) {
+    console.error('Failed to play notification sound:', error);
+  }
 };
 
 const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
@@ -1195,7 +1223,11 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                       onChange={(e) => setNewComment(e.target.value)}
                       onKeyPress={async (e) => {
                         if (e.key === 'Enter' && newComment.trim()) {
+                          console.log('💬 Adding comment:', newComment.trim());
                           const mentions = detectMentions(newComment.trim(), teamProfiles);
+                          console.log('👥 Detected mentions:', mentions);
+                          console.log('👤 Team profiles:', teamProfiles.map(p => ({ id: p.id, name: p.full_name })));
+
                           const comment: TaskComment = {
                             id: Date.now().toString(),
                             author: currentUser.name,
@@ -1215,9 +1247,10 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
 
                           // Create notifications for mentioned users
                           if (mentions.length > 0) {
-                            const client = clients.find(c => c.id === taskModal.clientId);
+                            console.log('📢 Creating notifications for', mentions.length, 'users');
                             for (const mentionedId of mentions) {
                               if (mentionedId !== currentUser.id) { // Don't notify self
+                                console.log('✉️ Notifying user:', mentionedId);
                                 await createNotification(
                                   mentionedId,
                                   `${currentUser.name} mentioned you`,
@@ -1227,7 +1260,10 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                 );
                               }
                             }
+                            console.log('🔔 Playing notification sound');
                             playNotificationSound();
+                          } else {
+                            console.log('⚠️ No mentions detected in comment');
                           }
                         }
                       }}
@@ -1237,7 +1273,10 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                     <button
                       onClick={async () => {
                         if (newComment.trim()) {
+                          console.log('💬 Adding comment (button):', newComment.trim());
                           const mentions = detectMentions(newComment.trim(), teamProfiles);
+                          console.log('👥 Detected mentions:', mentions);
+
                           const comment: TaskComment = {
                             id: Date.now().toString(),
                             author: currentUser.name,
@@ -1257,8 +1296,10 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
 
                           // Create notifications for mentioned users
                           if (mentions.length > 0) {
+                            console.log('📢 Creating notifications for', mentions.length, 'users');
                             for (const mentionedId of mentions) {
                               if (mentionedId !== currentUser.id) { // Don't notify self
+                                console.log('✉️ Notifying user:', mentionedId);
                                 await createNotification(
                                   mentionedId,
                                   `${currentUser.name} mentioned you`,
@@ -1268,7 +1309,10 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                 );
                               }
                             }
+                            console.log('🔔 Playing notification sound');
                             playNotificationSound();
+                          } else {
+                            console.log('⚠️ No mentions detected in comment');
                           }
                         }
                       }}
