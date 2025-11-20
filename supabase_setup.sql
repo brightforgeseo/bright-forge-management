@@ -110,29 +110,31 @@ CREATE POLICY "Profiles are viewable by everyone" ON profiles FOR SELECT USING (
 CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
 
 -- Allowed users policies (for invites)
+-- Note: Using auth.uid() IS NOT NULL instead of auth.role() = 'authenticated' for better compatibility
 CREATE POLICY "Anyone can check allowlist" ON allowed_users FOR SELECT USING (true);
-CREATE POLICY "Authenticated users can add to allowlist" ON allowed_users FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-CREATE POLICY "Authenticated users can update allowlist" ON allowed_users FOR UPDATE USING (auth.role() = 'authenticated');
+CREATE POLICY "Authenticated users can add to allowlist" ON allowed_users FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+CREATE POLICY "Authenticated users can update allowlist" ON allowed_users FOR UPDATE USING (auth.uid() IS NOT NULL);
+CREATE POLICY "Authenticated users can delete from allowlist" ON allowed_users FOR DELETE USING (auth.uid() IS NOT NULL);
 
 -- Channels policies
 CREATE POLICY "Channels are viewable by everyone" ON channels FOR SELECT USING (true);
-CREATE POLICY "Only authenticated users can create channels" ON channels FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-CREATE POLICY "Only authenticated users can delete channels" ON channels FOR DELETE USING (auth.role() = 'authenticated');
+CREATE POLICY "Only authenticated users can create channels" ON channels FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+CREATE POLICY "Only authenticated users can delete channels" ON channels FOR DELETE USING (auth.uid() IS NOT NULL);
 
 -- Chat messages policies
 CREATE POLICY "Messages are viewable by everyone" ON chat_messages FOR SELECT USING (true);
-CREATE POLICY "Authenticated users can send messages" ON chat_messages FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-CREATE POLICY "Authenticated users can delete messages" ON chat_messages FOR DELETE USING (auth.role() = 'authenticated');
+CREATE POLICY "Authenticated users can send messages" ON chat_messages FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+CREATE POLICY "Authenticated users can delete messages" ON chat_messages FOR DELETE USING (auth.uid() IS NOT NULL);
 
 -- Client boards policies
 CREATE POLICY "Boards are viewable by everyone" ON client_boards FOR SELECT USING (true);
-CREATE POLICY "Authenticated users can create boards" ON client_boards FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-CREATE POLICY "Authenticated users can update boards" ON client_boards FOR UPDATE USING (auth.role() = 'authenticated');
-CREATE POLICY "Authenticated users can delete boards" ON client_boards FOR DELETE USING (auth.role() = 'authenticated');
+CREATE POLICY "Authenticated users can create boards" ON client_boards FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+CREATE POLICY "Authenticated users can update boards" ON client_boards FOR UPDATE USING (auth.uid() IS NOT NULL);
+CREATE POLICY "Authenticated users can delete boards" ON client_boards FOR DELETE USING (auth.uid() IS NOT NULL);
 
 -- Notifications policies
 CREATE POLICY "Users can view their own notifications" ON notifications FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Authenticated users can create notifications" ON notifications FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Authenticated users can create notifications" ON notifications FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 CREATE POLICY "Users can update their own notifications" ON notifications FOR UPDATE USING (auth.uid() = user_id);
 
 -- Step 6: Create storage bucket for uploads
