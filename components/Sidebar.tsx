@@ -89,6 +89,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   message: newNote.message,
                   type: newNote.type,
                   linkView: newNote.link_view,
+                  linkData: newNote.link_data,
                   isRead: newNote.is_read,
                   createdAt: newNote.created_at
               }, ...prev]);
@@ -202,6 +203,17 @@ const Sidebar: React.FC<SidebarProps> = ({
                                      if(n.linkView) {
                                        onChangeView(n.linkView as ToolView);
                                        setIsNotificationsOpen(false); // Close dropdown after clicking
+
+                                       // If there's link data (task/board info), store it for TaskBoard to open
+                                       if (n.linkData) {
+                                         try {
+                                           const linkData = JSON.parse(n.linkData);
+                                           console.log('📍 Storing link data for task modal:', linkData);
+                                           localStorage.setItem('openTaskModal', n.linkData);
+                                         } catch (e) {
+                                           console.error('Error parsing link data:', e);
+                                         }
+                                       }
                                      }
                                  }}
                                >

@@ -69,6 +69,7 @@ export const fetchNotifications = async (userId: string): Promise<AppNotificatio
     message: n.message,
     type: n.type,
     linkView: n.link_view,
+    linkData: n.link_data,
     isRead: n.is_read,
     createdAt: n.created_at
   }));
@@ -79,15 +80,17 @@ export const createNotification = async (
   title: string,
   message: string,
   type: 'info' | 'success' | 'alert' | 'message',
-  linkView?: string
+  linkView?: string,
+  linkData?: any
 ) => {
-  console.log('📬 Creating notification:', { userId, title, message, type, linkView });
+  console.log('📬 Creating notification:', { userId, title, message, type, linkView, linkData });
   const { data, error } = await supabase.from('notifications').insert({
     user_id: userId,
     title,
     message,
     type,
-    link_view: linkView
+    link_view: linkView,
+    link_data: linkData ? JSON.stringify(linkData) : null
   });
 
   if (error) {
@@ -368,7 +371,12 @@ export const checkDueDateNotifications = async (currentUserId: string) => {
               'Task Due Today',
               `"${task.title}" is due today on ${board.name}`,
               'alert',
-              'TASKS'
+              'TASKS',
+              {
+                taskId: task.id,
+                boardId: board.id,
+                groupId: group.id
+              }
             );
             notificationCount++;
             console.log('✉️ Created due date notification for task:', task.title);

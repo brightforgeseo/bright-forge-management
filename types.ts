@@ -29,6 +29,7 @@ export interface AppNotification {
   message: string;
   type: 'info' | 'success' | 'alert' | 'message';
   linkView?: string;
+  linkData?: string; // JSON string with task/board IDs
   isRead: boolean;
   createdAt: string;
 }

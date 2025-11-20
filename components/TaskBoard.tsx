@@ -116,6 +116,37 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
       }
       setTeamProfiles(profiles);
       setIsLoadingData(false);
+
+      // Check if we should open a task modal from notification
+      const openTaskData = localStorage.getItem('openTaskModal');
+      if (openTaskData) {
+        try {
+          const { taskId, boardId, groupId } = JSON.parse(openTaskData);
+          console.log('📂 Opening task from notification:', { taskId, boardId, groupId });
+
+          // Find the board, group, and task
+          const board = boards.find(b => b.id === boardId);
+          if (board) {
+            const group = board.groups.find(g => g.id === groupId);
+            if (group) {
+              const task = group.tasks.find(t => t.id === taskId);
+              if (task) {
+                setTaskModal({
+                  task,
+                  groupId: group.id,
+                  clientId: board.id,
+                  groupTitle: group.title,
+                  groupColor: group.color
+                });
+                setSelectedClientId(board.id);
+              }
+            }
+          }
+          localStorage.removeItem('openTaskModal');
+        } catch (e) {
+          console.error('Error opening task modal:', e);
+        }
+      }
     };
     loadData();
   }, []);
