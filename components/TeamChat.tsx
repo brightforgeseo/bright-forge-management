@@ -123,12 +123,15 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
 
   // Message Listener with improved DM handling
   useEffect(() => {
+    console.log('[TeamChat] Setting up realtime subscription');
     const msgSub = supabase.channel('public:chat_messages')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, async (payload) => {
          const newMsg = payload.new as any;
-         
+         console.log('[TeamChat] Realtime message received:', newMsg);
+
          // 1. Is this for the channel I'm looking at?
          if (newMsg.channel_id === activeChannelRef.current) {
+             console.log('[TeamChat] Message is for active channel, adding to messages');
              setMessages(prev => {
                  // Prevent duplicates
                  if (prev.some(m => m.id === newMsg.id)) return prev;
@@ -146,8 +149,10 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
              });
              scrollToBottom();
          } else {
+             console.log('[TeamChat] Message is for different channel, looking up channel');
              // 2. It's for a different channel
              let targetChannel = channelsRef.current.find(c => c.id === newMsg.channel_id);
+             console.log('[TeamChat] Target channel:', targetChannel);
              
              // CRITICAL FIX: If we don't know about this channel, fetch all channels
              if (!targetChannel) {
