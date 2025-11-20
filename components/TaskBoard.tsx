@@ -1365,6 +1365,13 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                             const currentBoard = clients.find(c => c.id === taskModal.clientId);
                             const boardName = currentBoard?.name || 'Project';
 
+                            console.log('🔍 Notification linkData will be:', {
+                              taskId: taskModal.task.id,
+                              boardId: taskModal.clientId,
+                              groupId: taskModal.groupId,
+                              boardName: boardName
+                            });
+
                             for (const mentionedId of mentions) {
                               if (mentionedId !== currentUser.id) { // Don't notify self
                                 console.log('✉️ Notifying user:', mentionedId);
@@ -1491,6 +1498,13 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                             // Get the board name for the notification
                             const currentBoard = clients.find(c => c.id === taskModal.clientId);
                             const boardName = currentBoard?.name || 'Project';
+
+                            console.log('🔍 Notification linkData will be:', {
+                              taskId: taskModal.task.id,
+                              boardId: taskModal.clientId,
+                              groupId: taskModal.groupId,
+                              boardName: boardName
+                            });
 
                             for (const mentionedId of mentions) {
                               if (mentionedId !== currentUser.id) { // Don't notify self
