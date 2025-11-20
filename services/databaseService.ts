@@ -362,6 +362,8 @@ export const checkDueDateNotifications = async (currentUserId: string) => {
               .gte('created_at', todayStart)
               .lte('created_at', todayEnd);
 
+            console.log(`🔍 Checking for duplicates: found ${existingNotifications?.length || 0} notifications with title "Task Due Today" today`);
+
             // Check if any existing notification has this exact task ID in linkData
             // OR if the message contains this exact task title (for backwards compatibility)
             const alreadyNotified = existingNotifications?.some(n => {
@@ -369,16 +371,24 @@ export const checkDueDateNotifications = async (currentUserId: string) => {
                 // First try to match by linkData (most accurate)
                 if (n.link_data) {
                   const linkData = JSON.parse(n.link_data);
+                  console.log(`  Comparing: linkData.taskId=${linkData.taskId} vs task.id=${task.id}, linkData.boardId=${linkData.boardId} vs boardData.id=${boardData.id}`);
                   if (linkData.taskId === task.id && linkData.boardId === boardData.id) {
+                    console.log('  ✅ MATCH FOUND via linkData');
                     return true;
                   }
                 }
                 // Fallback: check if message contains this exact task title and board name
                 const expectedMessage = `"${task.title}" is due today on ${boardData.name}`;
-                return n.message === expectedMessage;
-              } catch {
+                console.log(`  Comparing messages: "${n.message}" vs "${expectedMessage}"`);
+                if (n.message === expectedMessage) {
+                  console.log('  ✅ MATCH FOUND via message');
+                  return true;
+                }
+              } catch (e) {
+                console.error('  Error comparing notification:', e);
                 return false;
               }
+              return false;
             });
 
             if (alreadyNotified) {
@@ -386,6 +396,8 @@ export const checkDueDateNotifications = async (currentUserId: string) => {
               skippedCount++;
               continue;
             }
+
+            console.log('✨ No duplicate found, will create notification for:', task.title);
 
             try {
               await createNotification(
