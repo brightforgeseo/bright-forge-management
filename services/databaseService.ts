@@ -350,18 +350,28 @@ export const checkDueDateNotifications = async (currentUserId: string) => {
 
             console.log('⏰ YOUR task due today:', task.title);
 
-            // Check if we already created this notification today
+            // Check if we already created this notification today for this specific task
+            // We check linkData to ensure we match the exact task, not just similar titles
             const { data: existingNotifications } = await supabase
               .from('notifications')
-              .select('id')
+              .select('id, link_data')
               .eq('user_id', currentUserId)
               .eq('title', 'Task Due Today')
-              .ilike('message', `%${task.title}%`)
               .gte('created_at', todayStart)
               .lte('created_at', todayEnd);
 
-            if (existingNotifications && existingNotifications.length > 0) {
-              console.log('⏭️ Notification already exists for:', task.title);
+            // Check if any existing notification has this exact task ID in linkData
+            const alreadyNotified = existingNotifications?.some(n => {
+              try {
+                const linkData = JSON.parse(n.link_data || '{}');
+                return linkData.taskId === task.id && linkData.boardId === boardData.id;
+              } catch {
+                return false;
+              }
+            });
+
+            if (alreadyNotified) {
+              console.log('⏭️ Notification already exists for task:', task.title);
               skippedCount++;
               continue;
             }
