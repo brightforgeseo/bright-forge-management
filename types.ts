@@ -121,6 +121,12 @@ export interface TaskGroup {
   isCollapsed?: boolean;
 }
 
+export interface MessageReaction {
+  emoji: string;
+  userIds: string[]; // Array of user IDs who reacted with this emoji
+  count: number;
+}
+
 export interface ChatMessage {
   id: string;
   channelId?: string;
@@ -134,6 +140,7 @@ export interface ChatMessage {
   attachmentType?: 'image' | 'file';
   isEdited?: boolean; // Flag to show message was edited
   editedAt?: string; // Timestamp of last edit
+  reactions?: MessageReaction[]; // Emoji reactions on this message
 }
 
 export interface ChatChannel {

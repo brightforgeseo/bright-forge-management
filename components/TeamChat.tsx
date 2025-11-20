@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check, Smile, Film } from 'lucide-react';
-import { ChatChannel, ChatMessage, User, ToastType, Profile } from '../types';
+import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check, Smile, Film, SmilePlus } from 'lucide-react';
+import { ChatChannel, ChatMessage, User, ToastType, Profile, MessageReaction } from '../types';
 import { getChatResponse } from '../services/geminiService';
-import { fetchChatMessages, sendChatMessage, clearChatHistory, uploadFile, fetchChannels, createChannel, deleteChannel, fetchProfiles, getOrCreateDMChannel, createNotification, editChatMessage } from '../services/databaseService';
+import { fetchChatMessages, sendChatMessage, clearChatHistory, uploadFile, fetchChannels, createChannel, deleteChannel, fetchProfiles, getOrCreateDMChannel, createNotification, editChatMessage, fetchMessageReactions, addMessageReaction, removeMessageReaction } from '../services/databaseService';
 import { supabase } from '../lib/supabaseClient';
 
 interface TeamChatProps {
@@ -41,6 +41,10 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
   const [gifSearch, setGifSearch] = useState('');
   const [gifs, setGifs] = useState<any[]>([]);
   const [gifLoading, setGifLoading] = useState(false);
+
+  // Reaction state
+  const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null); // messageId or null
+  const [messageReactions, setMessageReactions] = useState<Record<string, MessageReaction[]>>({}); // messageId -> reactions
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -147,6 +151,26 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
       }
     }
   }, [showGifPicker, gifs.length]);
+
+  // Load reactions for all visible messages
+  useEffect(() => {
+    const loadReactions = async () => {
+      const reactionData: Record<string, MessageReaction[]> = {};
+
+      for (const msg of messages) {
+        const reactions = await fetchMessageReactions(msg.id);
+        if (reactions.length > 0) {
+          reactionData[msg.id] = reactions;
+        }
+      }
+
+      setMessageReactions(reactionData);
+    };
+
+    if (messages.length > 0) {
+      loadReactions();
+    }
+  }, [messages]);
 
   // Sync Refs for listeners to avoid dependency loops
   useEffect(() => {
@@ -424,7 +448,28 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(msgSub); };
+    // Real-time reactions subscription
+    const reactionsSub = supabase.channel('public:message_reactions')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, async (payload) => {
+        const reactionData = payload.new as any;
+        const messageId = reactionData?.message_id || (payload.old as any)?.message_id;
+
+        if (!messageId) return;
+
+        // Reload reactions for this message
+        const updatedReactions = await fetchMessageReactions(messageId);
+
+        setMessageReactions(prev => ({
+          ...prev,
+          [messageId]: updatedReactions
+        }));
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(msgSub);
+      supabase.removeChannel(reactionsSub);
+    };
   }, [currentUser.id, currentUser.name]);
 
   // Active Channel Switch
@@ -592,6 +637,72 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
   const handleCancelEdit = () => {
     setEditingMessageId(null);
     setEditingText('');
+  };
+
+  // Handle adding/removing reactions
+  const handleReaction = async (messageId: string, emoji: string) => {
+    try {
+      const reactions = messageReactions[messageId] || [];
+      const existingReaction = reactions.find(r => r.emoji === emoji);
+
+      if (existingReaction && existingReaction.userIds.includes(currentUser.id)) {
+        // User already reacted with this emoji - remove it
+        await removeMessageReaction(messageId, currentUser.id, emoji);
+
+        // Update local state
+        setMessageReactions(prev => {
+          const updated = { ...prev };
+          const msgReactions = updated[messageId] || [];
+          updated[messageId] = msgReactions
+            .map(r => {
+              if (r.emoji === emoji) {
+                return {
+                  ...r,
+                  userIds: r.userIds.filter(id => id !== currentUser.id),
+                  count: r.count - 1
+                };
+              }
+              return r;
+            })
+            .filter(r => r.count > 0); // Remove reactions with 0 count
+          return updated;
+        });
+      } else {
+        // Add new reaction
+        await addMessageReaction(messageId, currentUser.id, emoji);
+
+        // Update local state
+        setMessageReactions(prev => {
+          const updated = { ...prev };
+          const msgReactions = updated[messageId] || [];
+          const existingIdx = msgReactions.findIndex(r => r.emoji === emoji);
+
+          if (existingIdx >= 0) {
+            // Emoji already exists, add user to it
+            msgReactions[existingIdx] = {
+              ...msgReactions[existingIdx],
+              userIds: [...msgReactions[existingIdx].userIds, currentUser.id],
+              count: msgReactions[existingIdx].count + 1
+            };
+          } else {
+            // New emoji
+            msgReactions.push({
+              emoji,
+              userIds: [currentUser.id],
+              count: 1
+            });
+          }
+
+          updated[messageId] = msgReactions;
+          return updated;
+        });
+      }
+
+      setShowReactionPicker(null);
+    } catch (error) {
+      console.error('Error handling reaction:', error);
+      addToast('error', 'Failed to add reaction');
+    }
   };
 
   const handleSendMessage = async () => {
@@ -1080,6 +1191,54 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                     )}
                   </div>
                 )}
+
+                {/* Reactions Display and Picker */}
+                <div className="mt-2 flex flex-wrap items-center gap-1">
+                  {/* Show existing reactions */}
+                  {(messageReactions[msg.id] || []).map((reaction) => (
+                    <button
+                      key={reaction.emoji}
+                      onClick={() => handleReaction(msg.id, reaction.emoji)}
+                      className={`flex items-center gap-1 px-2 py-1 rounded-full text-sm transition-all ${
+                        reaction.userIds.includes(currentUser.id)
+                          ? 'bg-brand-100 border-brand-300 border-2'
+                          : 'bg-slate-100 border border-slate-300 hover:bg-slate-200'
+                      }`}
+                      title={`Reacted by ${reaction.count} ${reaction.count === 1 ? 'person' : 'people'}`}
+                    >
+                      <span>{reaction.emoji}</span>
+                      <span className="text-xs font-medium text-slate-600">{reaction.count}</span>
+                    </button>
+                  ))}
+
+                  {/* Add reaction button */}
+                  {!msg.isAi && (
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowReactionPicker(showReactionPicker === msg.id ? null : msg.id)}
+                        className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 transition-opacity"
+                        title="Add reaction"
+                      >
+                        <SmilePlus className="w-4 h-4" />
+                      </button>
+
+                      {/* Reaction picker dropdown */}
+                      {showReactionPicker === msg.id && (
+                        <div className="absolute left-0 bottom-full mb-2 bg-white rounded-lg shadow-xl border border-slate-200 p-2 z-50 flex gap-1">
+                          {['👍', '❤️', '😂', '😮', '😢', '👏', '🎉', '🔥'].map((emoji) => (
+                            <button
+                              key={emoji}
+                              onClick={() => handleReaction(msg.id, emoji)}
+                              className="text-2xl hover:scale-125 transition-transform p-1"
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
            ))}

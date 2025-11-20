@@ -306,6 +306,68 @@ export const clearChatHistory = async (channelId: string) => {
     await supabase.from('chat_messages').delete().eq('channel_id', channelId);
 }
 
+// --- Message Reactions ---
+
+export const fetchMessageReactions = async (messageId: string) => {
+  const { data, error } = await supabase
+    .from('message_reactions')
+    .select('*')
+    .eq('message_id', messageId);
+
+  if (error) {
+    console.error('Error fetching reactions:', error);
+    return [];
+  }
+
+  // Group reactions by emoji
+  const reactionMap = new Map<string, { emoji: string; userIds: string[]; count: number }>();
+
+  data.forEach((reaction: any) => {
+    const existing = reactionMap.get(reaction.emoji);
+    if (existing) {
+      existing.userIds.push(reaction.user_id);
+      existing.count++;
+    } else {
+      reactionMap.set(reaction.emoji, {
+        emoji: reaction.emoji,
+        userIds: [reaction.user_id],
+        count: 1
+      });
+    }
+  });
+
+  return Array.from(reactionMap.values());
+};
+
+export const addMessageReaction = async (messageId: string, userId: string, emoji: string) => {
+  const { error } = await supabase
+    .from('message_reactions')
+    .insert({
+      message_id: messageId,
+      user_id: userId,
+      emoji
+    });
+
+  if (error) {
+    console.error('Error adding reaction:', error);
+    throw error;
+  }
+};
+
+export const removeMessageReaction = async (messageId: string, userId: string, emoji: string) => {
+  const { error } = await supabase
+    .from('message_reactions')
+    .delete()
+    .eq('message_id', messageId)
+    .eq('user_id', userId)
+    .eq('emoji', emoji);
+
+  if (error) {
+    console.error('Error removing reaction:', error);
+    throw error;
+  }
+};
+
 // --- Storage ---
 
 export const uploadFile = async (file: File, bucket: string = 'uploads'): Promise<string | null> => {
