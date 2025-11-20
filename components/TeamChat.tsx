@@ -246,20 +246,37 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
 
   // Direct Messaging - Improved with retry logic
   const handleStartDM = async (targetProfileId: string) => {
+      console.log('[TeamChat] Starting DM with user:', targetProfileId);
+      console.log('[TeamChat] Current user ID:', currentUser.id);
+
       try {
+          // Don't allow DM with yourself
+          if (targetProfileId === currentUser.id) {
+              addToast('info', 'Cannot message yourself!');
+              return;
+          }
+
           // Create or get DM channel
+          console.log('[TeamChat] Calling getOrCreateDMChannel...');
           const dmChannel = await getOrCreateDMChannel(currentUser.id, targetProfileId);
-          
+          console.log('[TeamChat] DM Channel created/found:', dmChannel);
+
           // Ensure it's in our local state
           setChannels(prev => {
-              if (prev.find(c => c.id === dmChannel.id)) return prev;
+              if (prev.find(c => c.id === dmChannel.id)) {
+                  console.log('[TeamChat] DM channel already in state');
+                  return prev;
+              }
+              console.log('[TeamChat] Adding DM channel to state');
               return [...prev, dmChannel];
           });
-          
+
           // Switch to it
+          console.log('[TeamChat] Switching to DM channel:', dmChannel.id);
           setActiveChannelId(dmChannel.id);
+          addToast('success', 'DM conversation opened!');
       } catch (e) {
-          console.error('DM creation error:', e);
+          console.error('[TeamChat] DM creation error:', e);
           addToast('error', 'Could not start DM. Please try again.');
       }
   };
