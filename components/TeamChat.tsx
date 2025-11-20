@@ -632,7 +632,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
     }
   };
 
-  const handlePaste = async (e: React.ClipboardEvent) => {
+  const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
       const items = e.clipboardData.items;
 
       // Check if pasting an image
@@ -675,8 +675,22 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
           }
       }
 
-      // For text paste: allow default behavior, don't auto-send
-      // Text will be inserted into textarea normally
+      // For text paste: manually handle to prevent any auto-send behavior
+      e.preventDefault();
+      const text = e.clipboardData.getData('text/plain');
+      const textarea = e.currentTarget;
+      const start = textarea.selectionStart || 0;
+      const end = textarea.selectionEnd || 0;
+      const currentValue = textarea.value;
+
+      // Insert pasted text at cursor position
+      const newValue = currentValue.substring(0, start) + text + currentValue.substring(end);
+      setMessage(newValue);
+
+      // Set cursor position after pasted text
+      setTimeout(() => {
+        textarea.selectionStart = textarea.selectionEnd = start + text.length;
+      }, 0);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
