@@ -32,6 +32,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const activeChannelRef = useRef<string>('');
+  const previousChannelRef = useRef<string>('');
   const channelsRef = useRef<ChatChannel[]>([]);
   const profilesRef = useRef<Profile[]>([]);
   const [mentionDropdown, setMentionDropdown] = useState<{ show: boolean; search: string; position: number } | null>(null);
@@ -282,30 +283,34 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
   // Active Channel Switch
   useEffect(() => {
     if (!activeChannelId) return;
-    activeChannelRef.current = activeChannelId;
 
-    // First, save current messages to cache before switching
-    if (messages.length > 0 && activeChannelId) {
-      const previousChannelId = channelsRef.current.find(c => c.id !== activeChannelId)?.id;
-      if (previousChannelId) {
-        setMessageCache(prev => ({ ...prev, [previousChannelId]: messages }));
-      }
+    // Save current messages to cache before switching (using the previous channel ID)
+    if (previousChannelRef.current && messages.length > 0) {
+      setMessageCache(prev => ({ ...prev, [previousChannelRef.current]: messages }));
+      console.log(`Saved ${messages.length} messages to cache for channel:`, previousChannelRef.current);
     }
+
+    // Update refs for the new channel
+    activeChannelRef.current = activeChannelId;
+    previousChannelRef.current = activeChannelId;
 
     const loadMsgs = async () => {
       // Check if we have cached messages for this channel
-      if (messageCache[activeChannelId]) {
-        console.log('Loading messages from cache for channel:', activeChannelId);
+      if (messageCache[activeChannelId] && messageCache[activeChannelId].length > 0) {
+        console.log(`Loading ${messageCache[activeChannelId].length} messages from cache for channel:`, activeChannelId);
         setMessages(messageCache[activeChannelId]);
 
         // Also fetch fresh messages in background to update cache
         fetchChatMessages(activeChannelId).then(freshMsgs => {
+          console.log(`Fetched ${freshMsgs.length} fresh messages for channel:`, activeChannelId);
           setMessages(freshMsgs);
           setMessageCache(prev => ({ ...prev, [activeChannelId]: freshMsgs }));
         });
       } else {
         // No cache, fetch from database
+        console.log('No cache found, fetching from database for channel:', activeChannelId);
         const msgs = await fetchChatMessages(activeChannelId);
+        console.log(`Fetched ${msgs.length} messages from database for channel:`, activeChannelId);
         setMessages(msgs);
         setMessageCache(prev => ({ ...prev, [activeChannelId]: msgs }));
       }
