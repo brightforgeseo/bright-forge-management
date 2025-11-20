@@ -48,8 +48,10 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
       }
 
       // Upload to Supabase storage
+      // Note: Using 'uploads' bucket until 'avatars' bucket is created
+      // Run SETUP_AVATARS_BUCKET.sql to create the dedicated avatars bucket
       console.log('[Settings] Starting avatar upload...');
-      const url = await uploadFile(file, 'avatars');
+      const url = await uploadFile(file, 'uploads');
       console.log('[Settings] Upload result:', url);
 
       if (url) {
