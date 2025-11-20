@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check } from 'lucide-react';
+import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check, Smile } from 'lucide-react';
 import { ChatChannel, ChatMessage, User, ToastType, Profile } from '../types';
 import { getChatResponse } from '../services/geminiService';
 import { fetchChatMessages, sendChatMessage, clearChatHistory, uploadFile, fetchChannels, createChannel, deleteChannel, fetchProfiles, getOrCreateDMChannel, createNotification, editChatMessage } from '../services/databaseService';
@@ -32,6 +32,9 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
   // Message editing state
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
+
+  // Emoji picker state
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1140,9 +1143,44 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                 className={`w-full max-h-40 min-h-[60px] p-3 outline-none resize-none rounded-t-xl ${isChannelReadOnly ? 'bg-slate-50 text-slate-400 cursor-not-allowed' : ''}`}
              />
              <div className={`flex justify-between items-center p-2 border-t rounded-b-xl ${isChannelReadOnly ? 'bg-slate-50 border-slate-200' : 'bg-slate-50 border-slate-100'}`}>
-                <div className="flex gap-1">
+                <div className="flex gap-1 relative">
                    <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
                    <button onClick={() => fileInputRef.current?.click()} disabled={isChannelReadOnly} className="p-2 hover:bg-slate-200 rounded-full text-slate-500 disabled:opacity-50 disabled:cursor-not-allowed"><ImageIcon className="w-5 h-5" /></button>
+
+                   {/* Emoji Picker Button */}
+                   <button
+                     onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                     disabled={isChannelReadOnly}
+                     className="p-2 hover:bg-slate-200 rounded-full text-slate-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                   >
+                     <Smile className="w-5 h-5" />
+                   </button>
+
+                   {/* Emoji Picker Dropdown */}
+                   {showEmojiPicker && (
+                     <div className="absolute bottom-full left-0 mb-2 bg-white rounded-lg shadow-xl border border-slate-200 p-3 z-[100] w-80">
+                       <div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-200">
+                         <p className="text-sm font-bold text-slate-700">Emojis</p>
+                         <button onClick={() => setShowEmojiPicker(false)} className="text-slate-400 hover:text-slate-600">
+                           <X className="w-4 h-4" />
+                         </button>
+                       </div>
+                       <div className="grid grid-cols-8 gap-2 max-h-64 overflow-y-auto">
+                         {['😀', '😃', '😄', '😁', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '😣', '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬', '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗', '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯', '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '🤐', '🥴', '🤢', '🤮', '🤧', '😷', '🤒', '🤕', '🤑', '🤠', '👍', '👎', '👏', '🙌', '👋', '🤝', '🙏', '💪', '✌️', '🤞', '🤟', '🤘', '👌', '🤌', '🤏', '👈', '👉', '👆', '👇', '☝️', '✋', '🤚', '🖐️', '🖖', '👊', '✊', '🤛', '🤜', '💯', '🔥', '⚡', '💥', '💫', '⭐', '🌟', '✨', '💝', '💖', '💗', '💓', '💞', '💕', '💟', '❤️', '🧡', '💛', '💚', '💙', '💜', '🤎', '🖤', '🤍', '💔', '❣️', '💘', '💌', '👀', '👁️', '🧠', '🗣️', '👤', '👥', '🫂', '🎉', '🎊', '🎈', '🎁', '🏆', '🥇', '🥈', '🥉', '⚽', '🏀', '🏈', '⚾', '🎾', '🏐', '🏉', '🎱', '🎮', '🎯', '🎲'].map(emoji => (
+                           <button
+                             key={emoji}
+                             onClick={() => {
+                               setMessage(message + emoji);
+                               setShowEmojiPicker(false);
+                             }}
+                             className="text-2xl hover:bg-slate-100 rounded p-1 transition-colors"
+                           >
+                             {emoji}
+                           </button>
+                         ))}
+                       </div>
+                     </div>
+                   )}
                 </div>
                 <button onClick={handleSendMessage} disabled={loading || isChannelReadOnly || (!message.trim() && !isUploading)} className="p-2 bg-green-700 text-white rounded-lg hover:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed">
                    {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
