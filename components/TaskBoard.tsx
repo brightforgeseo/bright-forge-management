@@ -156,6 +156,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   const [labelEditorType, setLabelEditorType] = useState<'status' | 'priority'>('status');
   const [taskModal, setTaskModal] = useState<{ task: Task, groupId: string, clientId: string, groupTitle: string, groupColor: string } | null>(null);
   const [newComment, setNewComment] = useState('');
+  const [mentionDropdown, setMentionDropdown] = useState<{ show: boolean, search: string, position: number } | null>(null);
 
   const activeClient = clients.find(c => c.id === selectedClientId);
 
@@ -1216,13 +1217,41 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                       </div>
                     )}
                   </div>
-                  <div className="flex-1 flex gap-2">
+                  <div className="flex-1 flex gap-2 relative">
                     <input
                       type="text"
                       value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setNewComment(value);
+
+                        // Detect @ for mentions
+                        const cursorPos = e.target.selectionStart || 0;
+                        const textBeforeCursor = value.substring(0, cursorPos);
+                        const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+
+                        if (lastAtIndex !== -1 && cursorPos > lastAtIndex) {
+                          const searchText = textBeforeCursor.substring(lastAtIndex + 1);
+                          // Only show if @ is at start or after space
+                          const charBeforeAt = lastAtIndex > 0 ? textBeforeCursor[lastAtIndex - 1] : ' ';
+                          if (charBeforeAt === ' ' || lastAtIndex === 0) {
+                            setMentionDropdown({ show: true, search: searchText.toLowerCase(), position: cursorPos });
+                          } else {
+                            setMentionDropdown(null);
+                          }
+                        } else {
+                          setMentionDropdown(null);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        // Close dropdown on Escape
+                        if (e.key === 'Escape') {
+                          setMentionDropdown(null);
+                        }
+                      }}
                       onKeyPress={async (e) => {
                         if (e.key === 'Enter' && newComment.trim()) {
+                          setMentionDropdown(null); // Close dropdown when submitting
                           console.log('💬 Adding comment:', newComment.trim());
                           const mentions = detectMentions(newComment.trim(), teamProfiles);
                           console.log('👥 Detected mentions:', mentions);
@@ -1267,9 +1296,74 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                           }
                         }
                       }}
-                      placeholder="Add a comment..."
+                      placeholder="Add a comment... (Use @name or @everyone to mention)"
                       className="flex-1 p-2 border border-slate-300 rounded-lg outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 text-sm"
                     />
+
+                    {/* Mention Dropdown */}
+                    {mentionDropdown?.show && (
+                      <div className="absolute bottom-full left-0 mb-2 w-64 bg-white rounded-lg shadow-xl border border-slate-200 overflow-hidden z-50 animate-fadeIn">
+                        <div className="p-2 bg-slate-50 border-b border-slate-200">
+                          <p className="text-xs font-bold text-slate-500 uppercase">Mention Someone</p>
+                        </div>
+                        <div className="max-h-48 overflow-y-auto">
+                          {/* @everyone option */}
+                          {(!mentionDropdown.search || 'everyone'.includes(mentionDropdown.search)) && (
+                            <button
+                              onClick={() => {
+                                const lastAtIndex = newComment.lastIndexOf('@');
+                                const newText = newComment.substring(0, lastAtIndex) + '@everyone ' + newComment.substring(mentionDropdown.position);
+                                setNewComment(newText);
+                                setMentionDropdown(null);
+                              }}
+                              className="w-full text-left px-3 py-2 hover:bg-brand-50 transition-colors flex items-center gap-2 text-sm"
+                            >
+                              <div className="w-8 h-8 rounded-full bg-brand-600 flex items-center justify-center text-white font-bold text-xs">
+                                ALL
+                              </div>
+                              <div>
+                                <p className="font-medium text-slate-900">@everyone</p>
+                                <p className="text-xs text-slate-500">Notify all team members</p>
+                              </div>
+                            </button>
+                          )}
+
+                          {/* Team members */}
+                          {teamProfiles
+                            .filter(profile => {
+                              if (!mentionDropdown.search) return true;
+                              const name = (profile.full_name || '').toLowerCase();
+                              return name.includes(mentionDropdown.search);
+                            })
+                            .map(profile => (
+                              <button
+                                key={profile.id}
+                                onClick={() => {
+                                  const lastAtIndex = newComment.lastIndexOf('@');
+                                  const mentionText = profile.full_name?.split(' ')[0] || 'User';
+                                  const newText = newComment.substring(0, lastAtIndex) + '@' + mentionText + ' ' + newComment.substring(mentionDropdown.position);
+                                  setNewComment(newText);
+                                  setMentionDropdown(null);
+                                }}
+                                className="w-full text-left px-3 py-2 hover:bg-brand-50 transition-colors flex items-center gap-2 text-sm"
+                              >
+                                {profile.avatar_url ? (
+                                  <img src={profile.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover" />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-bold text-xs">
+                                    {profile.full_name?.charAt(0) || '?'}
+                                  </div>
+                                )}
+                                <div>
+                                  <p className="font-medium text-slate-900">{profile.full_name || 'Unknown'}</p>
+                                  <p className="text-xs text-slate-500">@{profile.full_name?.split(' ')[0] || 'user'}</p>
+                                </div>
+                              </button>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+
                     <button
                       onClick={async () => {
                         if (newComment.trim()) {
