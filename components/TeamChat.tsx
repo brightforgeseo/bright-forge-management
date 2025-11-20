@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw } from 'lucide-react';
+import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check } from 'lucide-react';
 import { ChatChannel, ChatMessage, User, ToastType, Profile } from '../types';
 import { getChatResponse } from '../services/geminiService';
-import { fetchChatMessages, sendChatMessage, clearChatHistory, uploadFile, fetchChannels, createChannel, deleteChannel, fetchProfiles, getOrCreateDMChannel, createNotification } from '../services/databaseService';
+import { fetchChatMessages, sendChatMessage, clearChatHistory, uploadFile, fetchChannels, createChannel, deleteChannel, fetchProfiles, getOrCreateDMChannel, createNotification, editChatMessage } from '../services/databaseService';
 import { supabase } from '../lib/supabaseClient';
 
 interface TeamChatProps {
@@ -28,6 +28,10 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
 
   // Cache messages for each channel to prevent losing messages when switching
   const [messageCache, setMessageCache] = useState<Record<string, ChatMessage[]>>({});
+
+  // Message editing state
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState('');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -105,6 +109,54 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
       profilesRef.current = profiles;
   }, [profiles]);
 
+  // Presence Tracking - Track who's online
+  useEffect(() => {
+    const presenceChannel = supabase.channel('online-users', {
+      config: {
+        presence: {
+          key: currentUser.id,
+        },
+      },
+    });
+
+    // Subscribe to presence changes
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        const state = presenceChannel.presenceState();
+        console.log('[Presence] Online users:', state);
+
+        // Update profiles with online status
+        setProfiles(prev => prev.map(profile => {
+          const isOnline = Object.keys(state).includes(profile.id);
+          return { ...profile, isOnline };
+        }));
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('[Presence] Connected, tracking online status');
+          // Broadcast your presence
+          await presenceChannel.track({
+            user: currentUser.id,
+            online_at: new Date().toISOString(),
+          });
+        }
+      });
+
+    // Heartbeat to keep presence alive
+    const heartbeat = setInterval(() => {
+      presenceChannel.track({
+        user: currentUser.id,
+        online_at: new Date().toISOString(),
+      });
+    }, 30000); // Update every 30 seconds
+
+    return () => {
+      clearInterval(heartbeat);
+      presenceChannel.untrack();
+      supabase.removeChannel(presenceChannel);
+    };
+  }, [currentUser.id]);
+
   // Load Data
   const refreshData = async () => {
       setIsRefreshing(true);
@@ -131,13 +183,13 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
 
   // Helper: Get other user info in DM
   const getDMInfo = (ch: ChatChannel) => {
-      if (ch.type !== 'dm') return { name: ch.name, avatar: null };
+      if (ch.type !== 'dm') return { name: ch.name, avatar: null, isOnline: false };
       const ids = parseDMChannel(ch.name);
       const otherId = ids.find(id => id !== currentUser.id);
 
       if (!otherId) {
           // Self-DM or malformed
-          return { name: 'You', avatar: currentUser.avatarUrl };
+          return { name: 'You', avatar: currentUser.avatarUrl, isOnline: false };
       }
 
       const prof = profiles.find(p => p.id === otherId);
@@ -153,7 +205,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
 
       return {
           name: displayName,
-          avatar: prof?.avatar_url || null
+          avatar: prof?.avatar_url || null,
+          isOnline: prof?.isOnline || false
       };
   };
 
@@ -247,9 +300,20 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
 
              // CRITICAL FIX: If we don't know about this channel, fetch all channels
              if (!targetChannel) {
+                 console.log('[TeamChat] Channel not found locally, fetching from database...');
                  const updatedChannels = await fetchChannels();
-                 setChannels(updatedChannels);
                  targetChannel = updatedChannels.find(c => c.id === newMsg.channel_id);
+                 console.log('[TeamChat] Fetched channels, target channel:', targetChannel);
+
+                 // Update channels state with the new DM channel and increment unread count
+                 setChannels(updatedChannels.map(c =>
+                     c.id === newMsg.channel_id ? { ...c, unread: 1 } : c
+                 ));
+             } else {
+                 // Channel exists, just update unread count
+                 setChannels(prev => prev.map(c =>
+                     c.id === targetChannel?.id ? { ...c, unread: (c.unread || 0) + 1 } : c
+                 ));
              }
 
              // Notify appropriately
@@ -267,11 +331,6 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                      // Public channel notification
                      addToast('info', `New message in #${targetChannel.name}`);
                  }
-
-                 // Update unread count
-                 setChannels(prev => prev.map(c =>
-                     c.id === targetChannel?.id ? { ...c, unread: (c.unread || 0) + 1 } : c
-                 ));
              }
          }
       })
@@ -415,6 +474,38 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
       }
   };
 
+  const handleEditMessage = async (messageId: string) => {
+    if (!editingText.trim()) return;
+
+    await editChatMessage(messageId, editingText);
+
+    // Update local state
+    setMessages(prev => prev.map(m =>
+      m.id === messageId
+        ? { ...m, text: editingText, isEdited: true, editedAt: new Date().toISOString() }
+        : m
+    ));
+
+    // Update cache
+    setMessageCache(prev => ({
+      ...prev,
+      [activeChannelId]: prev[activeChannelId]?.map(m =>
+        m.id === messageId
+          ? { ...m, text: editingText, isEdited: true, editedAt: new Date().toISOString() }
+          : m
+      ) || []
+    }));
+
+    setEditingMessageId(null);
+    setEditingText('');
+    addToast('success', 'Message updated');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null);
+    setEditingText('');
+  };
+
   const handleSendMessage = async () => {
     if (!message.trim()) return;
     const currentCh = channels.find(c => c.id === activeChannelId);
@@ -423,6 +514,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
       id: Date.now().toString(),
       channelId: activeChannelId,
       sender: currentUser.name,
+      senderId: currentUser.id,
       text: message,
       timestamp: new Date().toISOString(),
       avatar: currentUser.avatarUrl || 'user'
@@ -666,7 +758,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                 </div>
                 <ul>
                     {dmChannels.map(channel => {
-                        const { name, avatar } = getDMInfo(channel);
+                        const { name, avatar, isOnline } = getDMInfo(channel);
                         return (
                             <li
                                 key={channel.id}
@@ -686,13 +778,19 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                                     }}
                                 >
                                     {avatar ? <img src={avatar} alt="" className="w-4 h-4 rounded-full object-cover" /> : <div className="w-4 h-4 rounded-full bg-green-600 flex items-center justify-center text-[8px] text-white font-bold">{name.charAt(0)}</div>}
-                                    {channel.unread ? <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border border-[#3F0E40]"></div> : null}
+                                    {/* Online status indicator (green) or Unread indicator (red) */}
+                                    {channel.unread ? (
+                                      <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border border-[#3F0E40]" title="Unread messages"></div>
+                                    ) : isOnline ? (
+                                      <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full border border-[#3F0E40]" title="Online"></div>
+                                    ) : null}
                                 </div>
                                 <span
                                     className={`truncate text-sm flex-1 cursor-pointer ${channel.unread ? 'font-bold text-white' : ''}`}
                                     onClick={() => setActiveChannelId(channel.id)}
                                 >
                                     {name} {channel.unread ? `(${channel.unread})` : ''}
+                                    {isOnline && !channel.unread && <span className="ml-1 text-[10px] text-green-400">●</span>}
                                 </span>
                                 <button
                                     onClick={(e) => {
@@ -721,19 +819,34 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
              </div>
              <ul>
                 {profiles.map(p => (
-                   <li 
-                     key={p.id} 
+                   <li
+                     key={p.id}
                      onClick={() => handleStartDM(p.id)}
                      className="px-4 py-1 flex items-center gap-2 mx-2 text-[#bcabbc] hover:bg-[#350d36] rounded-md cursor-pointer transition-colors"
                    >
-                      {p.avatar_url ? (
-                          <img src={p.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
-                      ) : (
-                          <div className="w-4 h-4 rounded-full bg-slate-500 flex items-center justify-center text-[8px] text-white font-bold">
-                             {p.full_name?.charAt(0) || '?'}
-                          </div>
+                      <div className="relative">
+                        {p.avatar_url ? (
+                            <img src={p.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
+                        ) : (
+                            <div className="w-4 h-4 rounded-full bg-slate-500 flex items-center justify-center text-[8px] text-white font-bold">
+                               {p.full_name?.charAt(0) || '?'}
+                            </div>
+                        )}
+                        {/* Online status indicator */}
+                        <div
+                          className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-[#3F0E40] ${
+                            p.isOnline ? 'bg-green-500' : 'bg-slate-400'
+                          }`}
+                          title={p.isOnline ? 'Online' : 'Offline'}
+                        />
+                      </div>
+                      <span className="truncate text-sm flex-1">
+                        {p.full_name || p.email?.split('@')[0] || 'Team Member'}
+                        {p.id === currentUser.id && ' (You)'}
+                      </span>
+                      {p.isOnline && p.id !== currentUser.id && (
+                        <span className="text-[10px] text-green-400 font-medium">●</span>
                       )}
-                      <span className="truncate text-sm flex-1">{p.full_name || p.email?.split('@')[0] || 'Team Member'} {p.id === currentUser.id && '(You)'}</span>
                    </li>
                 ))}
              </ul>
@@ -781,14 +894,30 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
            {messages.map((msg) => (
-            <div key={msg.id} className={`flex gap-4 ${msg.isAi ? 'bg-brand-50/30 -mx-6 px-6 py-2' : ''}`}>
+            <div key={msg.id} className={`flex gap-4 group ${msg.isAi ? 'bg-brand-50/30 -mx-6 px-6 py-2' : ''}`}>
               <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${msg.isAi ? 'bg-brand-500' : 'bg-slate-200'}`}>
                 {msg.isAi ? <Bot className="w-6 h-6 text-white" /> : msg.avatar && msg.avatar !== 'user' && msg.avatar.startsWith('http') ? <img src={msg.avatar} alt="" className="w-full h-full rounded-lg object-cover" /> : <UserIcon className="w-6 h-6 text-slate-500" />}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-baseline gap-2">
                   <span className="font-bold text-slate-900">{msg.sender}</span>
-                  <span className="text-xs text-slate-400">{new Date(msg.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                  <span className="text-xs text-slate-400">
+                    {new Date(msg.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                    {msg.isEdited && <span className="ml-1 italic">(edited)</span>}
+                  </span>
+                  {/* Show edit button only for own messages that aren't AI */}
+                  {!msg.isAi && msg.senderId === currentUser.id && editingMessageId !== msg.id && (
+                    <button
+                      onClick={() => {
+                        setEditingMessageId(msg.id);
+                        setEditingText(msg.text);
+                      }}
+                      className="ml-auto opacity-0 group-hover:opacity-100 text-slate-400 hover:text-brand-600 transition-opacity"
+                      title="Edit message"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
                 {msg.attachmentUrl && (
                   <div className="mt-2 mb-1">
@@ -799,7 +928,46 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                      )}
                   </div>
                 )}
-                <div className="text-slate-700 whitespace-pre-wrap mt-1">{msg.text}</div>
+                {editingMessageId === msg.id ? (
+                  <div className="mt-2 space-y-2">
+                    <textarea
+                      value={editingText}
+                      onChange={(e) => setEditingText(e.target.value)}
+                      className="w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none resize-none"
+                      rows={3}
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleEditMessage(msg.id);
+                        } else if (e.key === 'Escape') {
+                          handleCancelEdit();
+                        }
+                      }}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleEditMessage(msg.id)}
+                        className="flex items-center gap-1 px-3 py-1 bg-brand-600 hover:bg-brand-700 text-white text-sm rounded-lg transition-colors"
+                      >
+                        <Check className="w-3 h-3" />
+                        Save
+                      </button>
+                      <button
+                        onClick={handleCancelEdit}
+                        className="flex items-center gap-1 px-3 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm rounded-lg transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                        Cancel
+                      </button>
+                      <span className="text-xs text-slate-500 self-center ml-2">
+                        Press Enter to save • Esc to cancel
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-slate-700 whitespace-pre-wrap mt-1">{msg.text}</div>
+                )}
               </div>
             </div>
            ))}

@@ -258,7 +258,7 @@ ${currentUser.name}`;
       case ToolView.TASKS: return <TaskBoard currentUser={currentUser} addToast={addToast} />;
       case ToolView.MY_WORK: return <MyWork currentUser={currentUser} addToast={addToast} />;
       case ToolView.TEAM_CHAT: return <TeamChat currentUser={currentUser} addToast={addToast} />;
-      case ToolView.SETTINGS: return <Settings branding={branding} setBranding={setBranding} addToast={addToast} onProfileUpdate={refreshProfile} />;
+      case ToolView.SETTINGS: return <Settings branding={branding} setBranding={setBranding} addToast={addToast} currentUser={currentUser} />;
       default: return <Dashboard currentUser={currentUser} setCurrentView={setCurrentView} />;
     }
   };

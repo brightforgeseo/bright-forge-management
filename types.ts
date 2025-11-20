@@ -20,6 +20,8 @@ export interface Profile {
   avatar_url?: string;
   email?: string;
   updated_at?: string;
+  isOnline?: boolean; // Presence tracking
+  lastSeen?: string; // Last activity timestamp
 }
 
 export interface AppNotification {
@@ -123,12 +125,15 @@ export interface ChatMessage {
   id: string;
   channelId?: string;
   sender: string;
+  senderId?: string; // User ID of sender for edit permissions
   text: string;
   timestamp: string;
   isAi?: boolean;
   avatar?: string;
   attachmentUrl?: string;
   attachmentType?: 'image' | 'file';
+  isEdited?: boolean; // Flag to show message was edited
+  editedAt?: string; // Timestamp of last edit
 }
 
 export interface ChatChannel {

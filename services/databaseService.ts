@@ -259,12 +259,15 @@ export const fetchChatMessages = async (channelId: string): Promise<ChatMessage[
     id: row.id,
     channelId: row.channel_id,
     sender: row.sender,
+    senderId: row.sender_id,
     text: row.text,
     timestamp: row.created_at,
     isAi: row.is_ai,
     avatar: row.avatar,
     attachmentUrl: row.attachment_url,
-    attachmentType: row.attachment_type
+    attachmentType: row.attachment_type,
+    isEdited: row.is_edited,
+    editedAt: row.edited_at
   }));
 };
 
@@ -274,6 +277,7 @@ export const sendChatMessage = async (msg: ChatMessage) => {
     .insert({
       channel_id: msg.channelId,
       sender: msg.sender,
+      sender_id: msg.senderId,
       text: msg.text,
       is_ai: msg.isAi || false,
       avatar: msg.avatar,
@@ -283,6 +287,19 @@ export const sendChatMessage = async (msg: ChatMessage) => {
     });
 
   if (error) console.error('Error sending message:', error);
+};
+
+export const editChatMessage = async (messageId: string, newText: string) => {
+  const { error } = await supabase
+    .from('chat_messages')
+    .update({
+      text: newText,
+      is_edited: true,
+      edited_at: new Date().toISOString()
+    })
+    .eq('id', messageId);
+
+  if (error) console.error('Error editing message:', error);
 };
 
 export const clearChatHistory = async (channelId: string) => {
