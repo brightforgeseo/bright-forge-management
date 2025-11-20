@@ -1015,8 +1015,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-start gap-2 mt-1">
-                    <div className="text-slate-700 whitespace-pre-wrap flex-1">{msg.text}</div>
+                  <div className="mt-1">
+                    <span className="text-slate-700 whitespace-pre-wrap">{msg.text}</span>
                     {/* Show edit button only for own messages that aren't AI */}
                     {!msg.isAi && msg.senderId === currentUser.id && editingMessageId !== msg.id && (
                       <button
@@ -1024,7 +1024,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                           setEditingMessageId(msg.id);
                           setEditingText(msg.text);
                         }}
-                        className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-brand-600 transition-opacity flex-shrink-0 mt-0.5"
+                        className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-brand-600 transition-opacity inline-flex items-center ml-2 align-middle"
                         title="Edit message"
                       >
                         <Edit2 className="w-4 h-4" />
