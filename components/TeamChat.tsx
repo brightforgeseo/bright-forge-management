@@ -67,15 +67,25 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
       if (ch.type !== 'dm') return { name: ch.name, avatar: null };
       const ids = parseDMChannel(ch.name);
       const otherId = ids.find(id => id !== currentUser.id);
-      
+
       if (!otherId) {
           // Self-DM or malformed
           return { name: 'You', avatar: currentUser.avatarUrl };
       }
-      
+
       const prof = profiles.find(p => p.id === otherId);
+
+      // Better fallback: show email prefix or first 8 chars of ID
+      let displayName = 'Loading...';
+      if (prof) {
+          displayName = prof.full_name || prof.email?.split('@')[0] || `User ${otherId.substring(0, 8)}`;
+      } else if (profiles.length > 0) {
+          // Profiles loaded but this user not found - show partial ID
+          displayName = `User ${otherId.substring(0, 8)}`;
+      }
+
       return {
-          name: prof?.full_name || prof?.email?.split('@')[0] || 'Unknown User',
+          name: displayName,
           avatar: prof?.avatar_url || null
       };
   };
@@ -208,16 +218,23 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
   };
 
   const handleDeleteChannel = async (id: string) => {
-      if (!window.confirm("Delete this channel and all messages?")) return;
       try {
+          // Delete from database
           await deleteChannel(id);
-          // If we deleted the active channel, fall back
+
+          // Immediately remove from local state
+          setChannels(prev => prev.filter(c => c.id !== id));
+
+          // If we deleted the active channel, switch to general or first available
           if (activeChannelId === id) {
-             const general = channels.find(c => c.name === 'general' && c.id !== id);
-             setActiveChannelId(general ? general.id : (channels.find(c => c.id !== id)?.id || ''));
+             const remaining = channels.filter(c => c.id !== id);
+             const general = remaining.find(c => c.name === 'general');
+             setActiveChannelId(general ? general.id : (remaining[0]?.id || ''));
           }
-          addToast('info', 'Channel deleted');
+
+          addToast('success', 'Conversation deleted');
       } catch (e) {
+          console.error('Delete error:', e);
           addToast('error', 'Failed to delete');
       }
   };
@@ -426,9 +443,15 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                       </span>
                   </div>
                   {currentUser.role === 'Owner' && channel.name !== 'ask-ai' && (
-                     <button 
-                       onClick={(e) => { e.stopPropagation(); handleDeleteChannel(channel.id); }} 
+                     <button
+                       onClick={(e) => {
+                         e.stopPropagation();
+                         if (window.confirm(`Delete #${channel.name} and all its messages?`)) {
+                           handleDeleteChannel(channel.id);
+                         }
+                       }}
                        className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-400"
+                       title="Delete channel"
                      >
                         <Trash2 className="w-3 h-3" />
                      </button>
@@ -448,18 +471,35 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                     {dmChannels.map(channel => {
                         const { name, avatar } = getDMInfo(channel);
                         return (
-                            <li 
+                            <li
                                 key={channel.id}
-                                onClick={() => setActiveChannelId(channel.id)}
-                                className={`px-4 py-1 flex items-center gap-2 cursor-pointer mx-2 rounded-md ${activeChannelId === channel.id ? 'bg-[#1164A3] text-white' : 'text-[#bcabbc] hover:bg-[#350d36]'}`}
+                                className={`px-4 py-1 flex items-center gap-2 mx-2 rounded-md group ${activeChannelId === channel.id ? 'bg-[#1164A3] text-white' : 'text-[#bcabbc] hover:bg-[#350d36]'}`}
                             >
-                                <div className="relative w-4 h-4 flex-shrink-0">
+                                <div
+                                    className="relative w-4 h-4 flex-shrink-0 cursor-pointer"
+                                    onClick={() => setActiveChannelId(channel.id)}
+                                >
                                     {avatar ? <img src={avatar} alt="" className="w-4 h-4 rounded-full object-cover" /> : <div className="w-4 h-4 rounded-full bg-green-600 flex items-center justify-center text-[8px] text-white font-bold">{name.charAt(0)}</div>}
                                     {channel.unread ? <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border border-[#3F0E40]"></div> : null}
                                 </div>
-                                <span className={`truncate text-sm ${channel.unread ? 'font-bold text-white' : ''}`}>
+                                <span
+                                    className={`truncate text-sm flex-1 cursor-pointer ${channel.unread ? 'font-bold text-white' : ''}`}
+                                    onClick={() => setActiveChannelId(channel.id)}
+                                >
                                     {name} {channel.unread ? `(${channel.unread})` : ''}
                                 </span>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (window.confirm(`Delete conversation with ${name}?`)) {
+                                            handleDeleteChannel(channel.id);
+                                        }
+                                    }}
+                                    className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-400 flex-shrink-0"
+                                    title="Delete conversation"
+                                >
+                                    <Trash2 className="w-3 h-3" />
+                                </button>
                             </li>
                         );
                     })}
