@@ -382,6 +382,13 @@ export const checkDueDateNotifications = async (currentUserId: string) => {
             console.log('✨ No duplicate found, will create notification for:', task.title);
 
             try {
+              console.log('📦 Creating notification with IDs:');
+              console.log('  Database row ID:', board.id);
+              console.log('  BoardData ID:', boardData.id);
+              console.log('  BoardData name:', boardData.name);
+              console.log('  Task ID:', task.id);
+              console.log('  Group ID:', group.id);
+
               // Pass the parsed object - createNotification will stringify it
               await createNotification(
                 currentUserId,
@@ -391,7 +398,7 @@ export const checkDueDateNotifications = async (currentUserId: string) => {
                 'TASKS',
                 {
                   taskId: task.id,
-                  boardId: boardData.id,
+                  boardId: boardData.id,  // This is the ClientBoard ID
                   groupId: group.id,
                   boardName: boardData.name
                 }

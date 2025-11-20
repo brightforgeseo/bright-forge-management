@@ -121,10 +121,10 @@ const App: React.FC = () => {
 
     // One-time fix: Clear old checks and delete old notifications to force recreation with proper linkData
     const fixVersion = localStorage.getItem('notificationFixVersion');
-    if (fixVersion !== 'v3') {
+    if (fixVersion !== 'v4') {
       localStorage.removeItem('lastDueDateCheck');
-      localStorage.setItem('notificationFixVersion', 'v3');
-      console.log('🔧 Clearing old notifications to fix linkData issue...');
+      localStorage.setItem('notificationFixVersion', 'v4');
+      console.log('🔧 Clearing old notifications to fix board ID issue...');
 
       // Delete old due date notifications that don't have proper linkData
       supabase
