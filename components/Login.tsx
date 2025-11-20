@@ -120,7 +120,11 @@ const Login: React.FC<LoginProps> = ({ onLogin, branding }) => {
       }
 
     } catch (err: any) {
-      setError(err.message || 'Authentication failed.');
+      console.error('Auth error:', err);
+      const errorMsg = err.message || 'Authentication failed.';
+      setError(errorMsg.includes('Database error')
+        ? 'Activation failed: Database error saving new user'
+        : errorMsg);
     } finally {
       setLoading(false);
     }
