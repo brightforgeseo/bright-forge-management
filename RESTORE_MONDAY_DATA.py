@@ -9,6 +9,13 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+# Load updates/comments
+updates_file = Path('/Users/user/Downloads/bright-forge-portal/monday_updates.json')
+UPDATES = {}
+if updates_file.exists():
+    with open(updates_file, 'r') as f:
+        UPDATES = json.load(f)
+
 def clean_string(s):
     """Clean string for SQL"""
     if s is None:
@@ -92,6 +99,9 @@ def parse_board_file(filepath):
             if not item_id or not row[name_col]:
                 continue
 
+            # Get comments for this task from updates
+            task_comments = UPDATES.get(str(item_id), [])
+
             task = {
                 'title': clean_string(row[name_col]),
                 'person': clean_string(row[person_col]) if person_col and len(row) > person_col else '',
@@ -100,7 +110,8 @@ def parse_board_file(filepath):
                 'priority': clean_string(row[priority_col]) if priority_col and len(row) > priority_col else '',
                 'client_sheet': clean_string(row[client_col]) if client_col and len(row) > client_col else '',
                 'worksheet': '',  # Not in this format
-                'item_id': str(item_id)
+                'item_id': str(item_id),
+                'comments': task_comments
             }
             current_group_tasks.append(task)
 
@@ -134,6 +145,9 @@ def parse_board_file(filepath):
 
             # Check if this is a task row (has item ID)
             if row[7]:  # Item ID exists
+                # Get comments for this task from updates
+                task_comments = UPDATES.get(str(row[7]), [])
+
                 task = {
                     'title': clean_string(row[0]),
                     'person': clean_string(row[1]),
@@ -142,7 +156,8 @@ def parse_board_file(filepath):
                     'priority': clean_string(row[4]),
                     'client_sheet': clean_string(row[5]),
                     'worksheet': clean_string(row[6]),
-                    'item_id': str(row[7])
+                    'item_id': str(row[7]),
+                    'comments': task_comments
                 }
                 current_group_tasks.append(task)
 

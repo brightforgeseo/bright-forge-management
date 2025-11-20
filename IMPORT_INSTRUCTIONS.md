@@ -2,7 +2,7 @@
 
 ## Summary
 
-Successfully parsed **ALL 55 client boards** with **1,577 tasks** from your Monday.com export!
+Successfully parsed **ALL 55 client boards** with **1,577 tasks** and **2,872 comments** from your Monday.com export!
 
 ## What Was Recovered
 
@@ -74,16 +74,20 @@ If you want to replace ALL existing boards with the Monday.com data:
 ✓ Status (To Do, In Progress, Ben To Check, Sent To Client, etc.)
 ✓ Priority (Low, Medium, High, Critical)
 ✓ Due dates
-✓ Person assignments (mapped to Supabase users):
+✓ **Multiple person assignments** (mapped to Supabase users):
   - Ben Lowe
   - Janin Canonero
   - Dee Tan
   - Farhan Nazardin
   - Alyssa Marie Donayre
-✓ Worksheet URLs
-✓ Client Sheet URLs
+  - Tasks can be assigned to multiple people simultaneously!
+✓ Worksheet URLs (cleaned, just URLs)
+✓ Client Sheet URLs (cleaned, just URLs)
 ✓ Task groups with colors
-✓ Comment threads (empty, ready to use)
+✓ **2,872 actual comments from Monday.com!**
+  - Full comment threads with timestamps
+  - Author names preserved
+  - All updates and discussions restored
 
 ## Team Member Mappings
 

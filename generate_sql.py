@@ -86,6 +86,17 @@ for board_idx, board in enumerate(all_boards, 1):
         for task_idx, task in enumerate(group['tasks']):
             assigned_value = map_person_to_uuids(task.get('person', ''))
 
+            # Format comments with IDs
+            comments = []
+            for comment_idx, comment in enumerate(task.get('comments', [])):
+                comments.append({
+                    "id": f"comment-{board_idx}-{group_idx}-{task_idx}-{comment_idx}",
+                    "author": comment.get('author', 'Unknown'),
+                    "text": clean_for_json(comment.get('text', '')),
+                    "timestamp": comment.get('timestamp', ''),
+                    "avatar": ""
+                })
+
             task_obj = {
                 "id": f"task-{board_idx}-{group_idx}-{task_idx}",
                 "title": clean_for_json(task['title']),
@@ -95,7 +106,7 @@ for board_idx, board in enumerate(all_boards, 1):
                 "assignedTo": assigned_value,
                 "worksheet": clean_for_json(extract_url(task.get('worksheet', ''))),
                 "clientSheet": clean_for_json(extract_url(task.get('client_sheet', ''))),
-                "comments": []
+                "comments": comments
             }
             tasks_json.append(json.dumps(task_obj, separators=(',', ':')))
 
