@@ -1,20 +1,11 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { KeywordResult, AuditResult, ContentResult, Task } from '../types';
 import { getChatSystemPrompt, getSEOSystemPrompt } from './skillsLoader';
-
-// Import config if it exists
-let configApiKey: string | undefined;
-try {
-  // @ts-ignore - config.ts might not exist
-  const { config } = require('../config');
-  configApiKey = config?.anthropicApiKey;
-} catch (e) {
-  // Config file doesn't exist, will use env vars
-}
+import { config } from '../config';
 
 const getClaudeClient = () => {
   // Get API key from config.ts
-  let apiKey: string | undefined = configApiKey;
+  let apiKey: string | undefined = config?.anthropicApiKey;
 
   // Only try config file - simpler and works in browser
   if (!apiKey || apiKey === 'your-anthropic-api-key-here') {
