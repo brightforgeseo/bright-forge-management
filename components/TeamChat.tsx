@@ -113,6 +113,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
       query = 'trending';
     }
 
+    console.log('[searchGifs] Searching for:', query);
     setGifLoading(true);
     try {
       const apiKey = 'sXpGFDGZs0Dv1mmNFvYaGUvYwKX0PWIh';
@@ -121,12 +122,23 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
         ? `https://api.giphy.com/v1/gifs/trending?api_key=${apiKey}&limit=${limit}`
         : `https://api.giphy.com/v1/gifs/search?api_key=${apiKey}&q=${encodeURIComponent(query)}&limit=${limit}`;
 
+      console.log('[searchGifs] Fetching from:', endpoint);
       const response = await fetch(endpoint);
       const data = await response.json();
-      setGifs(data.data || []);
+      console.log('[searchGifs] Response:', data);
+
+      if (data.data && data.data.length > 0) {
+        console.log('[searchGifs] Found', data.data.length, 'GIFs');
+        setGifs(data.data);
+      } else {
+        console.warn('[searchGifs] No GIFs found in response');
+        setGifs([]);
+        addToast('info', 'No GIFs found');
+      }
     } catch (error) {
-      console.error('Error fetching GIFs:', error);
+      console.error('[searchGifs] Error fetching GIFs:', error);
       setGifs([]);
+      addToast('error', 'Failed to load GIFs');
     } finally {
       setGifLoading(false);
     }
@@ -1464,23 +1476,38 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                           <button
                             key={gif.id}
                             onClick={async () => {
+                              console.log('[GIF] Clicked GIF:', gif.id);
                               const gifUrl = gif.images?.original?.url || gif.images?.downsized?.url;
+                              console.log('[GIF] GIF URL:', gifUrl);
+
                               if (gifUrl) {
                                 const newMsg: ChatMessage = {
                                   id: `${Date.now()}_${Math.random()}`,
                                   channelId: activeChannelId,
                                   sender: currentUser.name,
                                   senderId: currentUser.id,
-                                  text: '',
+                                  text: 'GIF',
                                   timestamp: new Date().toISOString(),
                                   isAi: false,
                                   avatar: currentUser.avatarUrl || 'user',
                                   attachmentUrl: gifUrl,
                                   attachmentType: 'image'
                                 };
-                                await sendChatMessage(newMsg);
-                                setShowGifPicker(false);
-                                setGifSearch('');
+
+                                console.log('[GIF] Sending GIF message:', newMsg);
+                                try {
+                                  await sendChatMessage(newMsg);
+                                  console.log('[GIF] GIF sent successfully');
+                                  setShowGifPicker(false);
+                                  setGifSearch('');
+                                  addToast('success', 'GIF sent!');
+                                } catch (error) {
+                                  console.error('[GIF] Failed to send GIF:', error);
+                                  addToast('error', 'Failed to send GIF');
+                                }
+                              } else {
+                                console.error('[GIF] No GIF URL found');
+                                addToast('error', 'Invalid GIF');
                               }
                             }}
                             className="hover:opacity-75 transition-opacity rounded overflow-hidden"
