@@ -677,15 +677,17 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
     }
 
     try {
+      console.log('[TeamChat] Deleting message:', messageId);
       await deleteChatMessage(messageId);
+      console.log('[TeamChat] Message deleted successfully from database');
 
-      // Remove message from UI
+      // Remove message from UI immediately
       setMessages(prev => prev.filter(m => m.id !== messageId));
 
       addToast('success', 'Message deleted');
-    } catch (error) {
-      console.error('Failed to delete message:', error);
-      addToast('error', 'Failed to delete message');
+    } catch (error: any) {
+      console.error('[TeamChat] Failed to delete message:', error);
+      addToast('error', `Failed to delete: ${error?.message || 'Unknown error'}`);
     }
   };
 
