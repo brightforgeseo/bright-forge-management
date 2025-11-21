@@ -26,6 +26,8 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
   const [currentDate, setCurrentDate] = useState(new Date());
   const [teamProfiles, setTeamProfiles] = useState<Profile[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>(currentUser.id);
+  const [selectedStatusId, setSelectedStatusId] = useState<string>('all');
+  const [hideDone, setHideDone] = useState(true);
 
   // Task Modal State
   const [selectedTask, setSelectedTask] = useState<TaskWithContext | null>(null);
@@ -70,15 +72,40 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
     setLoading(false);
   };
 
-  // Filter tasks by selected user
+  // Get all unique statuses across all boards
+  const allStatuses = Array.from(
+    new Map(
+      allTasks.flatMap(task =>
+        task.boardData.statusDefs.map(def => [def.id, { id: def.id, label: def.label, color: def.color }])
+      )
+    ).values()
+  );
+
+  // Filter tasks by selected user and status
   const filteredTasks = allTasks.filter(task => {
-    if (selectedUserId === 'all') return true;
+    // User filter
+    if (selectedUserId !== 'all') {
+      const assignedIds = Array.isArray(task.assignedTo)
+        ? task.assignedTo
+        : task.assignedTo ? [task.assignedTo] : [];
 
-    const assignedIds = Array.isArray(task.assignedTo)
-      ? task.assignedTo
-      : task.assignedTo ? [task.assignedTo] : [];
+      if (!assignedIds.includes(selectedUserId)) return false;
+    }
 
-    return assignedIds.includes(selectedUserId);
+    // Status filter
+    if (selectedStatusId !== 'all' && task.status !== selectedStatusId) {
+      return false;
+    }
+
+    // Hide done filter
+    if (hideDone) {
+      const statusDef = task.boardData.statusDefs.find(s => s.id === task.status);
+      if (statusDef?.label.toLowerCase() === 'done') {
+        return false;
+      }
+    }
+
+    return true;
   });
 
   const getTaskStatus = (dueDate: string) => {
@@ -164,6 +191,37 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
               <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
               <ChevronRight className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none rotate-90" />
             </div>
+
+            {/* Status Filter Dropdown */}
+            <div className="relative">
+              <select
+                value={selectedStatusId}
+                onChange={(e) => setSelectedStatusId(e.target.value)}
+                className="appearance-none bg-white border border-slate-300 rounded-lg pl-10 pr-8 py-2.5 text-sm font-medium text-slate-700 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent cursor-pointer"
+              >
+                <option value="all">All Statuses</option>
+                {allStatuses.map(status => (
+                  <option key={status.id} value={status.id}>
+                    {status.label}
+                  </option>
+                ))}
+              </select>
+              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <ChevronRight className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none rotate-90" />
+            </div>
+
+            {/* Hide Done Toggle */}
+            <button
+              onClick={() => setHideDone(!hideDone)}
+              className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 border ${
+                hideDone
+                  ? 'bg-brand-50 text-brand-700 border-brand-300'
+                  : 'bg-white text-slate-600 border-slate-300 hover:border-slate-400'
+              }`}
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              <span className="hidden sm:inline">Hide Done</span>
+            </button>
 
             {/* View Toggle */}
             <div className="flex gap-2 bg-slate-100 p-1 rounded-lg">
