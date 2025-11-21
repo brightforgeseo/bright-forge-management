@@ -964,8 +964,9 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
         const fullHistory = pastContext + '\n\n' + recentHistory;
         const response = await getChatResponse(fullHistory, userMsg.text);
 
+        // Send Echo's response - let real-time listener add it to UI
         const aiMsg: ChatMessage = {
-          id: (Date.now() + 1).toString(),
+          id: '', // Let database generate ID
           channelId: activeChannelId,
           sender: 'Echo AI',
           senderId: currentUser.id, // Use current user's ID to satisfy FK constraint
@@ -976,6 +977,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
         };
 
         await sendChatMessage(aiMsg);
+        // Don't manually add to messages array - real-time listener will handle it
 
         // Store conversation for future memory
         try {
@@ -989,7 +991,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
           console.log('[Echo] Could not store conversation (table may not exist yet)');
         }
       } catch (err) {
-        addToast('error', 'AI unavailable');
+        console.error('[Echo] Error:', err);
+        addToast('error', 'Echo AI unavailable');
       } finally {
         setLoading(false);
       }
