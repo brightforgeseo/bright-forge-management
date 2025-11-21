@@ -440,18 +440,31 @@ export const checkDueDateNotifications = async (currentUserId: string) => {
 
           if (!assignedIds.includes(currentUserId)) continue;
 
-          // Check for duplicate notification
+          // Check for duplicate notification - check both by link_data AND by message text
+          const taskMessage = `"${task.title}" is due today on ${boardData.name}`;
           const { data: existing } = await supabase
             .from('notifications')
-            .select('id')
+            .select('id, link_data, message')
             .eq('user_id', currentUserId)
             .eq('type', 'alert')
-            .eq('link_data->taskId', task.id)
-            .eq('link_data->boardId', boardData.id)
-            .gte('created_at', today + 'T00:00:00')
-            .maybeSingle();
+            .eq('title', 'Task Due Today')
+            .gte('created_at', today + 'T00:00:00');
 
-          if (existing) continue;
+          // Check if this exact task notification already exists
+          const isDuplicate = existing?.some(notif => {
+            // Check by message text (always works)
+            if (notif.message === taskMessage) return true;
+            // Check by link_data if it exists
+            if (notif.link_data) {
+              const linkData = typeof notif.link_data === 'string'
+                ? JSON.parse(notif.link_data)
+                : notif.link_data;
+              return linkData.taskId === task.id && linkData.boardId === boardData.id;
+            }
+            return false;
+          });
+
+          if (isDuplicate) continue;
 
           await createNotification(
             currentUserId,
