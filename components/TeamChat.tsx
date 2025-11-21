@@ -487,9 +487,11 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
     setLoadingMembers(true);
     try {
       const members = await fetchChannelMembers(channelId);
+      console.log('Loaded members:', members);
       setChannelMembers(members || []);
     } catch (e) {
-      addToast('error', 'Failed to load channel members');
+      console.error('Load members error:', e);
+      addToast('error', `Failed to load channel members: ${e instanceof Error ? e.message : 'Unknown error'}`);
     } finally {
       setLoadingMembers(false);
     }
