@@ -1,5 +1,5 @@
 
-const { app, BrowserWindow, shell, ipcMain } = require('electron');
+const { app, BrowserWindow, shell, ipcMain, dialog } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 
@@ -10,9 +10,11 @@ const isDev = !app.isPackaged;
 autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = true;
 
+let mainWindow;
+
 function createWindow() {
   // Create the browser window.
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
     title: "Bright Forge Portal",
@@ -20,7 +22,7 @@ function createWindow() {
       nodeIntegration: true,
       contextIsolation: false,
       // This allows us to use the camera/mic if needed
-      mediaHandlers: true, 
+      mediaHandlers: true,
     },
     autoHideMenuBar: true, // Hides the file menu on Windows/Linux for a cleaner look
   });
@@ -28,37 +30,72 @@ function createWindow() {
   // In development, load the local server
   // In production, load the build file
   if (isDev) {
-    win.loadURL('http://localhost:1234'); // Assuming Parcel/Vite uses port 1234
+    mainWindow.loadURL('http://localhost:1234'); // Assuming Parcel/Vite uses port 1234
     // Open DevTools in development
-    // win.webContents.openDevTools();
+    // mainWindow.webContents.openDevTools();
   } else {
     // In production, load the index.html from the build folder
-    win.loadFile(path.join(__dirname, 'dist', 'index.html'));
+    mainWindow.loadFile(path.join(__dirname, 'dist', 'index.html'));
   }
 
   // Handle external links (don't open them inside the app, open in default browser)
-  win.webContents.setWindowOpenHandler(({ url }) => {
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('https:') || url.startsWith('http:')) {
       shell.openExternal(url);
       return { action: 'deny' };
     }
     return { action: 'allow' };
   });
+
+  return mainWindow;
 }
 
 // Auto-updater event handlers
 autoUpdater.on('update-available', (info) => {
   console.log('Update available:', info);
+
+  // Show notification that update is available
+  dialog.showMessageBox(mainWindow, {
+    type: 'info',
+    title: 'Update Available',
+    message: 'A new version is available!',
+    detail: `Version ${info.version} is now available. It will be downloaded in the background.`,
+    buttons: ['OK']
+  });
+
   autoUpdater.downloadUpdate();
 });
 
 autoUpdater.on('update-downloaded', (info) => {
   console.log('Update downloaded:', info);
-  // Install update on next app restart
+
+  // Prompt user to restart and install
+  const response = dialog.showMessageBoxSync(mainWindow, {
+    type: 'info',
+    title: 'Update Ready',
+    message: 'Update downloaded!',
+    detail: 'A new version has been downloaded. Restart the app to install the update.',
+    buttons: ['Restart Now', 'Later'],
+    defaultId: 0,
+    cancelId: 1
+  });
+
+  if (response === 0) {
+    // User clicked "Restart Now"
+    autoUpdater.quitAndInstall();
+  }
 });
 
 autoUpdater.on('error', (err) => {
   console.log('Auto-update error:', err);
+
+  dialog.showMessageBox(mainWindow, {
+    type: 'error',
+    title: 'Update Error',
+    message: 'Error checking for updates',
+    detail: err.message,
+    buttons: ['OK']
+  });
 });
 
 // This method will be called when Electron has finished initialization
