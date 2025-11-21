@@ -186,11 +186,19 @@ export const createChannel = async (
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('Create channel error:', error);
+    throw error;
+  }
 
   // If private channel with owner, add owner as member
   if (isPrivate && ownerId && data) {
-    await addChannelMember(data.id, ownerId, 'owner');
+    try {
+      await addChannelMember(data.id, ownerId, 'owner');
+    } catch (memberError) {
+      console.error('Failed to add owner as member:', memberError);
+      // Don't throw - channel was created successfully
+    }
   }
 
   return data;
