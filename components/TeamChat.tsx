@@ -904,8 +904,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
       return;
     }
 
-    // Create Notification if DM
-    if (currentCh?.type === 'dm') {
+    // Create Notification if DM (but not for Echo AI)
+    if (currentCh?.type === 'dm' && !isEchoAIChannel(currentCh)) {
       const ids = parseDMChannel(currentCh.name);
       const otherId = ids.find(id => id !== currentUser.id);
       if (otherId && otherId !== currentUser.id) {
