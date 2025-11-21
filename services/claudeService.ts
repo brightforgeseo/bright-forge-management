@@ -1,0 +1,285 @@
+import Anthropic from '@anthropic-ai/sdk';
+import { KeywordResult, AuditResult, ContentResult, Task } from '../types';
+
+const getClaudeClient = () => {
+  let apiKey;
+  try {
+    apiKey = process.env.ANTHROPIC_API_KEY;
+  } catch (e) {
+    console.warn('ANTHROPIC_API_KEY not found in environment variables');
+  }
+
+  if (!apiKey) {
+    console.warn('Claude API Key not found - AI features will not work');
+    throw new Error('ANTHROPIC_API_KEY not configured');
+  }
+
+  return new Anthropic({
+    apiKey: apiKey,
+  });
+};
+
+/**
+ * Chat response using Claude Haiku 4 (fast, cost-effective for chat)
+ */
+export const getClaudeChatResponse = async (
+  history: string,
+  message: string
+): Promise<string> => {
+  const client = getClaudeClient();
+
+  try {
+    // Truncate history if too long (roughly last 8000 chars)
+    const truncatedHistory = history.length > 8000 ? '...' + history.slice(-8000) : history;
+
+    const response = await client.messages.create({
+      model: 'claude-3-5-haiku-20241022',
+      max_tokens: 1024,
+      messages: [
+        {
+          role: 'user',
+          content: `You are "NexusBot", a helpful, professional, and slightly witty SEO AI Assistant in a team chat for a digital agency called "Bright Forge".
+
+Chat History Context:
+${truncatedHistory}
+
+User Message: ${message}
+
+Reply to the user as a helpful colleague.
+- Be concise (under 3 sentences unless asked for detail).
+- You can use simple markdown (*bold*, _italic_) but avoid complex blocks unless it's code.
+- If asked to do a task you can't do (like "delete this"), explain you are a chat assistant but can guide them.`,
+        },
+      ],
+    });
+
+    return response.content[0].type === 'text' ? response.content[0].text : 'Sorry, I had trouble generating a response.';
+  } catch (error) {
+    console.error('Claude chat response failed:', error);
+    throw new Error('AI Service Unavailable');
+  }
+};
+
+/**
+ * Content generation using Claude Sonnet 4.5 (high-quality, detailed content)
+ */
+export const generateClaudeContent = async (
+  topic: string,
+  tone: string,
+  keywords: string
+): Promise<ContentResult> => {
+  const client = getClaudeClient();
+
+  try {
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 4096,
+      messages: [
+        {
+          role: 'user',
+          content: `Write a high-quality, SEO-optimized blog post about "${topic}".
+Tone: ${tone}.
+Target Keywords to include: ${keywords}.
+Structure the content with Markdown headings (##, ###).
+
+Return your response as JSON with this exact structure:
+{
+  "title": "A catchy, SEO-optimized title",
+  "content": "The full blog post body in Markdown format with ## and ### headings",
+  "metaDescription": "A compelling meta description under 160 characters"
+}`,
+        },
+      ],
+    });
+
+    const text = response.content[0].type === 'text' ? response.content[0].text : '';
+
+    // Extract JSON from the response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]) as ContentResult;
+    }
+
+    throw new Error('No content generated');
+  } catch (error) {
+    console.error('Claude content generation failed:', error);
+    throw error;
+  }
+};
+
+/**
+ * SEO Strategy & Task Plan Generator using Claude Sonnet 4.5
+ */
+export const generateSEOStrategy = async (
+  clientName: string,
+  industry: string,
+  goal: string,
+  targetKeywords?: string[]
+): Promise<{
+  strategy: string;
+  tasks: Task[];
+  recommendations: string[];
+}> => {
+  const client = getClaudeClient();
+
+  try {
+    const keywordsText = targetKeywords && targetKeywords.length > 0
+      ? `\nTarget Keywords: ${targetKeywords.join(', ')}`
+      : '';
+
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 4096,
+      messages: [
+        {
+          role: 'user',
+          content: `You are an expert SEO strategist and project manager. Create a comprehensive SEO strategy and task plan for:
+
+Client: ${clientName}
+Industry: ${industry}
+Goal: ${goal}${keywordsText}
+
+Provide:
+1. A strategic overview (2-3 paragraphs) explaining the approach
+2. 6-10 specific, actionable tasks with:
+   - Clear task titles
+   - Status assignment (mix of 'Not Started', 'Working on it')
+   - Priority (High, Medium, Low)
+   - Due dates within 90 days (YYYY-MM-DD format)
+3. 4-6 key SEO recommendations specific to this industry and goal
+
+Return as JSON:
+{
+  "strategy": "The strategic overview as markdown text",
+  "tasks": [
+    {
+      "id": "unique-id",
+      "title": "Task title",
+      "status": "Not Started" | "Working on it",
+      "priority": "High" | "Medium" | "Low",
+      "dueDate": "YYYY-MM-DD"
+    }
+  ],
+  "recommendations": ["recommendation 1", "recommendation 2", ...]
+}`,
+        },
+      ],
+    });
+
+    const text = response.content[0].type === 'text' ? response.content[0].text : '';
+
+    // Extract JSON from the response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+
+    throw new Error('No strategy generated');
+  } catch (error) {
+    console.error('Claude SEO strategy generation failed:', error);
+    throw error;
+  }
+};
+
+/**
+ * Keyword research using Claude Sonnet 4.5
+ */
+export const generateClaudeKeywords = async (seedKeyword: string): Promise<KeywordResult[]> => {
+  const client = getClaudeClient();
+
+  try {
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2048,
+      messages: [
+        {
+          role: 'user',
+          content: `Generate 5-7 related long-tail keywords for "${seedKeyword}".
+For each keyword:
+- Estimate monthly search volume (realistic range 100-50000)
+- Assign difficulty level (Low, Medium, High)
+- Estimate competition score (0-100)
+- Create a 6-month search trend array (6 numbers between 0-100 representing relative interest)
+
+Return as JSON array:
+[
+  {
+    "keyword": "keyword phrase",
+    "searchVolume": number,
+    "difficulty": "Low" | "Medium" | "High",
+    "competition": number,
+    "trend": [number, number, number, number, number, number]
+  }
+]`,
+        },
+      ],
+    });
+
+    const text = response.content[0].type === 'text' ? response.content[0].text : '';
+
+    // Extract JSON from the response
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]) as KeywordResult[];
+    }
+
+    return [];
+  } catch (error) {
+    console.error('Claude keyword generation failed:', error);
+    throw error;
+  }
+};
+
+/**
+ * SEO Audit using Claude Sonnet 4.5
+ */
+export const analyzeClaudeText = async (text: string): Promise<AuditResult> => {
+  const client = getClaudeClient();
+
+  try {
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2048,
+      messages: [
+        {
+          role: 'user',
+          content: `Analyze the following text content for SEO optimization opportunities.
+
+Text: "${text.substring(0, 2000)}..."
+
+Provide:
+- An overall SEO score (0-100)
+- 3-5 specific issues categorized by severity (high, medium, low)
+- Actionable recommendations for each issue
+- A brief summary
+
+Return as JSON:
+{
+  "score": number,
+  "summary": "Brief overview of SEO health",
+  "issues": [
+    {
+      "severity": "high" | "medium" | "low",
+      "message": "Description of the issue",
+      "recommendation": "How to fix it"
+    }
+  ]
+}`,
+        },
+      ],
+    });
+
+    const responseText = response.content[0].type === 'text' ? response.content[0].text : '';
+
+    // Extract JSON from the response
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]) as AuditResult;
+    }
+
+    throw new Error('Analysis failed');
+  } catch (error) {
+    console.error('Claude audit failed:', error);
+    throw error;
+  }
+};
