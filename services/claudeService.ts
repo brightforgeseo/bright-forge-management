@@ -1,21 +1,24 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { KeywordResult, AuditResult, ContentResult, Task } from '../types';
 
+// Import config if it exists
+let configApiKey: string | undefined;
+try {
+  // @ts-ignore - config.ts might not exist
+  const { config } = require('../config');
+  configApiKey = config?.anthropicApiKey;
+} catch (e) {
+  // Config file doesn't exist, will use env vars
+}
+
 const getClaudeClient = () => {
   // Try multiple ways to get the API key
   let apiKey: string | undefined;
 
   // 1. Try config file first (local development)
-  try {
-    const { config } = require('../config');
-    apiKey = config?.anthropicApiKey;
-    if (apiKey && apiKey !== 'your-anthropic-api-key-here') {
-      console.log('Using API key from config.ts');
-    } else {
-      apiKey = undefined;
-    }
-  } catch (e) {
-    // config.ts doesn't exist or has error
+  if (configApiKey && configApiKey !== 'your-anthropic-api-key-here') {
+    apiKey = configApiKey;
+    console.log('✅ Using API key from config.ts');
   }
 
   // 2. Try process.env (Node.js/Electron)
