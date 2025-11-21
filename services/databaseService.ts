@@ -328,6 +328,12 @@ export const clearChatHistory = async (channelId: string) => {
 // --- Message Reactions ---
 
 export const fetchMessageReactions = async (messageId: string) => {
+  // Skip fetching reactions for non-UUID message IDs (old timestamp-based IDs)
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(messageId)) {
+    return [];
+  }
+
   const { data, error } = await supabase
     .from('message_reactions')
     .select('*')
