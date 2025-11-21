@@ -81,6 +81,13 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
     ).values()
   );
 
+  console.log('=== MY WORK FILTER DEBUG ===');
+  console.log('Total tasks:', allTasks.length);
+  console.log('Selected User ID:', selectedUserId);
+  console.log('Selected Status ID:', selectedStatusId);
+  console.log('Hide Done:', hideDone);
+  console.log('All Statuses:', allStatuses);
+
   // Filter tasks by selected user and status
   const filteredTasks = allTasks.filter(task => {
     // User filter
@@ -89,18 +96,30 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
         ? task.assignedTo
         : task.assignedTo ? [task.assignedTo] : [];
 
-      if (!assignedIds.includes(selectedUserId)) return false;
+      if (!assignedIds.includes(selectedUserId)) {
+        console.log(`[User Filter] Excluding task "${task.title}" - not assigned to selected user`);
+        return false;
+      }
     }
 
     // Status filter
-    if (selectedStatusId !== 'all' && task.status !== selectedStatusId) {
-      return false;
+    if (selectedStatusId !== 'all') {
+      const statusDef = task.boardData.statusDefs.find(s => s.id === task.status);
+      console.log(`[Status Filter] Task: "${task.title}", Task Status ID: "${task.status}", Selected Status ID: "${selectedStatusId}", Status Label: "${statusDef?.label}", Match: ${task.status === selectedStatusId}`);
+
+      if (task.status !== selectedStatusId) {
+        console.log(`[Status Filter] Excluding task "${task.title}" - status mismatch`);
+        return false;
+      }
     }
 
     // Hide done filter
     if (hideDone) {
       const statusDef = task.boardData.statusDefs.find(s => s.id === task.status);
-      if (statusDef?.label.toLowerCase() === 'done') {
+      const statusLabel = statusDef?.label?.toLowerCase() || '';
+
+      if (statusLabel === 'done') {
+        console.log(`[Hide Done] Excluding task "${task.title}" - status is done`);
         return false;
       }
     }
@@ -300,11 +319,11 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
                   ) : (
                     filteredTasks
                       .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
-                      .map(task => {
+                      .map((task, index) => {
                         const status = getTaskStatus(task.dueDate);
                         return (
                           <tr
-                            key={`${task.clientId}-${task.groupId}-${task.id}`}
+                            key={`${task.clientId}-${task.groupId}-${task.id}-${index}`}
                             className="hover:bg-slate-50 transition-colors cursor-pointer"
                             onClick={() => handleTaskClick(task)}
                           >
