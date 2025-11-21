@@ -632,7 +632,6 @@ export const fetchChannelMembers = async (channelId: string) => {
       profiles!channel_members_user_id_fkey (
         id,
         full_name,
-        email,
         avatar_url
       )
     `)
