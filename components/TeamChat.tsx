@@ -53,6 +53,9 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
   const activeChannelRef = useRef<string>('');
   const [mentionDropdown, setMentionDropdown] = useState<{ show: boolean; search: string; position: number } | null>(null);
 
+  // Echo AI Bot User ID (fixed UUID for the bot)
+  const ECHO_BOT_ID = '00000000-0000-0000-0000-000000000001';
+
   // Channel members state
   const [showMembersModal, setShowMembersModal] = useState(false);
   const [channelMembers, setChannelMembers] = useState<any[]>([]);
@@ -244,6 +247,13 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
     return channelName.substring(dmPrefix.length).split('_').filter(id => id.length > 0);
   };
 
+  // Helper: Check if channel is an Echo AI DM
+  const isEchoAIChannel = (channel: ChatChannel): boolean => {
+    if (channel.type !== 'dm') return false;
+    const ids = parseDMChannel(channel.name);
+    return ids.includes(ECHO_BOT_ID);
+  };
+
   // Helper: Check if user is participant in DM
   const isUserInDM = (channel: ChatChannel, userId: string): boolean => {
     if (channel.type !== 'dm') return false;
@@ -259,6 +269,11 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
 
     if (!otherId) {
       return { name: 'You', avatar: currentUser.avatarUrl, isOnline: false };
+    }
+
+    // Check if this is Echo AI
+    if (otherId === ECHO_BOT_ID) {
+      return { name: 'Echo AI', avatar: 'bot', isOnline: true };
     }
 
     const prof = profiles.find(p => p.id === otherId);
@@ -597,6 +612,29 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
     }
   };
 
+  const handleStartEchoAI = async () => {
+    try {
+      const echoChannel = await getOrCreateDMChannel(currentUser.id, ECHO_BOT_ID);
+
+      if (!echoChannel || !echoChannel.id) {
+        throw new Error('Echo AI channel creation failed');
+      }
+
+      setChannels(prev => {
+        if (prev.find(c => c.id === echoChannel.id)) {
+          return prev;
+        }
+        return [...prev, echoChannel];
+      });
+
+      setActiveChannelId(echoChannel.id);
+      addToast('success', 'Echo AI chat opened!');
+    } catch (e: any) {
+      console.error('Echo AI error:', e);
+      addToast('error', 'Could not start Echo AI: ' + (e?.message || 'Unknown error'));
+    }
+  };
+
   const handleEditMessage = async (messageId: string) => {
     if (!editingText.trim()) return;
 
@@ -878,8 +916,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
       playNotificationSound();
     }
 
-    // AI Response
-    if (currentCh?.name === 'echo-ai') {
+    // AI Response for Echo AI DM channels
+    if (currentCh && isEchoAIChannel(currentCh)) {
       setLoading(true);
       try {
         // Build context from conversation history
@@ -899,8 +937,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
         const aiMsg: ChatMessage = {
           id: (Date.now() + 1).toString(),
           channelId: activeChannelId,
-          sender: 'Echo',
-          senderId: currentUser.id, // Use current user's ID to satisfy FK constraint
+          sender: 'Echo AI',
+          senderId: ECHO_BOT_ID, // Use Echo bot ID
           text: response,
           timestamp: new Date().toISOString(),
           isAi: true,
@@ -1017,8 +1055,11 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
 
   const activeChannel = channels.find(c => c.id === activeChannelId);
   const isChannelReadOnly = false;
-  const publicChannels = channels.filter(c => c.type !== 'dm');
-  const dmChannels = channels.filter(c => isUserInDM(c, currentUser.id));
+  // Filter out the old echo-ai channel if it exists
+  const publicChannels = channels.filter(c => c.type !== 'dm' && c.name !== 'echo-ai');
+  const allDmChannels = channels.filter(c => isUserInDM(c, currentUser.id));
+  const echoAIChannel = allDmChannels.find(c => isEchoAIChannel(c));
+  const dmChannels = allDmChannels.filter(c => !isEchoAIChannel(c));
 
   return (
     <div className="flex h-full overflow-hidden bg-slate-50">
@@ -1082,6 +1123,37 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
         )}
 
         <div className="flex-1 overflow-y-auto custom-scrollbar py-4 space-y-6">
+          {/* AI Assistant Section */}
+          <div>
+            <div className="px-4 flex items-center justify-between group text-[#bcabbc] mb-2">
+              <span className="text-xs font-medium uppercase tracking-wider">AI Assistant</span>
+            </div>
+            <ul>
+              {echoAIChannel ? (
+                <li
+                  key={echoAIChannel.id}
+                  onClick={() => setActiveChannelId(echoAIChannel.id)}
+                  className={`px-4 py-1 flex items-center justify-between cursor-pointer mx-2 rounded-md group ${activeChannelId === echoAIChannel.id ? 'bg-[#1164A3] text-white' : 'text-[#bcabbc] hover:bg-[#350d36]'}`}
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <Bot className="w-4 h-4 text-brand-400" />
+                    <span className={`truncate ${echoAIChannel.unread ? 'font-bold text-white' : ''}`}>
+                      Echo AI {echoAIChannel.unread ? `(${echoAIChannel.unread})` : ''}
+                    </span>
+                  </div>
+                </li>
+              ) : (
+                <li
+                  onClick={handleStartEchoAI}
+                  className="px-4 py-1 flex items-center gap-2 mx-2 rounded-md text-[#bcabbc] hover:bg-[#350d36] cursor-pointer"
+                >
+                  <Bot className="w-4 h-4 text-brand-400" />
+                  <span className="truncate">Start Echo AI Chat</span>
+                </li>
+              )}
+            </ul>
+          </div>
+
           {/* Public Channels */}
           <div>
             <div className="px-4 flex items-center justify-between group text-[#bcabbc] mb-2">
@@ -1118,7 +1190,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                         <UserPlus className="w-4 h-4" />
                       </button>
                     )}
-                    {currentUser.role === 'Owner' && channel.name !== 'echo-ai' && (
+                    {currentUser.role === 'Owner' && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1252,20 +1324,30 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
             </button>
             {activeChannel?.type === 'dm' ? (
               <div className="flex items-center gap-2">
-                {getDMInfo(activeChannel!).avatar ? (
-                  <img src={getDMInfo(activeChannel!).avatar!} alt="" className="w-6 h-6 rounded-full object-cover" />
+                {isEchoAIChannel(activeChannel) ? (
+                  <>
+                    <div className="w-6 h-6 rounded-full bg-brand-500 flex items-center justify-center">
+                      <Bot className="w-4 h-4 text-white" />
+                    </div>
+                    <h3 className="font-bold text-slate-900 truncate text-sm md:text-base">Echo AI</h3>
+                    <span className="hidden sm:inline px-2 py-0.5 bg-brand-100 text-brand-700 text-xs rounded-full font-medium">AI Assistant</span>
+                  </>
+                ) : getDMInfo(activeChannel!).avatar && getDMInfo(activeChannel!).avatar !== 'bot' ? (
+                  <>
+                    <img src={getDMInfo(activeChannel!).avatar!} alt="" className="w-6 h-6 rounded-full object-cover" />
+                    <h3 className="font-bold text-slate-900 truncate text-sm md:text-base">{getDMInfo(activeChannel!).name}</h3>
+                  </>
                 ) : (
-                  <UserIcon className="w-5 h-5 text-slate-400" />
+                  <>
+                    <UserIcon className="w-5 h-5 text-slate-400" />
+                    <h3 className="font-bold text-slate-900 truncate text-sm md:text-base">{getDMInfo(activeChannel!).name}</h3>
+                  </>
                 )}
-                <h3 className="font-bold text-slate-900 truncate text-sm md:text-base">{getDMInfo(activeChannel!).name}</h3>
               </div>
             ) : (
               <div className="flex items-center gap-2 min-w-0">
                 <Hash className="w-4 h-4 md:w-5 md:h-5 text-slate-400 flex-shrink-0" />
                 <h3 className="font-bold text-slate-900 truncate text-sm md:text-base">{activeChannel?.name}</h3>
-                {activeChannel?.name === 'echo-ai' && (
-                  <span className="hidden sm:inline px-2 py-0.5 bg-brand-100 text-brand-700 text-xs rounded-full font-medium">AI</span>
-                )}
               </div>
             )}
           </div>

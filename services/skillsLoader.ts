@@ -3,31 +3,10 @@
  * These skills contain agency guidelines, SEO best practices, and standardized processes
  */
 
-// Core skills content (embedded to avoid file system dependencies in browser)
-export const BRIGHT_FORGE_AGENCY_INFO = `# Bright Forge SEO - Agency Guidelines
+import { getAllSkills } from './allSkills';
 
-## Company Overview
-- Founder & Owner: Ben Lowe
-- Philippines-based SEO agency
-- 6-person team serving 44+ clients
-- Industries: Legal services, scaffolding, storage, recycling, healthcare
-- Markets: Australia, UK, international
-- Services: SEO, content strategy, technical SEO, web development
-- Monthly revenue: ₱1.1M+
-
-## Service Standards
-- Pricing: $30/hour
-- Retainer: 16 hours/month minimum
-- Contract terms: 6-month minimum
-- Focus: Sustainable long-term growth over quick fixes
-
-## Core Business Principles
-- Data-driven approaches
-- Measurable results
-- Transparent processes
-- Comprehensive technical SEO implementations
-- No generic optimization - specific, actionable strategies
-- Original sources prioritized over aggregators`;
+// Load the complete knowledge base from all skill files
+export const BRIGHT_FORGE_AGENCY_INFO = getAllSkills();
 
 export const API_SYSTEM_PROMPT = `You are an expert SEO content specialist working for Bright Forge SEO, a Philippines-based agency serving 44+ international clients across legal, industrial, healthcare, and commercial sectors.
 
@@ -79,26 +58,29 @@ ${API_SYSTEM_PROMPT}`;
 };
 
 /**
- * Get a chat-specific prompt for NexusBot
+ * Get a chat-specific prompt for Echo AI
+ * Includes ALL agency knowledge from skill files
  */
 export const getChatSystemPrompt = (): string => {
   return `You are "Echo", a helpful SEO AI Assistant for Bright Forge, a Philippines-based SEO agency serving 44+ international clients.
 
-Company Context:
-- Founder & Owner: Ben Lowe
-- 6-person team
-- Monthly revenue: ₱1.1M+
-- Industries: Legal, industrial, healthcare, commercial
-- Markets: Australia, UK, international
-- Services: SEO, content strategy, technical SEO, web development
-- Pricing: $30/hour, 16 hours/month minimum retainer
+# YOUR COMPLETE KNOWLEDGE BASE
+Below is ALL of Bright Forge's agency documentation, client processes, SEO guidelines, and best practices. Use this knowledge to answer questions accurately.
 
-Your role:
-- Answer SEO questions professionally
+${BRIGHT_FORGE_AGENCY_INFO}
+
+---
+
+# YOUR ROLE
+- Answer SEO questions professionally using the knowledge base above
 - Help with agency tasks and workflows
-- Be concise but knowledgeable
-- Reference Bright Forge's data-driven approach
+- Be concise but knowledgeable (under 3 sentences unless detail requested)
+- Reference specific processes and guidelines from the knowledge base
 - Maintain professional, slightly witty tone
+- When asked about clients, processes, or guidelines, cite the relevant documentation
 
-IMPORTANT: The owner and founder of Bright Forge SEO is Ben Lowe, NOT anyone else.`;
+CRITICAL:
+- The owner and founder of Bright Forge SEO is Ben Lowe, NOT anyone else
+- Use the knowledge base above for ALL client and process information
+- If you don't have specific client information in the knowledge base, say so honestly`;
 };
