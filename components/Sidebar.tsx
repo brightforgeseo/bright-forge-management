@@ -183,6 +183,54 @@ const Sidebar: React.FC<SidebarProps> = ({
               </span>
             )}
           </button>
+
+          {/* Notification Panel - Dropdown */}
+          {isNotificationsOpen && (
+            <>
+              <div className="fixed inset-0 z-[60]" onClick={() => setIsNotificationsOpen(false)}></div>
+              <div className="absolute top-full right-0 mt-2 w-80 lg:w-96 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden z-[70] text-slate-900 max-h-[calc(100vh-6rem)]">
+                <div className="p-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                  <h3 className="font-bold text-sm text-slate-700">Notifications</h3>
+                  <div className="flex gap-2">
+                    {unreadCount > 0 && (
+                      <button onClick={handleMarkAllRead} className="text-xs text-brand-600 hover:text-brand-700 font-medium">
+                        Mark all read
+                      </button>
+                    )}
+                    {notifications.length > 0 && (
+                      <button onClick={handleClearAll} className="text-xs text-red-600 hover:text-red-700 font-medium">
+                        Clear all
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="overflow-y-auto max-h-[500px]">
+                  {notifications.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400 text-sm">No notifications</div>
+                  ) : (
+                    notifications.map(n => (
+                      <div
+                        key={n.id}
+                        className={`p-3 border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer ${!n.isRead ? 'bg-blue-50/30' : ''}`}
+                        onClick={() => handleNotificationClick(n)}
+                      >
+                        <div className="flex justify-between items-start gap-2">
+                          <div>
+                            <p className={`text-sm ${!n.isRead ? 'font-bold text-slate-900' : 'font-medium text-slate-700'}`}>{n.title}</p>
+                            <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">{n.message}</p>
+                            <p className="text-[10px] text-slate-400 mt-1">
+                              {new Date(n.createdAt).toLocaleTimeString()} · {new Date(n.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          {!n.isRead && <div className="w-2 h-2 bg-brand-500 rounded-full mt-1.5"></div>}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -263,54 +311,6 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
     </div>
-
-    {/* Notification Panel - Drops down from bell icon */}
-    {isNotificationsOpen && (
-      <>
-        <div className="fixed inset-0 z-[60]" onClick={() => setIsNotificationsOpen(false)}></div>
-        <div className="fixed top-[4.5rem] left-4 w-[calc(100vw-2rem)] sm:left-auto sm:right-4 sm:w-96 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden z-[70] text-slate-900 max-h-[calc(100vh-6rem)]">
-          <div className="p-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-            <h3 className="font-bold text-sm text-slate-700">Notifications</h3>
-            <div className="flex gap-2">
-              {unreadCount > 0 && (
-                <button onClick={handleMarkAllRead} className="text-xs text-brand-600 hover:text-brand-700 font-medium">
-                  Mark all read
-                </button>
-              )}
-              {notifications.length > 0 && (
-                <button onClick={handleClearAll} className="text-xs text-red-600 hover:text-red-700 font-medium">
-                  Clear all
-                </button>
-              )}
-            </div>
-          </div>
-          <div className="overflow-y-auto max-h-[500px]">
-            {notifications.length === 0 ? (
-              <div className="p-8 text-center text-slate-400 text-sm">No notifications</div>
-            ) : (
-              notifications.map(n => (
-                <div
-                  key={n.id}
-                  className={`p-3 border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer ${!n.isRead ? 'bg-blue-50/30' : ''}`}
-                  onClick={() => handleNotificationClick(n)}
-                >
-                  <div className="flex justify-between items-start gap-2">
-                    <div>
-                      <p className={`text-sm ${!n.isRead ? 'font-bold text-slate-900' : 'font-medium text-slate-700'}`}>{n.title}</p>
-                      <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">{n.message}</p>
-                      <p className="text-[10px] text-slate-400 mt-1">
-                        {new Date(n.createdAt).toLocaleTimeString()} · {new Date(n.createdAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                    {!n.isRead && <div className="w-2 h-2 bg-brand-500 rounded-full mt-1.5"></div>}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </>
-    )}
     </>
   );
 };
