@@ -25,9 +25,9 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [teamProfiles, setTeamProfiles] = useState<Profile[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState<string>(currentUser.id);
+  const [selectedUserId, setSelectedUserId] = useState<string>('all');
   const [selectedStatusId, setSelectedStatusId] = useState<string>('all');
-  const [hideDone, setHideDone] = useState(true);
+  const [hideDone, setHideDone] = useState(false);
 
   // Task Modal State
   const [selectedTask, setSelectedTask] = useState<TaskWithContext | null>(null);
@@ -72,10 +72,6 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
         });
       });
     });
-
-    console.log('📊 Loaded tasks:', tasks.length, '(removed', taskIds.size - tasks.length, 'duplicates)');
-    console.log('👥 Team profiles loaded:', profiles.map(p => ({ id: p.id, name: p.full_name || p.email })));
-    console.log('📌 Sample task assignments:', tasks.slice(0, 3).map(t => ({ title: t.title, assignedTo: t.assignedTo })));
 
     setAllTasks(tasks);
     setTeamProfiles(profiles);
@@ -140,21 +136,6 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
     return true;
   });
 
-  // Debug logging
-  if (allTasks.length > 0) {
-    console.log('🔍 MY WORK FILTERS:');
-    console.log('  - Selected User:', selectedUserId === currentUser.id ? 'ME' : selectedUserId === 'all' ? 'ALL USERS' : selectedUserId);
-    console.log('  - Selected Status:', selectedStatusId === 'all' ? 'ALL STATUSES' : allStatuses.find(s => s.id === selectedStatusId)?.label || selectedStatusId);
-    console.log('  - Hide Done:', hideDone ? 'YES' : 'NO');
-    console.log('  - Total Tasks:', allTasks.length);
-    console.log('  - After Filtering:', filteredTasks.length);
-    console.log('  - Will render:', filteredTasks.length, 'task rows');
-    console.log('  - Sample filtered task statuses:', filteredTasks.slice(0, 5).map(t => {
-      const statusDef = t.boardData.statusDefs.find(s => s.id === t.status);
-      return statusDef?.label;
-    }));
-    console.log('  - Unique task titles (first 10):', [...new Set(filteredTasks.slice(0, 10).map(t => t.title))]);
-  }
 
   const getTaskStatus = (dueDate: string) => {
     const today = new Date();
