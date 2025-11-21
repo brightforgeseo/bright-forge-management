@@ -498,23 +498,45 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
   };
 
   const handleInviteUser = async (channelId: string, userId: string) => {
+    // Optimistically update UI first
+    const invitedProfile = profiles.find(p => p.id === userId);
+    if (invitedProfile) {
+      setChannelMembers(prev => [...prev, {
+        id: `temp-${userId}`,
+        channel_id: channelId,
+        user_id: userId,
+        role: 'member',
+        joined_at: new Date().toISOString(),
+        profiles: invitedProfile
+      }]);
+    }
+
+    // Then sync with database in background
     try {
       await addChannelMember(channelId, userId, 'member', currentUser.id);
       addToast('success', 'User invited to channel');
-      await loadChannelMembers(channelId);
+      // Reload to get correct data with real IDs
+      loadChannelMembers(channelId);
     } catch (e) {
       console.error('Invite user error:', e);
       addToast('error', `Failed to invite user: ${e instanceof Error ? e.message : 'Unknown error'}`);
+      // Revert optimistic update on error
+      setChannelMembers(prev => prev.filter(m => m.user_id !== userId));
     }
   };
 
   const handleRemoveMember = async (channelId: string, userId: string) => {
+    // Optimistically update UI first
+    setChannelMembers(prev => prev.filter(m => m.user_id !== userId));
+
+    // Then sync with database in background
     try {
       await removeChannelMember(channelId, userId);
       addToast('success', 'User removed from channel');
-      await loadChannelMembers(channelId);
     } catch (e) {
       addToast('error', 'Failed to remove user');
+      // Reload on error to restore correct state
+      loadChannelMembers(channelId);
     }
   };
 
