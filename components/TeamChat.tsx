@@ -3,7 +3,7 @@ import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Lo
 import { ChatChannel, ChatMessage, User, ToastType, Profile, MessageReaction } from '../types';
 import { getChatResponse } from '../services/geminiService';
 import { storeEchoConversation, buildConversationContext } from '../services/echoMemory';
-import { fetchChatMessages, sendChatMessage, clearChatHistory, uploadFile, fetchChannels, createChannel, deleteChannel, fetchProfiles, getOrCreateDMChannel, createNotification, editChatMessage, fetchMessageReactions, addMessageReaction, removeMessageReaction, fetchChannelMembers, addChannelMember, removeChannelMember } from '../services/databaseService';
+import { fetchChatMessages, sendChatMessage, clearChatHistory, uploadFile, fetchChannels, createChannel, deleteChannel, fetchProfiles, getOrCreateDMChannel, createNotification, editChatMessage, fetchMessageReactions, addMessageReaction, removeMessageReaction, fetchChannelMembers, addChannelMember, removeChannelMember, deleteChatMessage } from '../services/databaseService';
 import { supabase } from '../lib/supabaseClient';
 import DailyIframe from '@daily-co/daily-js';
 
@@ -426,6 +426,15 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
           ));
         }
       })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'chat_messages' }, async (payload) => {
+        const deletedMsg = payload.old as any;
+        console.log('[TeamChat] Message DELETE received:', deletedMsg.id);
+
+        // Remove from UI if it's in the current channel
+        if (deletedMsg.channel_id === activeChannelRef.current) {
+          setMessages(prev => prev.filter(m => m.id !== deletedMsg.id));
+        }
+      })
       .subscribe((status) => {
         console.log('[TeamChat] Message subscription status:', status);
       });
@@ -659,6 +668,25 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
   const handleCancelEdit = () => {
     setEditingMessageId(null);
     setEditingText('');
+  };
+
+  const handleDeleteMessage = async (messageId: string, messageText: string) => {
+    const preview = messageText.substring(0, 100) + (messageText.length > 100 ? '...' : '');
+    if (!window.confirm(`Delete this message?\n\n"${preview}"`)) {
+      return;
+    }
+
+    try {
+      await deleteChatMessage(messageId);
+
+      // Remove message from UI
+      setMessages(prev => prev.filter(m => m.id !== messageId));
+
+      addToast('success', 'Message deleted');
+    } catch (error) {
+      console.error('Failed to delete message:', error);
+      addToast('error', 'Failed to delete message');
+    }
   };
 
   const handleReaction = async (messageId: string, emoji: string) => {
@@ -1465,18 +1493,29 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                 ) : (
                   <div className="mt-1">
                     <span className="text-slate-700 whitespace-pre-wrap text-sm md:text-base">{msg.text}</span>
-                    {!msg.isAi && msg.senderId === currentUser.id && editingMessageId !== msg.id && (
-                      <button
-                        onClick={() => {
-                          setEditingMessageId(msg.id);
-                          setEditingText(msg.text);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-brand-600 transition-opacity inline-flex items-center ml-2 align-middle"
-                        title="Edit message"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                    )}
+                    <span className="inline-flex items-center gap-1 ml-2">
+                      {!msg.isAi && msg.senderId === currentUser.id && editingMessageId !== msg.id && (
+                        <button
+                          onClick={() => {
+                            setEditingMessageId(msg.id);
+                            setEditingText(msg.text);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-brand-600 transition-opacity inline-flex items-center align-middle"
+                          title="Edit message"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                      )}
+                      {!msg.isAi && (currentUser.role === 'Owner' || msg.senderId === currentUser.id) && editingMessageId !== msg.id && (
+                        <button
+                          onClick={() => handleDeleteMessage(msg.id, msg.text)}
+                          className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-600 transition-opacity inline-flex items-center align-middle"
+                          title="Delete message"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </span>
                   </div>
                 )}
 

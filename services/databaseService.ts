@@ -402,6 +402,18 @@ export const clearChatHistory = async (channelId: string) => {
     await supabase.from('chat_messages').delete().eq('channel_id', channelId);
 }
 
+export const deleteChatMessage = async (messageId: string) => {
+  const { error } = await supabase
+    .from('chat_messages')
+    .delete()
+    .eq('id', messageId);
+
+  if (error) {
+    console.error('Error deleting message:', error);
+    throw error;
+  }
+}
+
 // --- Message Reactions ---
 
 export const fetchMessageReactions = async (messageId: string) => {
