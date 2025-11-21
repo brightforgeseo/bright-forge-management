@@ -619,12 +619,17 @@ export const fetchChannelMembers = async (channelId: string) => {
 
   console.log('[fetchChannelMembers] Basic query successful, now fetching with profiles');
 
-  // Now try with the join
+  // Now try with the join - specify which foreign key to use
   const { data, error } = await supabase
     .from('channel_members')
     .select(`
-      *,
-      profiles (
+      id,
+      channel_id,
+      user_id,
+      role,
+      invited_by,
+      joined_at,
+      profiles!channel_members_user_id_fkey (
         id,
         full_name,
         email,
