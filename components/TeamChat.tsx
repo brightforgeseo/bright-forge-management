@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check, Smile, Film, SmilePlus } from 'lucide-react';
+import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check, Smile, Film, SmilePlus, Video, Phone } from 'lucide-react';
 import { ChatChannel, ChatMessage, User, ToastType, Profile, MessageReaction } from '../types';
 import { getChatResponse } from '../services/geminiService';
 import { fetchChatMessages, sendChatMessage, clearChatHistory, uploadFile, fetchChannels, createChannel, deleteChannel, fetchProfiles, getOrCreateDMChannel, createNotification, editChatMessage, fetchMessageReactions, addMessageReaction, removeMessageReaction } from '../services/databaseService';
 import { supabase } from '../lib/supabaseClient';
+import DailyIframe from '@daily-co/daily-js';
 
 interface TeamChatProps {
   currentUser: User;
@@ -45,6 +46,11 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
   // Reaction state
   const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null); // messageId or null
   const [messageReactions, setMessageReactions] = useState<Record<string, MessageReaction[]>>({}); // messageId -> reactions
+
+  // Video call state
+  const [isInCall, setIsInCall] = useState(false);
+  const [callFrame, setCallFrame] = useState<any>(null);
+  const callContainerRef = useRef<HTMLDivElement>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -705,6 +711,92 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
     }
   };
 
+  // Video/Voice Call Functions
+  const startCall = async (videoEnabled: boolean = true) => {
+    try {
+      // Create a Daily room
+      const response = await fetch('https://api.daily.co/v1/rooms', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer d4eae6d1fbed74640d5203ffb203db8ed8fc6d7e3ec7d8c22ccf5b6cd4922f2b'
+        },
+        body: JSON.stringify({
+          properties: {
+            enable_screenshare: true,
+            enable_chat: false,
+            start_video_off: !videoEnabled,
+            start_audio_off: false
+          }
+        })
+      });
+
+      const room = await response.json();
+      const roomUrl = room.url;
+
+      // Send room link to chat
+      const callMsg: ChatMessage = {
+        id: Date.now().toString(),
+        channelId: activeChannelId,
+        sender: currentUser.name,
+        senderId: currentUser.id,
+        text: `${videoEnabled ? '📹' : '📞'} Started a ${videoEnabled ? 'video' : 'voice'} call: ${roomUrl}`,
+        timestamp: new Date().toISOString(),
+        avatar: currentUser.avatarUrl || 'user'
+      };
+      await sendChatMessage(callMsg);
+
+      // Join the call
+      joinCall(roomUrl, videoEnabled);
+
+      addToast('success', `${videoEnabled ? 'Video' : 'Voice'} call started!`);
+    } catch (error) {
+      console.error('Error starting call:', error);
+      addToast('error', 'Failed to start call');
+    }
+  };
+
+  const joinCall = (roomUrl: string, videoEnabled: boolean = true) => {
+    if (!callContainerRef.current) return;
+
+    const frame = DailyIframe.createFrame(callContainerRef.current, {
+      showLeaveButton: true,
+      iframeStyle: {
+        position: 'fixed',
+        top: '0',
+        left: '0',
+        width: '100%',
+        height: '100%',
+        zIndex: 9999,
+        border: 'none'
+      }
+    });
+
+    frame.join({
+      url: roomUrl,
+      userName: currentUser.name,
+      startVideoOff: !videoEnabled
+    });
+
+    frame.on('left-meeting', () => {
+      frame.destroy();
+      setCallFrame(null);
+      setIsInCall(false);
+    });
+
+    setCallFrame(frame);
+    setIsInCall(true);
+  };
+
+  const endCall = () => {
+    if (callFrame) {
+      callFrame.leave();
+      callFrame.destroy();
+      setCallFrame(null);
+      setIsInCall(false);
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!message.trim()) return;
     const currentCh = channels.find(c => c.id === activeChannelId);
@@ -1110,24 +1202,45 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                  </div>
             )}
           </div>
-          {activeChannelId && (
-            <button
-              onClick={async () => {
-                if (window.confirm("Are you sure you want to delete all messages in this chat? This cannot be undone.")) {
-                  try {
-                    await clearChatHistory(activeChannelId);
-                    setMessages([]);
-                    addToast('success', 'Chat history cleared');
-                  } catch (error) {
-                    addToast('error', 'Failed to clear chat history');
+          <div className="flex items-center gap-2">
+            {/* Video/Voice Call Buttons */}
+            {activeChannelId && (
+              <>
+                <button
+                  onClick={() => startCall(true)}
+                  className="p-2 hover:bg-green-50 rounded-lg transition-colors group"
+                  title="Start Video Call"
+                >
+                  <Video className="w-5 h-5 text-slate-400 group-hover:text-green-600" />
+                </button>
+                <button
+                  onClick={() => startCall(false)}
+                  className="p-2 hover:bg-blue-50 rounded-lg transition-colors group"
+                  title="Start Voice Call"
+                >
+                  <Phone className="w-5 h-5 text-slate-400 group-hover:text-blue-600" />
+                </button>
+              </>
+            )}
+            {activeChannelId && (
+              <button
+                onClick={async () => {
+                  if (window.confirm("Are you sure you want to delete all messages in this chat? This cannot be undone.")) {
+                    try {
+                      await clearChatHistory(activeChannelId);
+                      setMessages([]);
+                      addToast('success', 'Chat history cleared');
+                    } catch (error) {
+                      addToast('error', 'Failed to clear chat history');
+                    }
                   }
-                }
-              }}
-              title="Clear History"
-            >
-              <Trash2 className="w-4 h-4 text-slate-300 hover:text-red-500" />
-            </button>
-          )}
+                }}
+                title="Clear History"
+              >
+                <Trash2 className="w-4 h-4 text-slate-300 hover:text-red-500" />
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
@@ -1503,6 +1616,9 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
            </div>
         </div>
       </div>
+
+      {/* Video Call Container */}
+      <div ref={callContainerRef} />
     </div>
   );
 };
