@@ -501,7 +501,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
       addToast('success', 'User invited to channel');
       await loadChannelMembers(channelId);
     } catch (e) {
-      addToast('error', 'Failed to invite user');
+      console.error('Invite user error:', e);
+      addToast('error', `Failed to invite user: ${e instanceof Error ? e.message : 'Unknown error'}`);
     }
   };
 
