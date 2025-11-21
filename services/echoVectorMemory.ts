@@ -5,7 +5,7 @@
 
 import OpenAI from 'openai';
 import { supabase } from '../lib/supabaseClient';
-import { config } from '../config.ts';
+import { config } from '../config';
 
 // Import config
 let openaiApiKey: string | undefined = config?.openaiApiKey;
