@@ -97,7 +97,19 @@ const Sidebar: React.FC<SidebarProps> = ({
       setIsNotificationsOpen(false);
 
       if (notification.linkData && typeof notification.linkData === 'object') {
-        localStorage.setItem('openTaskModal', JSON.stringify(notification.linkData));
+        const linkData = typeof notification.linkData === 'string'
+          ? JSON.parse(notification.linkData)
+          : notification.linkData;
+
+        // Handle task notifications
+        if (notification.linkView === 'TASKS' && linkData.taskId) {
+          localStorage.setItem('openTaskModal', JSON.stringify(linkData));
+        }
+
+        // Handle chat notifications (DMs and mentions)
+        if (notification.linkView === 'TEAM_CHAT' && linkData.channelId) {
+          localStorage.setItem('openChatNotification', JSON.stringify(linkData));
+        }
       }
     }
   };

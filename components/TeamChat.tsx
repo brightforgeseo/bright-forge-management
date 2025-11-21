@@ -252,7 +252,30 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
   useEffect(() => {
     const init = async () => {
       const chans = await refreshData();
-      if (chans.length > 0 && !activeChannelId) {
+
+      // Check for notification click (chat navigation)
+      const openChatNotification = localStorage.getItem('openChatNotification');
+      if (openChatNotification) {
+        try {
+          const chatData = JSON.parse(openChatNotification);
+          console.log('[TeamChat] Opening chat from notification:', chatData);
+
+          // Find the channel by ID
+          const targetChannel = chans.find(c => c.id === chatData.channelId);
+          if (targetChannel) {
+            setActiveChannelId(targetChannel.id);
+            console.log('[TeamChat] Switched to channel:', targetChannel.name);
+          } else {
+            console.warn('[TeamChat] Channel not found:', chatData.channelId);
+          }
+
+          localStorage.removeItem('openChatNotification');
+        } catch (e) {
+          console.error('[TeamChat] Failed to parse chat notification:', e);
+          localStorage.removeItem('openChatNotification');
+        }
+      } else if (chans.length > 0 && !activeChannelId) {
+        // No notification - default to general
         const general = chans.find(c => c.name === 'general');
         setActiveChannelId(general ? general.id : chans[0].id);
       }
@@ -727,11 +750,17 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
       if (otherId && otherId !== currentUser.id) {
         await createNotification(
           otherId,
-          'New Message',
+          'New Direct Message',
           `${currentUser.name}: ${userMsg.text.substring(0, 100)}`,
           'message',
-          'TEAM_CHAT'
+          'TEAM_CHAT',
+          {
+            channelId: activeChannelId,
+            channelName: currentCh.name,
+            channelType: 'dm'
+          }
         );
+        playNotificationSound();
       }
     }
 
@@ -744,7 +773,12 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
             `${currentUser.name} mentioned you in #${currentCh.name}`,
             userMsg.text.substring(0, 100),
             'message',
-            'TEAM_CHAT'
+            'TEAM_CHAT',
+            {
+              channelId: activeChannelId,
+              channelName: currentCh.name,
+              channelType: 'channel'
+            }
           );
         }
       }
