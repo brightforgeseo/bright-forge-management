@@ -58,10 +58,13 @@ export const fetchNotifications = async (userId: string): Promise<AppNotificatio
     .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
-    .limit(20);
-    
-  if (error) return [];
-  
+    .limit(50);
+
+  if (error) {
+    console.error('Error fetching notifications:', error);
+    return [];
+  }
+
   return data.map((n: any) => ({
     id: n.id,
     userId: n.user_id,
@@ -83,33 +86,49 @@ export const createNotification = async (
   linkView?: string,
   linkData?: any
 ) => {
-  console.log('📬 Creating notification:', { userId, title, message, type, linkView, linkData });
   const { data, error } = await supabase.from('notifications').insert({
     user_id: userId,
     title,
     message,
     type,
     link_view: linkView,
-    link_data: linkData ? JSON.stringify(linkData) : null
-  });
+    link_data: linkData || null
+  }).select().single();
 
   if (error) {
-    console.error('❌ Error creating notification:', error);
-    console.error('Error details:', JSON.stringify(error, null, 2));
-    console.error('Attempted to insert:', { userId, title, message, type, linkView, linkData });
+    console.error('Error creating notification:', error);
     throw error;
   }
 
-  console.log('✅ Notification created successfully:', data);
   return data;
 };
 
 export const markNotificationRead = async (id: string) => {
-  await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+  const { error } = await supabase
+    .from('notifications')
+    .update({ is_read: true })
+    .eq('id', id);
+
+  if (error) console.error('Error marking notification as read:', error);
 };
 
 export const markAllNotificationsRead = async (userId: string) => {
-  await supabase.from('notifications').update({ is_read: true }).eq('user_id', userId);
+  const { error } = await supabase
+    .from('notifications')
+    .update({ is_read: true })
+    .eq('user_id', userId)
+    .eq('is_read', false);
+
+  if (error) console.error('Error marking all notifications as read:', error);
+};
+
+export const deleteAllNotifications = async (userId: string) => {
+  const { error } = await supabase
+    .from('notifications')
+    .delete()
+    .eq('user_id', userId);
+
+  if (error) console.error('Error deleting notifications:', error);
 };
 
 
@@ -396,114 +415,58 @@ export const uploadFile = async (file: File, bucket: string = 'uploads'): Promis
 // --- Due Date Notifications ---
 
 export const checkDueDateNotifications = async (currentUserId: string) => {
-  try {
-    console.log('🔔 Checking for due date notifications for user:', currentUserId);
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
-    // Get today's date in local timezone YYYY-MM-DD format
-    const now = new Date();
-    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    const todayStart = new Date(today + 'T00:00:00').toISOString();
-    const todayEnd = new Date(today + 'T23:59:59').toISOString();
-    console.log('📅 Today is (local timezone):', today);
+  const { data: boards, error: boardsError } = await supabase
+    .from('client_boards')
+    .select('*');
 
-    // Fetch all client boards
-    const { data: boards, error: boardsError } = await supabase
-      .from('client_boards')
-      .select('*');
+  if (boardsError || !boards) {
+    console.error('Error fetching boards for due date check:', boardsError);
+    return;
+  }
 
-    if (boardsError || !boards) {
-      console.error('Error fetching boards:', boardsError);
-      return;
-    }
+  for (const board of boards) {
+    const boardData = board.board_data as any;
+    if (!boardData.groups) continue;
 
-    console.log('📊 Found', boards.length, 'boards to check');
-    let notificationCount = 0;
-    let skippedCount = 0;
+    for (const group of boardData.groups) {
+      if (!group.tasks) continue;
 
-    // Iterate through all boards and their tasks
-    for (const board of boards) {
-      const boardData = board.board_data as any;
-      if (!boardData.groups) continue;
+      for (const task of group.tasks) {
+        if (task.dueDate === today && task.assignedTo) {
+          const assignedIds = Array.isArray(task.assignedTo) ? task.assignedTo : [task.assignedTo];
 
-      for (const group of boardData.groups) {
-        if (!group.tasks) continue;
+          if (!assignedIds.includes(currentUserId)) continue;
 
-        for (const task of group.tasks) {
-          // Check if task is due today AND assigned to current user
-          if (task.dueDate === today && task.assignedTo) {
-            const assignedIds = Array.isArray(task.assignedTo)
-              ? task.assignedTo
-              : [task.assignedTo];
+          // Check for duplicate notification
+          const { data: existing } = await supabase
+            .from('notifications')
+            .select('id')
+            .eq('user_id', currentUserId)
+            .eq('type', 'alert')
+            .eq('link_data->taskId', task.id)
+            .eq('link_data->boardId', boardData.id)
+            .gte('created_at', today + 'T00:00:00')
+            .maybeSingle();
 
-            // Only notify if this task is assigned to the current user
-            if (!assignedIds.includes(currentUserId)) {
-              continue; // Skip tasks not assigned to current user
+          if (existing) continue;
+
+          await createNotification(
+            currentUserId,
+            'Task Due Today',
+            `"${task.title}" is due today on ${boardData.name}`,
+            'alert',
+            'TASKS',
+            {
+              taskId: task.id,
+              boardId: boardData.id,
+              groupId: group.id
             }
-
-            console.log('⏰ YOUR task due today:', task.title);
-
-            // Check if we already created this notification for this specific task
-            // Check by matching the task ID in the link_data
-            const { data: existingNotifications } = await supabase
-              .from('notifications')
-              .select('id, link_data')
-              .eq('user_id', currentUserId)
-              .eq('title', 'Task Due Today')
-              .gte('created_at', todayStart);
-
-            // Check if any existing notification has this exact task
-            const alreadyExists = existingNotifications?.some(n => {
-              try {
-                if (n.link_data) {
-                  const data = JSON.parse(n.link_data);
-                  return data.taskId === task.id && data.boardId === boardData.id;
-                }
-              } catch (e) {}
-              return false;
-            });
-
-            if (alreadyExists) {
-              console.log('⏭️ Notification already exists for task:', task.title);
-              skippedCount++;
-              continue;
-            }
-
-            console.log('✨ No duplicate found, will create notification for:', task.title);
-
-            try {
-              console.log('📦 Creating notification with IDs:');
-              console.log('  Database row ID:', board.id);
-              console.log('  BoardData ID:', boardData.id);
-              console.log('  BoardData name:', boardData.name);
-              console.log('  Task ID:', task.id);
-              console.log('  Group ID:', group.id);
-
-              // Pass the parsed object - createNotification will stringify it
-              await createNotification(
-                currentUserId,
-                'Task Due Today',
-                `"${task.title}" is due today on ${boardData.name}`,
-                'alert',
-                'TASKS',
-                {
-                  taskId: task.id,
-                  boardId: boardData.id,  // This is the ClientBoard ID
-                  groupId: group.id,
-                  boardName: boardData.name
-                }
-              );
-              notificationCount++;
-              console.log('✉️ Created due date notification for task:', task.title);
-            } catch (notifError) {
-              console.error('Failed to create notification for task:', task.title, notifError);
-            }
-          }
+          );
         }
       }
     }
-
-    console.log(`✅ Due date check completed - sent ${notificationCount} new notifications, skipped ${skippedCount} duplicates`);
-  } catch (error) {
-    console.error('Error checking due dates:', error);
   }
 };

@@ -19,12 +19,13 @@ import { Copy, X, UserPlus, Check, Mail, RefreshCw, AlertTriangle, MessageSquare
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentView, setCurrentView] = useState<ToolView>(ToolView.DASHBOARD);
-  
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   // Invite Modal State
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteStep, setInviteStep] = useState<'form' | 'success'>('form');
   const [inviteForm, setInviteForm] = useState({ email: '', name: '', password: '' });
-  
+
   const [currentUser, setCurrentUser] = useState<User>({
     id: 'guest', name: 'Guest', role: 'Visitor', initials: 'GU', email: ''
   });
@@ -110,74 +111,18 @@ const App: React.FC = () => {
         console.error('[App] Error fetching user data:', e);
     }
 
-    // IMPORTANT: Set ID to the real UUID (uid) so DMs work
     setCurrentUser({ id: uid, name, role, initials: name.substring(0, 2).toUpperCase(), email, avatarUrl });
     setIsAuthenticated(true);
 
-    // Check due dates only ONCE per day using localStorage
-    // Use local date to avoid timezone issues
+    // Check for due date notifications once per day
     const now = new Date();
-    const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-
-    // One-time fix: Clear old checks and delete old notifications to force recreation with proper linkData
-    const fixVersion = localStorage.getItem('notificationFixVersion');
-    if (fixVersion !== 'v5') {
-      localStorage.removeItem('lastDueDateCheck');
-      localStorage.removeItem('lastDueDateCheckInProgress');
-      localStorage.setItem('notificationFixVersion', 'v5');
-      console.log('🔧 FORCE clearing ALL due date notifications...');
-
-      // Delete ALL due date notifications for this user
-      supabase
-        .from('notifications')
-        .delete()
-        .eq('user_id', uid)
-        .ilike('title', '%Due%')
-        .then(({ data, error }) => {
-          if (error) {
-            console.error('Error deleting old notifications:', error);
-          } else {
-            console.log('✅ Deleted ALL due notifications, forcing complete recreation');
-          }
-        });
-
-      // Also delete by message pattern
-      supabase
-        .from('notifications')
-        .delete()
-        .eq('user_id', uid)
-        .ilike('message', '%due today%')
-        .then(({ data, error }) => {
-          if (!error) {
-            console.log('✅ Also deleted notifications by message pattern');
-          }
-        });
-    }
-
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const lastCheck = localStorage.getItem('lastDueDateCheck');
-    const checkInProgress = localStorage.getItem('lastDueDateCheckInProgress');
 
-    if (lastCheck !== localDate && !checkInProgress) {
-      console.log('🗓️ First login today - checking for due date notifications (local date:', localDate, ')');
-      // Set in-progress flag IMMEDIATELY to prevent duplicate checks
-      localStorage.setItem('lastDueDateCheckInProgress', 'true');
-
+    if (lastCheck !== today) {
       checkDueDateNotifications(uid)
-        .then(() => {
-          localStorage.setItem('lastDueDateCheck', localDate);
-          localStorage.removeItem('lastDueDateCheckInProgress');
-          console.log('✅ Due date check complete - will not run again until tomorrow');
-        })
-        .catch(err => {
-          console.error('Error checking due dates:', err);
-          localStorage.removeItem('lastDueDateCheckInProgress');
-        });
-    } else {
-      if (checkInProgress) {
-        console.log('⏳ Due date check already in progress - skipping');
-      } else {
-        console.log('⏭️ Already checked due dates today - skipping (local date:', localDate, ')');
-      }
+        .then(() => localStorage.setItem('lastDueDateCheck', today))
+        .catch(err => console.error('Error checking due dates:', err));
     }
     }, 100); // 100ms debounce
   };
@@ -276,22 +221,45 @@ ${currentUser.name}`;
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-sans text-slate-900">
-      <Sidebar 
-        currentView={currentView} 
-        onChangeView={setCurrentView} 
+      <Sidebar
+        currentView={currentView}
+        onChangeView={setCurrentView}
         branding={branding}
         currentUser={currentUser}
         onLogout={handleLogout}
         onInvite={() => { generatePassword(); setShowInviteModal(true); }}
+        isMobileMenuOpen={isMobileMenuOpen}
+        setIsMobileMenuOpen={setIsMobileMenuOpen}
       />
-      <main className={`flex-1 ml-64 h-full overflow-hidden relative ${isFullHeight ? '' : 'bg-slate-50'}`}>
+
+      {/* Mobile Header */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-slate-200 z-30 flex items-center px-4 gap-3">
+        <button
+          onClick={() => setIsMobileMenuOpen(true)}
+          className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+        >
+          <svg className="w-6 h-6 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-gradient-to-br from-brand-500 to-brand-600 rounded-lg flex items-center justify-center">
+            <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+            </svg>
+          </div>
+          <span className="font-bold text-slate-900 truncate">{branding.companyName}</span>
+        </div>
+      </div>
+
+      <main className={`flex-1 lg:ml-64 h-full overflow-hidden relative ${isFullHeight ? '' : 'bg-slate-50'} pt-16 lg:pt-0`}>
         {isFullHeight ? renderContent() : <ScrollablePageWrapper>{renderContent()}</ScrollablePageWrapper>}
       </main>
       <ToastContainer toasts={toasts} removeToast={removeToast} />
 
       {showInviteModal && (
-        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 animate-fadeIn backdrop-blur-sm">
-           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-100">
+        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 lg:p-8 animate-fadeIn backdrop-blur-sm">
+           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-100 max-h-[90vh] overflow-y-auto">
               <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                  <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                     <UserPlus className="w-5 h-5 text-brand-600" /> 

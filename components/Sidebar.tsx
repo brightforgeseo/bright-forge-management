@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Search, PenTool, BarChart, Settings, TableProperties, MessageSquare, Hexagon, LogOut, UserPlus, MoreVertical, Bell, X, Check, CheckSquare } from 'lucide-react';
+import { LayoutDashboard, Search, PenTool, BarChart, Settings, TableProperties, MessageSquare, Hexagon, LogOut, UserPlus, MoreVertical, Bell, X, Check, CheckSquare, Menu } from 'lucide-react';
 import { ToolView, BrandingConfig, User, AppNotification } from '../types';
 import { supabase } from '../lib/supabaseClient';
-import { fetchNotifications, markNotificationRead, markAllNotificationsRead } from '../services/databaseService';
+import { fetchNotifications, markNotificationRead, markAllNotificationsRead, deleteAllNotifications } from '../services/databaseService';
 
 interface SidebarProps {
   currentView: ToolView;
@@ -12,127 +12,94 @@ interface SidebarProps {
   currentUser: User;
   onLogout: () => void;
   onInvite: () => void;
+  isMobileMenuOpen: boolean;
+  setIsMobileMenuOpen: (open: boolean) => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ 
-  currentView, 
-  onChangeView, 
-  branding, 
-  currentUser, 
+const Sidebar: React.FC<SidebarProps> = ({
+  currentView,
+  onChangeView,
+  branding,
+  currentUser,
   onLogout,
-  onInvite
+  onInvite,
+  isMobileMenuOpen,
+  setIsMobileMenuOpen
 }) => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
-  // Play notification sound - LOUD bell sound
-  const playNotificationSound = async () => {
-    try {
-      // Check if audio is allowed (user interaction or permission)
-      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioContext) {
-        console.warn('Web Audio API not supported');
-        return;
-      }
-
-      const audioContext = new AudioContext();
-
-      // Resume context if suspended (Chrome autoplay policy)
-      if (audioContext.state === 'suspended') {
-        await audioContext.resume();
-      }
-
-      // Create a more pleasant notification sound
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-
-      // Use a sine wave for a softer sound
-      oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(880, audioContext.currentTime); // A5 note
-      oscillator.frequency.exponentialRampToValueAtTime(440, audioContext.currentTime + 0.15); // Drop to A4
-
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-
-      // Envelope for a quick bell-like sound
-      gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-      gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.01); // Quick attack
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3); // Decay
-
-      oscillator.start(audioContext.currentTime);
-      oscillator.stop(audioContext.currentTime + 0.3);
-
-      // Clean up after sound finishes
-      oscillator.onended = () => {
-        audioContext.close();
-      };
-
-      console.log('🔔 Notification sound played successfully');
-    } catch (error) {
-      console.warn('Could not play notification sound:', error);
-      // Fallback: Try to use HTML5 audio if available
-      try {
-        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhCCuBzvLZiTcIG2m98OScTgwOUavnzbllHAUyjN3w0');
-        audio.volume = 0.3;
-        audio.play();
-      } catch (fallbackError) {
-        console.warn('Fallback audio also failed:', fallbackError);
-      }
-    }
+  const handleViewChange = (view: ToolView) => {
+    onChangeView(view);
+    setIsMobileMenuOpen(false);
   };
 
-  // Notification listener
   useEffect(() => {
-      if (!currentUser || currentUser.id === 'guest') return;
+    if (!currentUser || currentUser.id === 'guest') return;
 
-      const loadNotifications = async () => {
-          const data = await fetchNotifications(currentUser.id);
-          setNotifications(data);
-      };
-      loadNotifications();
+    const loadNotifications = async () => {
+      const data = await fetchNotifications(currentUser.id);
+      setNotifications(data);
+    };
+    loadNotifications();
 
-      // Subscribe to new notifications
-      const sub = supabase.channel('public:notifications')
-          .on('postgres_changes', {
-              event: 'INSERT',
-              schema: 'public',
-              table: 'notifications',
-              filter: `user_id=eq.${currentUser.id}`
-          }, (payload) => {
-              const newNote = payload.new as any;
-              console.log('🔔 New notification received!', newNote);
+    const channel = supabase
+      .channel('notifications')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${currentUser.id}`
+      }, (payload) => {
+        const newNote = payload.new as any;
+        setNotifications(prev => [{
+          id: newNote.id,
+          userId: newNote.user_id,
+          title: newNote.title,
+          message: newNote.message,
+          type: newNote.type,
+          linkView: newNote.link_view,
+          linkData: newNote.link_data,
+          isRead: newNote.is_read,
+          createdAt: newNote.created_at
+        }, ...prev]);
+      })
+      .subscribe();
 
-              setNotifications(prev => [{
-                  id: newNote.id,
-                  userId: newNote.user_id,
-                  title: newNote.title,
-                  message: newNote.message,
-                  type: newNote.type,
-                  linkView: newNote.link_view,
-                  linkData: newNote.link_data,
-                  isRead: newNote.is_read,
-                  createdAt: newNote.created_at
-              }, ...prev]);
-
-              // Play notification sound
-              playNotificationSound();
-          })
-          .subscribe();
-
-      return () => { supabase.removeChannel(sub); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [currentUser.id]);
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   const handleMarkRead = async (id: string) => {
-      await markNotificationRead(id);
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+    await markNotificationRead(id);
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
   };
 
   const handleMarkAllRead = async () => {
-      await markAllNotificationsRead(currentUser.id);
-      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    await markAllNotificationsRead(currentUser.id);
+    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+  };
+
+  const handleClearAll = async () => {
+    if (!window.confirm('Clear all notifications?')) return;
+    await deleteAllNotifications(currentUser.id);
+    setNotifications([]);
+  };
+
+  const handleNotificationClick = (notification: AppNotification) => {
+    if (!notification.isRead) handleMarkRead(notification.id);
+    if (notification.linkView) {
+      onChangeView(notification.linkView as ToolView);
+      setIsNotificationsOpen(false);
+
+      if (notification.linkData && typeof notification.linkData === 'object') {
+        localStorage.setItem('openTaskModal', JSON.stringify(notification.linkData));
+      }
+    }
   };
 
   const navItems = [
@@ -147,9 +114,22 @@ const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   return (
-    <div className="w-64 bg-slate-900 text-white flex flex-col h-full fixed left-0 top-0 shadow-xl z-10 transition-all duration-300">
+    <>
+      {/* Mobile Overlay */}
+      {isMobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <div className={`
+        w-64 bg-slate-900 text-white flex flex-col h-full fixed left-0 top-0 shadow-xl z-50 transition-transform duration-300
+        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `}>
       {/* Brand Header */}
-      <div className="p-6 border-b border-slate-800 flex items-center justify-between">
+      <div className="p-4 lg:p-6 border-b border-slate-800 flex items-center justify-between">
         <div className="flex items-center gap-3 overflow-hidden">
             <div className="w-8 h-8 flex-shrink-0 bg-gradient-to-br from-brand-500 to-brand-600 rounded-lg flex items-center justify-center shadow-lg shadow-brand-900/50">
                <Hexagon className="w-5 h-5 text-white" fill="currentColor" />
@@ -159,132 +139,64 @@ const Sidebar: React.FC<SidebarProps> = ({
         
         {/* Notification Bell */}
         <div className="relative">
-            <button
-                onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-                className="p-2 rounded-lg hover:bg-slate-800 transition-colors relative"
-                style={unreadCount > 0 ? {
-                  boxShadow: '0 0 25px rgba(251, 146, 60, 1), 0 0 50px rgba(251, 146, 60, 0.6), 0 0 75px rgba(251, 146, 60, 0.3)',
-                  animation: 'glow 1.5s ease-in-out infinite',
-                  backgroundColor: 'rgba(251, 146, 60, 0.1)'
-                } : {}}
-            >
-                <Bell
-                  className={`w-5 h-5 transition-colors ${unreadCount > 0 ? 'text-orange-500' : 'text-slate-400 hover:text-white'}`}
-                  style={unreadCount > 0 ? { filter: 'drop-shadow(0 0 8px rgba(251, 146, 60, 0.8))' } : {}}
-                />
-                {unreadCount > 0 && (
-                    <span
-                      className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-orange-500 text-white text-[10px] font-bold rounded-full border-2 border-slate-900 flex items-center justify-center px-1"
-                      style={{
-                        boxShadow: '0 0 15px rgba(251, 146, 60, 0.8)',
-                        animation: 'pulse 1s ease-in-out infinite'
-                      }}
-                    >
-                        {unreadCount}
-                    </span>
-                )}
-            </button>
-
-            {isNotificationsOpen && (
-                <>
-                <div className="fixed inset-0 z-40" onClick={() => setIsNotificationsOpen(false)}></div>
-                <div className="absolute top-full left-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden z-50 animate-fadeIn text-slate-900 left-0 md:left-auto md:right-[-200px] lg:left-0 origin-top-left">
-                   <div className="p-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                       <h3 className="font-bold text-sm text-slate-700">Notifications</h3>
-                       <div className="flex gap-2">
-                           {unreadCount > 0 && (
-                               <button onClick={handleMarkAllRead} className="text-xs text-brand-600 hover:text-brand-700 font-medium">Mark all read</button>
-                           )}
-                           {notifications.length > 0 && (
-                               <button
-                                 onClick={() => {
-                                   // Use setTimeout to prevent blocking the UI
-                                   setTimeout(async () => {
-                                     const shouldClear = window.confirm('Clear all notifications?');
-                                     if (shouldClear) {
-                                       // Clear UI immediately for responsiveness
-                                       setNotifications([]);
-
-                                       // Delete from database in background
-                                       try {
-                                         await supabase.from('notifications').delete().eq('user_id', currentUser.id);
-                                       } catch (error) {
-                                         console.error('Error clearing notifications:', error);
-                                         // Reload notifications if delete failed
-                                         const freshNotifications = await fetchNotifications(currentUser.id);
-                                         setNotifications(freshNotifications);
-                                       }
-                                     }
-                                   }, 0);
-                                 }}
-                                 className="text-xs text-red-600 hover:text-red-700 font-medium"
-                               >
-                                 Clear all
-                               </button>
-                           )}
-                       </div>
-                   </div>
-                   <div className="max-h-80 overflow-y-auto">
-                       {notifications.length === 0 ? (
-                           <div className="p-8 text-center text-slate-400 text-sm">No notifications</div>
-                       ) : (
-                           notifications.map(n => (
-                               <div 
-                                 key={n.id} 
-                                 className={`p-3 border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer ${!n.isRead ? 'bg-blue-50/30' : ''}`}
-                                 onClick={() => {
-                                     console.log('🔔 Notification clicked:', n.title);
-
-                                     if(!n.isRead) handleMarkRead(n.id);
-                                     if(n.linkView) {
-                                       console.log('📍 Changing view to:', n.linkView);
-                                       onChangeView(n.linkView as ToolView);
-                                       setIsNotificationsOpen(false); // Close dropdown after clicking
-
-                                       // If there's link data (task/board info), store it for TaskBoard to open
-                                       if (n.linkData) {
-                                         try {
-                                           // linkData is already a string from the database, no need to parse
-                                           console.log('📍 Storing link data for task modal (raw):', n.linkData);
-
-                                           // Validate it's valid JSON by parsing it
-                                           const validation = JSON.parse(n.linkData);
-                                           console.log('📍 Validated link data:', validation);
-
-                                           // Store the string directly
-                                           localStorage.setItem('openTaskModal', n.linkData);
-                                           console.log('✅ localStorage set successfully!');
-
-                                           // Double-check it was stored
-                                           const check = localStorage.getItem('openTaskModal');
-                                           console.log('Verification - localStorage now contains:', check);
-                                         } catch (e) {
-                                           console.error('Error validating link data:', e);
-                                           console.error('Invalid linkData was:', n.linkData);
-                                         }
-                                       } else {
-                                         console.log('⚠️ No linkData in notification!');
-                                       }
-                                     } else {
-                                       console.log('⚠️ No linkView in notification!');
-                                     }
-                                 }}
-                               >
-                                  <div className="flex justify-between items-start gap-2">
-                                      <div>
-                                          <p className={`text-sm ${!n.isRead ? 'font-bold text-slate-900' : 'font-medium text-slate-700'}`}>{n.title}</p>
-                                          <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">{n.message}</p>
-                                          <p className="text-[10px] text-slate-400 mt-1">{new Date(n.createdAt).toLocaleTimeString()} · {new Date(n.createdAt).toLocaleDateString()}</p>
-                                      </div>
-                                      {!n.isRead && <div className="w-2 h-2 bg-brand-500 rounded-full mt-1.5"></div>}
-                                  </div>
-                               </div>
-                           ))
-                       )}
-                   </div>
-                </div>
-                </>
+          <button
+            onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+            className="p-2 rounded-lg hover:bg-slate-800 transition-colors relative"
+          >
+            <Bell className={`w-5 h-5 ${unreadCount > 0 ? 'text-orange-500' : 'text-slate-400'}`} />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-orange-500 text-white text-[10px] font-bold rounded-full border-2 border-slate-900 flex items-center justify-center px-1">
+                {unreadCount}
+              </span>
             )}
+          </button>
+
+          {isNotificationsOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setIsNotificationsOpen(false)}></div>
+              <div className="fixed lg:absolute top-16 lg:top-full left-0 right-0 lg:left-auto lg:right-0 lg:w-80 mt-0 lg:mt-2 bg-white rounded-none lg:rounded-xl shadow-xl border-t lg:border border-slate-200 overflow-hidden z-50 text-slate-900 max-h-[calc(100vh-4rem)] lg:max-h-96">
+                <div className="p-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                  <h3 className="font-bold text-sm text-slate-700">Notifications</h3>
+                  <div className="flex gap-2">
+                    {unreadCount > 0 && (
+                      <button onClick={handleMarkAllRead} className="text-xs text-brand-600 hover:text-brand-700 font-medium">
+                        Mark all read
+                      </button>
+                    )}
+                    {notifications.length > 0 && (
+                      <button onClick={handleClearAll} className="text-xs text-red-600 hover:text-red-700 font-medium">
+                        Clear all
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="max-h-80 overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400 text-sm">No notifications</div>
+                  ) : (
+                    notifications.map(n => (
+                      <div
+                        key={n.id}
+                        className={`p-3 border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer ${!n.isRead ? 'bg-blue-50/30' : ''}`}
+                        onClick={() => handleNotificationClick(n)}
+                      >
+                        <div className="flex justify-between items-start gap-2">
+                          <div>
+                            <p className={`text-sm ${!n.isRead ? 'font-bold text-slate-900' : 'font-medium text-slate-700'}`}>{n.title}</p>
+                            <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">{n.message}</p>
+                            <p className="text-[10px] text-slate-400 mt-1">
+                              {new Date(n.createdAt).toLocaleTimeString()} · {new Date(n.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          {!n.isRead && <div className="w-2 h-2 bg-brand-500 rounded-full mt-1.5"></div>}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -295,7 +207,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           return (
             <button
               key={item.id}
-              onClick={() => onChangeView(item.id)}
+              onClick={() => handleViewChange(item.id)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
                 isActive
                   ? 'bg-brand-600 text-white shadow-md shadow-brand-900/20'
@@ -365,6 +277,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
     </div>
+    </>
   );
 };
 

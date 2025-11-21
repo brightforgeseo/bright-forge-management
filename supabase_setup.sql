@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS notifications (
   message TEXT NOT NULL,
   type TEXT DEFAULT 'info', -- 'info', 'success', 'alert', 'message'
   link_view TEXT,
+  link_data JSONB,
   is_read BOOLEAN DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
