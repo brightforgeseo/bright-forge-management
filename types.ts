@@ -147,7 +147,18 @@ export interface ChatChannel {
   id: string;
   name: string;
   type: 'channel' | 'dm';
+  is_private?: boolean;
+  owner_id?: string;
   unread?: number;
+}
+
+export interface ChannelMember {
+  id: string;
+  channel_id: string;
+  user_id: string;
+  role: 'owner' | 'member';
+  invited_by?: string;
+  joined_at: string;
 }
 
 export type ToastType = 'success' | 'error' | 'info';

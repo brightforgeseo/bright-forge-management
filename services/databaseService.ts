@@ -166,17 +166,33 @@ export const fetchChannels = async (): Promise<ChatChannel[]> => {
   return data as ChatChannel[];
 };
 
-export const createChannel = async (name: string, type: 'channel' | 'dm' = 'channel') => {
+export const createChannel = async (
+  name: string,
+  type: 'channel' | 'dm' = 'channel',
+  isPrivate: boolean = false,
+  ownerId?: string
+) => {
   // Ensure name is safe
   const safeName = name.toLowerCase().replace(/\s+/g, '-');
-  
+
   const { data, error } = await supabase
     .from('channels')
-    .insert({ name: safeName, type })
+    .insert({
+      name: safeName,
+      type,
+      is_private: isPrivate,
+      owner_id: ownerId
+    })
     .select()
     .single();
-  
+
   if (error) throw error;
+
+  // If private channel with owner, add owner as member
+  if (isPrivate && ownerId && data) {
+    await addChannelMember(data.id, ownerId, 'owner');
+  }
+
   return data;
 };
 
@@ -509,4 +525,65 @@ export const checkDueDateNotifications = async (currentUserId: string) => {
       }
     }
   }
+};
+
+// =====================================================
+// CHANNEL MEMBERSHIP FUNCTIONS
+// =====================================================
+
+export const addChannelMember = async (
+  channelId: string,
+  userId: string,
+  role: 'owner' | 'member' = 'member',
+  invitedBy?: string
+) => {
+  const { data, error } = await supabase
+    .from('channel_members')
+    .insert({
+      channel_id: channelId,
+      user_id: userId,
+      role,
+      invited_by: invitedBy
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+export const removeChannelMember = async (channelId: string, userId: string) => {
+  const { error } = await supabase
+    .from('channel_members')
+    .delete()
+    .eq('channel_id', channelId)
+    .eq('user_id', userId);
+
+  if (error) throw error;
+};
+
+export const fetchChannelMembers = async (channelId: string) => {
+  const { data, error } = await supabase
+    .from('channel_members')
+    .select(`
+      *,
+      user:profiles!channel_members_user_id_fkey(id, full_name, email, avatar_url)
+    `)
+    .eq('channel_id', channelId)
+    .order('joined_at', { ascending: true });
+
+  if (error) throw error;
+  return data;
+};
+
+export const isChannelMember = async (channelId: string, userId: string): Promise<boolean> => {
+  const { data, error } = await supabase
+    .from('channel_members')
+    .select('id')
+    .eq('channel_id', channelId)
+    .eq('user_id', userId)
+    .single();
+
+  if (error && error.code !== 'PGRST116') throw error; // PGRST116 is "no rows returned"
+  return !!data;
 };

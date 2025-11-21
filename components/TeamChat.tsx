@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check, Smile, Film, SmilePlus, Video, Phone } from 'lucide-react';
+import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check, Smile, Film, SmilePlus, Video, Phone, Lock, UserPlus } from 'lucide-react';
 import { ChatChannel, ChatMessage, User, ToastType, Profile, MessageReaction } from '../types';
 import { getChatResponse } from '../services/geminiService';
-import { fetchChatMessages, sendChatMessage, clearChatHistory, uploadFile, fetchChannels, createChannel, deleteChannel, fetchProfiles, getOrCreateDMChannel, createNotification, editChatMessage, fetchMessageReactions, addMessageReaction, removeMessageReaction } from '../services/databaseService';
+import { fetchChatMessages, sendChatMessage, clearChatHistory, uploadFile, fetchChannels, createChannel, deleteChannel, fetchProfiles, getOrCreateDMChannel, createNotification, editChatMessage, fetchMessageReactions, addMessageReaction, removeMessageReaction, fetchChannelMembers, addChannelMember, removeChannelMember } from '../services/databaseService';
 import { supabase } from '../lib/supabaseClient';
 import DailyIframe from '@daily-co/daily-js';
 
@@ -22,6 +22,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
+  const [isPrivateChannel, setIsPrivateChannel] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Message editing state
@@ -50,6 +51,11 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const activeChannelRef = useRef<string>('');
   const [mentionDropdown, setMentionDropdown] = useState<{ show: boolean; search: string; position: number } | null>(null);
+
+  // Channel members state
+  const [showMembersModal, setShowMembersModal] = useState(false);
+  const [channelMembers, setChannelMembers] = useState<any[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
 
   // Helper function to detect @mentions in text
   const detectMentions = (text: string): string[] => {
@@ -457,16 +463,54 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
   const handleCreateChannel = async () => {
     if (!newChannelName.trim()) return;
     try {
-      const newCh = await createChannel(newChannelName, 'channel');
+      const newCh = await createChannel(
+        newChannelName,
+        'channel',
+        isPrivateChannel,
+        isPrivateChannel ? currentUser.id : undefined
+      );
       setNewChannelName('');
+      setIsPrivateChannel(false);
       setShowCreateChannel(false);
       if (newCh) {
         setChannels(prev => [...prev, newCh]);
         setActiveChannelId(newCh.id);
       }
-      addToast('success', 'Channel created');
+      addToast('success', `${isPrivateChannel ? 'Private' : 'Public'} channel created`);
     } catch (e) {
       addToast('error', 'Failed to create channel (Name might be taken)');
+    }
+  };
+
+  const loadChannelMembers = async (channelId: string) => {
+    setLoadingMembers(true);
+    try {
+      const members = await fetchChannelMembers(channelId);
+      setChannelMembers(members || []);
+    } catch (e) {
+      addToast('error', 'Failed to load channel members');
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
+
+  const handleInviteUser = async (channelId: string, userId: string) => {
+    try {
+      await addChannelMember(channelId, userId, 'member', currentUser.id);
+      addToast('success', 'User invited to channel');
+      await loadChannelMembers(channelId);
+    } catch (e) {
+      addToast('error', 'Failed to invite user');
+    }
+  };
+
+  const handleRemoveMember = async (channelId: string, userId: string) => {
+    try {
+      await removeChannelMember(channelId, userId);
+      addToast('success', 'User removed from channel');
+      await loadChannelMembers(channelId);
+    } catch (e) {
+      addToast('error', 'Failed to remove user');
     }
   };
 
@@ -939,6 +983,15 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
               onChange={e => setNewChannelName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleCreateChannel()}
             />
+            <label className="flex items-center text-xs text-[#bcabbc] mb-1 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isPrivateChannel}
+                onChange={e => setIsPrivateChannel(e.target.checked)}
+                className="mr-2"
+              />
+              Private channel (only invited members can access)
+            </label>
             <div className="flex gap-1">
               <button onClick={handleCreateChannel} className="flex-1 bg-green-600 text-white text-[10px] py-0.5 rounded">Create</button>
               <button onClick={() => setShowCreateChannel(false)} className="flex-1 bg-slate-600 text-white text-[10px] py-0.5 rounded">Cancel</button>
@@ -960,25 +1013,44 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                   className={`px-4 py-1 flex items-center justify-between cursor-pointer mx-2 rounded-md group ${activeChannelId === channel.id ? 'bg-[#1164A3] text-white' : 'text-[#bcabbc] hover:bg-[#350d36]'}`}
                 >
                   <div className="flex items-center truncate">
-                    <Hash className="w-4 h-4 mr-2 opacity-70" />
+                    {channel.is_private ? (
+                      <Lock className="w-4 h-4 mr-2 opacity-70" />
+                    ) : (
+                      <Hash className="w-4 h-4 mr-2 opacity-70" />
+                    )}
                     <span className={`truncate ${channel.unread ? 'font-bold text-white' : ''}`}>
                       {channel.name} {channel.unread ? `(${channel.unread})` : ''}
                     </span>
                   </div>
-                  {currentUser.role === 'Owner' && channel.name !== 'ask-ai' && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (window.confirm(`Delete #${channel.name} and all its messages?`)) {
-                          handleDeleteChannel(channel.id);
-                        }
-                      }}
-                      className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-400"
+                  <div className="flex items-center gap-1">
+                    {channel.is_private && channel.owner_id === currentUser.id && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowMembersModal(true);
+                          loadChannelMembers(channel.id);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-400"
+                        title="Manage members"
+                      >
+                        <UserPlus className="w-4 h-4" />
+                      </button>
+                    )}
+                    {currentUser.role === 'Owner' && channel.name !== 'ask-ai' && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`Delete #${channel.name} and all its messages?`)) {
+                            handleDeleteChannel(channel.id);
+                          }
+                        }}
+                        className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-400"
                       title="Delete channel"
                     >
                       <Trash2 className="w-3 h-3" />
                     </button>
                   )}
+                  </div>
                 </li>
               ))}
             </ul>
@@ -1538,6 +1610,75 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
 
       {/* Video Call Container */}
       <div ref={callContainerRef} />
+
+      {/* Members Management Modal */}
+      {showMembersModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-[#1a1d29] rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-white text-lg font-semibold">Manage Channel Members</h3>
+              <button onClick={() => setShowMembersModal(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {loadingMembers ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+              </div>
+            ) : (
+              <>
+                <div className="mb-4">
+                  <h4 className="text-slate-300 text-sm font-medium mb-2">Current Members</h4>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {channelMembers.map((member: any) => (
+                      <div key={member.id} className="flex items-center justify-between bg-[#2d3142] rounded p-2">
+                        <div className="flex items-center gap-2">
+                          <UserIcon className="w-4 h-4 text-slate-400" />
+                          <span className="text-white text-sm">{member.user?.full_name || member.user?.email}</span>
+                          {member.role === 'owner' && (
+                            <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded">Owner</span>
+                          )}
+                        </div>
+                        {member.role !== 'owner' && (
+                          <button
+                            onClick={() => handleRemoveMember(activeChannel?.id || '', member.user_id)}
+                            className="text-red-400 hover:text-red-300"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="text-slate-300 text-sm font-medium mb-2">Invite Members</h4>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {profiles
+                      .filter(p => !channelMembers.some((m: any) => m.user_id === p.id))
+                      .map(profile => (
+                        <div key={profile.id} className="flex items-center justify-between bg-[#2d3142] rounded p-2">
+                          <div className="flex items-center gap-2">
+                            <UserIcon className="w-4 h-4 text-slate-400" />
+                            <span className="text-white text-sm">{profile.full_name || profile.email}</span>
+                          </div>
+                          <button
+                            onClick={() => handleInviteUser(activeChannel?.id || '', profile.id)}
+                            className="text-green-400 hover:text-green-300"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
