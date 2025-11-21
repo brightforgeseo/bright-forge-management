@@ -43,6 +43,8 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
 
     // Extract all tasks with context
     const tasks: TaskWithContext[] = [];
+    const taskIds = new Set<string>(); // Track unique task IDs to avoid duplicates
+
     boards.forEach(board => {
       board.groups.forEach(group => {
         group.tasks.forEach(task => {
@@ -51,8 +53,12 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
             ? task.assignedTo
             : task.assignedTo ? [task.assignedTo] : [];
 
-          // Include task if ANY user is assigned (for filtering later)
-          if (assignedIds.length > 0) {
+          // Create unique key for this task
+          const taskKey = `${board.id}-${group.id}-${task.id}`;
+
+          // Include task if ANY user is assigned and not already added
+          if (assignedIds.length > 0 && !taskIds.has(taskKey)) {
+            taskIds.add(taskKey);
             tasks.push({
               ...task,
               groupTitle: group.title,
@@ -67,6 +73,7 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
       });
     });
 
+    console.log('📊 Loaded tasks:', tasks.length, '(removed', taskIds.size - tasks.length, 'duplicates)');
     setAllTasks(tasks);
     setTeamProfiles(profiles);
     setLoading(false);
