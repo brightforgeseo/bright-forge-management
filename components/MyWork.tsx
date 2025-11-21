@@ -127,10 +127,12 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
     console.log('  - Hide Done:', hideDone ? 'YES' : 'NO');
     console.log('  - Total Tasks:', allTasks.length);
     console.log('  - After Filtering:', filteredTasks.length);
+    console.log('  - Will render:', filteredTasks.length, 'task rows');
     console.log('  - Sample filtered task statuses:', filteredTasks.slice(0, 5).map(t => {
       const statusDef = t.boardData.statusDefs.find(s => s.id === t.status);
       return statusDef?.label;
     }));
+    console.log('  - Unique task titles (first 10):', [...new Set(filteredTasks.slice(0, 10).map(t => t.title))]);
   }
 
   const getTaskStatus = (dueDate: string) => {
