@@ -132,8 +132,16 @@ DROP POLICY IF EXISTS "Channel owners can remove members" ON channel_members;
 CREATE POLICY "Users can view members of their channels"
   ON channel_members FOR SELECT
   USING (
-    auth.role() = 'authenticated' AND
-    channel_id IN (SELECT channel_id FROM channel_members WHERE user_id = auth.uid())
+    auth.role() = 'authenticated' AND (
+      -- Can view members of public channels
+      channel_id IN (SELECT id FROM channels WHERE is_private = FALSE)
+      OR
+      -- Can view members of private channels they own
+      channel_id IN (SELECT id FROM channels WHERE owner_id = auth.uid())
+      OR
+      -- Can view members of private channels they belong to (see their own membership)
+      user_id = auth.uid()
+    )
   );
 
 CREATE POLICY "Channel owners can add members"
