@@ -956,7 +956,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
     }
 
     // AI Response
-    if (currentCh?.name === 'ask-ai') {
+    if (currentCh?.name === 'echo-ai') {
       setLoading(true);
       try {
         const history = messages.slice(-10).map(m => `${m.sender}: ${m.text}`).join('\n');
@@ -965,8 +965,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
         const aiMsg: ChatMessage = {
           id: (Date.now() + 1).toString(),
           channelId: activeChannelId,
-          sender: 'NexusBot',
-          senderId: 'ai-bot',
+          sender: 'Echo',
+          senderId: currentUser.id, // Use current user's ID to satisfy FK constraint
           text: response,
           timestamp: new Date().toISOString(),
           isAi: true,
@@ -1148,7 +1148,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                         {channel.name} {channel.unread ? `(${channel.unread})` : ''}
                       </span>
                   </div>
-                  {currentUser.role === 'Owner' && channel.name !== 'ask-ai' && (
+                  {currentUser.role === 'Owner' && channel.name !== 'echo-ai' && (
                      <button
                        onClick={(e) => {
                          e.stopPropagation();
@@ -1284,7 +1284,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                  <div className="flex items-center gap-2">
                     <Hash className="w-5 h-5 text-slate-400" />
                     <h3 className="font-bold text-slate-900 truncate">{activeChannel?.name}</h3>
-                    {activeChannel?.name === 'ask-ai' && <span className="px-2 py-0.5 bg-brand-100 text-brand-700 text-xs rounded-full font-medium">AI</span>}
+                    {activeChannel?.name === 'echo-ai' && <span className="px-2 py-0.5 bg-brand-100 text-brand-700 text-xs rounded-full font-medium">AI</span>}
                     {isChannelReadOnly && <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-xs rounded-full font-medium border border-slate-200">Read Only</span>}
                  </div>
             )}

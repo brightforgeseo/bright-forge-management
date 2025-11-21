@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check, Smile, Film, SmilePlus, Video, Phone, Lock, UserPlus, Menu } from 'lucide-react';
 import { ChatChannel, ChatMessage, User, ToastType, Profile, MessageReaction } from '../types';
 import { getChatResponse } from '../services/geminiService';
+import { storeEchoConversation, buildConversationContext } from '../services/echoMemory';
 import { fetchChatMessages, sendChatMessage, clearChatHistory, uploadFile, fetchChannels, createChannel, deleteChannel, fetchProfiles, getOrCreateDMChannel, createNotification, editChatMessage, fetchMessageReactions, addMessageReaction, removeMessageReaction, fetchChannelMembers, addChannelMember, removeChannelMember } from '../services/databaseService';
 import { supabase } from '../lib/supabaseClient';
 import DailyIframe from '@daily-co/daily-js';
@@ -878,17 +879,28 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
     }
 
     // AI Response
-    if (currentCh?.name === 'ask-ai') {
+    if (currentCh?.name === 'echo-ai') {
       setLoading(true);
       try {
-        const history = messages.slice(-10).map(m => `${m.sender}: ${m.text}`).join('\n');
-        const response = await getChatResponse(history, userMsg.text);
+        // Build context from conversation history
+        const recentHistory = messages.slice(-10).map(m => `${m.sender}: ${m.text}`).join('\n');
+
+        // Get past conversation context (if available)
+        let pastContext = '';
+        try {
+          pastContext = await buildConversationContext(currentUser.id, activeChannelId);
+        } catch (e) {
+          console.log('[Echo] Past context not available yet');
+        }
+
+        const fullHistory = pastContext + '\n\n' + recentHistory;
+        const response = await getChatResponse(fullHistory, userMsg.text);
 
         const aiMsg: ChatMessage = {
           id: (Date.now() + 1).toString(),
           channelId: activeChannelId,
-          sender: 'NexusBot',
-          senderId: 'ai-bot',
+          sender: 'Echo',
+          senderId: currentUser.id, // Use current user's ID to satisfy FK constraint
           text: response,
           timestamp: new Date().toISOString(),
           isAi: true,
@@ -896,6 +908,18 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
         };
 
         await sendChatMessage(aiMsg);
+
+        // Store conversation for future memory
+        try {
+          await storeEchoConversation(
+            currentUser.id,
+            activeChannelId,
+            userMsg.text,
+            response
+          );
+        } catch (e) {
+          console.log('[Echo] Could not store conversation (table may not exist yet)');
+        }
       } catch (err) {
         addToast('error', 'AI unavailable');
       } finally {
@@ -1094,7 +1118,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                         <UserPlus className="w-4 h-4" />
                       </button>
                     )}
-                    {currentUser.role === 'Owner' && channel.name !== 'ask-ai' && (
+                    {currentUser.role === 'Owner' && channel.name !== 'echo-ai' && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1239,7 +1263,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
               <div className="flex items-center gap-2 min-w-0">
                 <Hash className="w-4 h-4 md:w-5 md:h-5 text-slate-400 flex-shrink-0" />
                 <h3 className="font-bold text-slate-900 truncate text-sm md:text-base">{activeChannel?.name}</h3>
-                {activeChannel?.name === 'ask-ai' && (
+                {activeChannel?.name === 'echo-ai' && (
                   <span className="hidden sm:inline px-2 py-0.5 bg-brand-100 text-brand-700 text-xs rounded-full font-medium">AI</span>
                 )}
               </div>
@@ -1421,7 +1445,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
               </div>
             </div>
           ))}
-          {loading && <div className="text-sm text-slate-400 italic px-6">NexusBot is typing...</div>}
+          {loading && <div className="text-sm text-slate-400 italic px-6">Echo is typing...</div>}
           <div ref={messagesEndRef} />
         </div>
 

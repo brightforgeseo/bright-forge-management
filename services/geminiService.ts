@@ -223,7 +223,7 @@ export const getChatResponse = async (history: string, message: string): Promise
 
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: `You are "NexusBot", a helpful, professional, and slightly witty SEO AI Assistant in a team chat for a digital agency called "Bright Forge".
+        contents: `You are "Echo", a helpful, professional, and slightly witty SEO AI Assistant in a team chat for a digital agency called "Bright Forge".
 
         Chat History Context:
         ${truncatedHistory}

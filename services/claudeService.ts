@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { KeywordResult, AuditResult, ContentResult, Task } from '../types';
+import { getChatSystemPrompt, getSEOSystemPrompt } from './skillsLoader';
 
 // Import config if it exists
 let configApiKey: string | undefined;
@@ -69,31 +70,41 @@ export const getClaudeChatResponse = async (
     // Truncate history if too long (roughly last 8000 chars)
     const truncatedHistory = history.length > 8000 ? '...' + history.slice(-8000) : history;
 
+    const systemPrompt = getChatSystemPrompt();
+
     const response = await client.messages.create({
       model: 'claude-3-5-haiku-20241022', // Claude 4.5 Haiku
-      max_tokens: 1024,
+      max_tokens: 2048, // Increased for better responses
+      system: [
+        {
+          type: 'text',
+          text: systemPrompt,
+          cache_control: { type: 'ephemeral' } // Cache business context for 5 min
+        }
+      ],
       messages: [
         {
           role: 'user',
-          content: `You are "NexusBot", a helpful, professional, and slightly witty SEO AI Assistant in a team chat for a digital agency called "Bright Forge".
-
-Chat History Context:
+          content: `Chat History:
 ${truncatedHistory}
 
 User Message: ${message}
 
-Reply to the user as a helpful colleague.
-- Be concise (under 3 sentences unless asked for detail).
-- You can use simple markdown (*bold*, _italic_) but avoid complex blocks unless it's code.
-- If asked to do a task you can't do (like "delete this"), explain you are a chat assistant but can guide them.`,
+Reply as a helpful SEO colleague. Be concise (under 3 sentences unless asked for detail).`,
         },
       ],
     });
 
     return response.content[0].type === 'text' ? response.content[0].text : 'Sorry, I had trouble generating a response.';
-  } catch (error) {
+  } catch (error: any) {
     console.error('Claude chat response failed:', error);
-    throw new Error('AI Service Unavailable');
+    console.error('Error details:', {
+      message: error?.message,
+      status: error?.status,
+      type: error?.type,
+      error: error?.error
+    });
+    throw error; // Re-throw original error so fallback can see it
   }
 };
 
@@ -108,22 +119,39 @@ export const generateClaudeContent = async (
   const client = getClaudeClient();
 
   try {
+    const seoSystemPrompt = getSEOSystemPrompt();
+
     const response = await client.messages.create({
       model: 'claude-sonnet-4-20250514', // Claude 4.5 Sonnet
-      max_tokens: 4096,
+      max_tokens: 8192, // Increased for longer content
+      system: [
+        {
+          type: 'text',
+          text: seoSystemPrompt,
+          cache_control: { type: 'ephemeral' } // Cache SEO guidelines
+        }
+      ],
       messages: [
         {
           role: 'user',
           content: `Write a high-quality, SEO-optimized blog post about "${topic}".
-Tone: ${tone}.
-Target Keywords to include: ${keywords}.
-Structure the content with Markdown headings (##, ###).
 
-Return your response as JSON with this exact structure:
+Tone: ${tone}
+Target Keywords: ${keywords}
+
+Requirements:
+- Follow Bright Forge SEO standards
+- Use primary keyword 3-5x in body
+- Professional, data-driven tone
+- NO generic AI language
+- Markdown structure with ## and ### headings
+- 3-4 sentence paragraphs maximum
+
+Return as JSON:
 {
-  "title": "A catchy, SEO-optimized title",
-  "content": "The full blog post body in Markdown format with ## and ### headings",
-  "metaDescription": "A compelling meta description under 160 characters"
+  "title": "SEO-optimized title with primary keyword",
+  "content": "Full blog post in Markdown",
+  "metaDescription": "Compelling description under 160 chars with primary keyword"
 }`,
         },
       ],

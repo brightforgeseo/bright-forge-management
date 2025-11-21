@@ -9,8 +9,8 @@ Bright Forge Portal now uses **Claude AI 4.5** for superior performance and qual
 
 ## Features
 
-### 1. **Team Chat - Ask AI**
-Uses **Claude 4.5 Haiku** for quick, intelligent responses in the #ask-ai channel.
+### 1. **Team Chat - Echo AI**
+Uses **Claude 4.5 Haiku** for quick, intelligent responses in the #echo-ai channel. Your AI assistant is called "Echo".
 
 ### 2. **Content Generator**
 Uses **Claude 4.5 Sonnet** to create:
@@ -91,8 +91,8 @@ This ensures the application continues working even if:
 
 ## Usage
 
-### Chat (Ask AI)
-Just type in the #ask-ai channel. The bot will respond using Claude 4.5 Haiku.
+### Chat (Echo AI)
+Just type in the #echo-ai channel. Echo will respond using Claude 4.5 Haiku.
 
 ### Content Generation
 1. Go to **Content** tab
