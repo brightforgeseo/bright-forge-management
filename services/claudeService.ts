@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { KeywordResult, AuditResult, ContentResult, Task } from '../types';
 import { getChatSystemPrompt, getSEOSystemPrompt } from './skillsLoader';
-import { config } from '../config';
+import { config } from './config';
 
 const getClaudeClient = () => {
   // Get API key from config.ts
