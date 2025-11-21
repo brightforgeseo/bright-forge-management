@@ -733,6 +733,13 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
     });
     setMentionDropdown(null); // Close dropdown
 
+    // OPTIMISTIC UPDATE: Add message immediately to local state and cache
+    setMessages(prev => [...prev, userMsg]);
+    setMessageCache(prev => ({
+      ...prev,
+      [activeChannelId]: [...(prev[activeChannelId] || []), userMsg]
+    }));
+
     await sendChatMessage(userMsg);
 
     // Create Notification if DM
@@ -775,16 +782,26 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
       try {
         const history = messages.slice(-10).map(m => `${m.sender}: ${m.text}`).join('\n');
         const response = await getChatResponse(history, userMsg.text);
-        
-        await sendChatMessage({
+
+        const aiMsg: ChatMessage = {
           id: (Date.now() + 1).toString(),
           channelId: activeChannelId,
           sender: 'NexusBot',
+          senderId: 'ai-bot',
           text: response,
           timestamp: new Date().toISOString(),
           isAi: true,
           avatar: 'bot'
-        });
+        };
+
+        // OPTIMISTIC UPDATE: Add AI message immediately
+        setMessages(prev => [...prev, aiMsg]);
+        setMessageCache(prev => ({
+          ...prev,
+          [activeChannelId]: [...(prev[activeChannelId] || []), aiMsg]
+        }));
+
+        await sendChatMessage(aiMsg);
       } catch (err) {
         addToast('error', 'AI unavailable');
       } finally {
