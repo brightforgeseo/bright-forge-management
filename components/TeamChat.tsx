@@ -478,7 +478,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
       }
       addToast('success', `${isPrivateChannel ? 'Private' : 'Public'} channel created`);
     } catch (e) {
-      addToast('error', 'Failed to create channel (Name might be taken)');
+      console.error('Channel creation error:', e);
+      addToast('error', `Failed to create channel: ${e instanceof Error ? e.message : 'Unknown error'}`);
     }
   };
 
