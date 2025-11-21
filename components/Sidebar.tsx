@@ -171,17 +171,19 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
         
         {/* Notification Bell */}
-        <button
-          onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-          className="p-2 rounded-lg hover:bg-slate-800 transition-colors relative"
-        >
-          <Bell className={`w-5 h-5 ${unreadCount > 0 ? 'text-orange-500' : 'text-slate-400'}`} />
-          {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-orange-500 text-white text-[10px] font-bold rounded-full border-2 border-slate-900 flex items-center justify-center px-1">
-              {unreadCount}
-            </span>
-          )}
-        </button>
+        <div className="relative">
+          <button
+            onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+            className="p-2 rounded-lg hover:bg-slate-800 transition-colors relative"
+          >
+            <Bell className={`w-5 h-5 ${unreadCount > 0 ? 'text-orange-500' : 'text-slate-400'}`} />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-orange-500 text-white text-[10px] font-bold rounded-full border-2 border-slate-900 flex items-center justify-center px-1">
+                {unreadCount}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
       <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto custom-scrollbar">
@@ -262,11 +264,11 @@ const Sidebar: React.FC<SidebarProps> = ({
       </div>
     </div>
 
-    {/* Notification Panel - Outside sidebar, fixed to viewport */}
+    {/* Notification Panel - Drops down from bell icon */}
     {isNotificationsOpen && (
       <>
         <div className="fixed inset-0 z-[60]" onClick={() => setIsNotificationsOpen(false)}></div>
-        <div className="fixed top-20 right-4 w-[calc(100vw-2rem)] sm:w-96 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden z-[70] text-slate-900 max-h-[calc(100vh-6rem)]">
+        <div className="fixed top-[4.5rem] left-4 w-[calc(100vw-2rem)] sm:left-auto sm:right-4 sm:w-96 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden z-[70] text-slate-900 max-h-[calc(100vh-6rem)]">
           <div className="p-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
             <h3 className="font-bold text-sm text-slate-700">Notifications</h3>
             <div className="flex gap-2">
