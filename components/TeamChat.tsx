@@ -1639,7 +1639,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                       <div key={member.id} className="flex items-center justify-between bg-[#2d3142] rounded p-2">
                         <div className="flex items-center gap-2">
                           <UserIcon className="w-4 h-4 text-slate-400" />
-                          <span className="text-white text-sm">{member.user?.full_name || member.user?.email}</span>
+                          <span className="text-white text-sm">{member.profiles?.full_name || member.profiles?.email}</span>
                           {member.role === 'owner' && (
                             <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded">Owner</span>
                           )}
