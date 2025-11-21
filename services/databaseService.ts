@@ -403,15 +403,29 @@ export const clearChatHistory = async (channelId: string) => {
 }
 
 export const deleteChatMessage = async (messageId: string) => {
-  const { error } = await supabase
+  console.log('[databaseService] Attempting to delete message:', messageId);
+
+  const { data, error, count, status, statusText } = await supabase
     .from('chat_messages')
     .delete()
-    .eq('id', messageId);
+    .eq('id', messageId)
+    .select();
+
+  console.log('[databaseService] Delete response:', { data, error, count, status, statusText });
 
   if (error) {
-    console.error('Error deleting message:', error);
+    console.error('[databaseService] Error deleting message:', error);
+    console.error('[databaseService] Error details:', JSON.stringify(error, null, 2));
     throw error;
   }
+
+  if (!data || data.length === 0) {
+    console.warn('[databaseService] No rows deleted - message may not exist or RLS policy blocking');
+  } else {
+    console.log('[databaseService] Successfully deleted message:', data);
+  }
+
+  return data;
 }
 
 // --- Message Reactions ---
