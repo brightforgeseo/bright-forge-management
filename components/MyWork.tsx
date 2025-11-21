@@ -103,13 +103,24 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
 
       // Check if user is assigned by ID OR by name
       const isAssigned = assignedIds.some(assignedId => {
-        // Match by ID
+        // Try exact ID match first
         if (assignedId === selectedUserId) return true;
-        // Match by current user ID
         if (isCurrentUser && assignedId === currentUser.id) return true;
-        // Match by name (fallback for legacy data)
-        if (selectedUserName && assignedId === selectedUserName) return true;
-        if (isCurrentUser && assignedId === currentUserName) return true;
+
+        // Try case-insensitive name match (for legacy data)
+        const assignedLower = String(assignedId).toLowerCase().trim();
+        const selectedNameLower = selectedUserName.toLowerCase().trim();
+        const currentNameLower = currentUserName.toLowerCase().trim();
+
+        if (selectedNameLower && assignedLower === selectedNameLower) return true;
+        if (isCurrentUser && assignedLower === currentNameLower) return true;
+
+        // Try partial name match (first name or last name)
+        if (selectedNameLower && (
+          assignedLower.includes(selectedNameLower) ||
+          selectedNameLower.includes(assignedLower)
+        )) return true;
+
         return false;
       });
 
