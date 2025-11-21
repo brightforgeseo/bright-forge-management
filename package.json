@@ -15,6 +15,7 @@
   "dependencies": {
     "@google/genai": "^1.30.0",
     "@supabase/supabase-js": "^2.83.0",
+    "electron-updater": "^6.6.2",
     "lucide-react": "^0.554.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
@@ -52,13 +53,18 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["arm64", "x64"]
+          "arch": [
+            "arm64",
+            "x64"
+          ]
         }
       ]
     },
     "win": {
       "target": "nsis",
-      "arch": ["x64"]
+      "arch": [
+        "x64"
+      ]
     }
   }
 }

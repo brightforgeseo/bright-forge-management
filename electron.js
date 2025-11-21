@@ -1,9 +1,14 @@
 
-const { app, BrowserWindow, shell } = require('electron');
+const { app, BrowserWindow, shell, ipcMain } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 
 // Determine if we are in development mode
 const isDev = !app.isPackaged;
+
+// Configure auto-updater
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = true;
 
 function createWindow() {
   // Create the browser window.
@@ -41,9 +46,34 @@ function createWindow() {
   });
 }
 
+// Auto-updater event handlers
+autoUpdater.on('update-available', (info) => {
+  console.log('Update available:', info);
+  autoUpdater.downloadUpdate();
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+  console.log('Update downloaded:', info);
+  // Install update on next app restart
+});
+
+autoUpdater.on('error', (err) => {
+  console.log('Auto-update error:', err);
+});
+
 // This method will be called when Electron has finished initialization
 app.whenReady().then(() => {
   createWindow();
+
+  // Check for updates only in production
+  if (!isDev) {
+    autoUpdater.checkForUpdatesAndNotify();
+
+    // Check for updates every hour
+    setInterval(() => {
+      autoUpdater.checkForUpdatesAndNotify();
+    }, 60 * 60 * 1000);
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
