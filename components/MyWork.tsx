@@ -273,17 +273,40 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
                               </span>
                             </td>
                             <td className="py-3 px-4 text-center">
-                              <span className={`inline-block px-2 py-1 text-xs font-semibold rounded whitespace-nowrap ${
-                                task.status === 'Done' ? 'bg-green-100 text-green-700' :
-                                task.status === 'In Progress' ? 'bg-blue-100 text-blue-700' :
-                                task.status === 'Stuck' ? 'bg-red-100 text-red-700' :
-                                'bg-slate-100 text-slate-600'
-                              }`}>
-                                {task.status}
-                              </span>
+                              {(() => {
+                                const statusDef = task.boardData.statusDefs.find(s => s.id === task.status);
+                                const statusLabel = statusDef?.label || task.status;
+                                const statusColor = statusDef?.color || '#94a3b8';
+                                return (
+                                  <span
+                                    className="inline-block px-2 py-1 text-xs font-semibold rounded whitespace-nowrap"
+                                    style={{
+                                      backgroundColor: statusColor + '20',
+                                      color: statusColor
+                                    }}
+                                  >
+                                    {statusLabel}
+                                  </span>
+                                );
+                              })()}
                             </td>
                             <td className="py-3 px-4 text-center">
-                              <span className="text-xs text-slate-500">{task.priority}</span>
+                              {(() => {
+                                const priorityDef = task.boardData.priorityDefs.find(p => p.id === task.priority);
+                                const priorityLabel = priorityDef?.label || task.priority;
+                                const priorityColor = priorityDef?.color || '#94a3b8';
+                                return (
+                                  <span
+                                    className="inline-block px-2 py-1 text-xs font-semibold rounded whitespace-nowrap"
+                                    style={{
+                                      backgroundColor: priorityColor + '20',
+                                      color: priorityColor
+                                    }}
+                                  >
+                                    {priorityLabel}
+                                  </span>
+                                );
+                              })()}
                             </td>
                           </tr>
                         );
@@ -412,11 +435,41 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">Status</label>
-                  <p className="text-sm text-slate-700">{selectedTask.status}</p>
+                  {(() => {
+                    const statusDef = selectedTask.boardData.statusDefs.find(s => s.id === selectedTask.status);
+                    const statusLabel = statusDef?.label || selectedTask.status;
+                    const statusColor = statusDef?.color || '#94a3b8';
+                    return (
+                      <span
+                        className="inline-block px-3 py-1.5 text-sm font-semibold rounded"
+                        style={{
+                          backgroundColor: statusColor + '20',
+                          color: statusColor
+                        }}
+                      >
+                        {statusLabel}
+                      </span>
+                    );
+                  })()}
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">Priority</label>
-                  <p className="text-sm text-slate-700">{selectedTask.priority}</p>
+                  {(() => {
+                    const priorityDef = selectedTask.boardData.priorityDefs.find(p => p.id === selectedTask.priority);
+                    const priorityLabel = priorityDef?.label || selectedTask.priority;
+                    const priorityColor = priorityDef?.color || '#94a3b8';
+                    return (
+                      <span
+                        className="inline-block px-3 py-1.5 text-sm font-semibold rounded"
+                        style={{
+                          backgroundColor: priorityColor + '20',
+                          color: priorityColor
+                        }}
+                      >
+                        {priorityLabel}
+                      </span>
+                    );
+                  })()}
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">Assigned To</label>
