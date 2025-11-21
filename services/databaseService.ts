@@ -603,19 +603,48 @@ export const removeChannelMember = async (channelId: string, userId: string) => 
 };
 
 export const fetchChannelMembers = async (channelId: string) => {
+  console.log('[fetchChannelMembers] Fetching members for channel:', channelId);
+
+  // First, try a simple query to check if table exists and is accessible
+  const { data: testData, error: testError } = await supabase
+    .from('channel_members')
+    .select('*')
+    .eq('channel_id', channelId)
+    .limit(1);
+
+  if (testError) {
+    console.error('[fetchChannelMembers] Basic query failed:', testError);
+    throw new Error(`Cannot access channel_members table: ${testError.message}`);
+  }
+
+  console.log('[fetchChannelMembers] Basic query successful, now fetching with profiles');
+
+  // Now try with the join
   const { data, error } = await supabase
     .from('channel_members')
     .select(`
       *,
-      profiles!channel_members_user_id_fkey(id, full_name, email, avatar_url)
+      profiles (
+        id,
+        full_name,
+        email,
+        avatar_url
+      )
     `)
     .eq('channel_id', channelId)
     .order('joined_at', { ascending: true });
 
   if (error) {
-    console.error('Fetch channel members error:', error);
-    throw error;
+    console.error('[fetchChannelMembers] Error details:', {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code
+    });
+    throw new Error(`${error.message} (Code: ${error.code})`);
   }
+
+  console.log('[fetchChannelMembers] Successfully fetched members:', data);
   return data;
 };
 
