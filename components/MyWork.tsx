@@ -112,6 +112,20 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
     return true;
   });
 
+  // Debug logging
+  if (allTasks.length > 0) {
+    console.log('🔍 MY WORK FILTERS:');
+    console.log('  - Selected User:', selectedUserId === currentUser.id ? 'ME' : selectedUserId === 'all' ? 'ALL USERS' : selectedUserId);
+    console.log('  - Selected Status:', selectedStatusId === 'all' ? 'ALL STATUSES' : allStatuses.find(s => s.id === selectedStatusId)?.label || selectedStatusId);
+    console.log('  - Hide Done:', hideDone ? 'YES' : 'NO');
+    console.log('  - Total Tasks:', allTasks.length);
+    console.log('  - After Filtering:', filteredTasks.length);
+    console.log('  - Sample filtered task statuses:', filteredTasks.slice(0, 5).map(t => {
+      const statusDef = t.boardData.statusDefs.find(s => s.id === t.status);
+      return statusDef?.label;
+    }));
+  }
+
   const getTaskStatus = (dueDate: string) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
