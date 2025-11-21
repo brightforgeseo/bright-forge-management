@@ -91,25 +91,46 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const handleNotificationClick = (notification: AppNotification) => {
+    console.log('[Sidebar] Notification clicked:', notification);
+    console.log('[Sidebar] linkView:', notification.linkView);
+    console.log('[Sidebar] linkData:', notification.linkData);
+    console.log('[Sidebar] linkData type:', typeof notification.linkData);
+
     if (!notification.isRead) handleMarkRead(notification.id);
     if (notification.linkView) {
       onChangeView(notification.linkView as ToolView);
       setIsNotificationsOpen(false);
 
-      if (notification.linkData && typeof notification.linkData === 'object') {
-        const linkData = typeof notification.linkData === 'string'
-          ? JSON.parse(notification.linkData)
-          : notification.linkData;
+      if (notification.linkData) {
+        let linkData;
+
+        // Parse linkData if it's a string
+        if (typeof notification.linkData === 'string') {
+          try {
+            linkData = JSON.parse(notification.linkData);
+            console.log('[Sidebar] Parsed linkData from string:', linkData);
+          } catch (e) {
+            console.error('[Sidebar] Failed to parse linkData:', e);
+            return;
+          }
+        } else {
+          linkData = notification.linkData;
+          console.log('[Sidebar] Using linkData as object:', linkData);
+        }
 
         // Handle task notifications
         if (notification.linkView === 'TASKS' && linkData.taskId) {
+          console.log('[Sidebar] Setting openTaskModal:', linkData);
           localStorage.setItem('openTaskModal', JSON.stringify(linkData));
         }
 
         // Handle chat notifications (DMs and mentions)
         if (notification.linkView === 'TEAM_CHAT' && linkData.channelId) {
+          console.log('[Sidebar] Setting openChatNotification:', linkData);
           localStorage.setItem('openChatNotification', JSON.stringify(linkData));
         }
+      } else {
+        console.warn('[Sidebar] No linkData found in notification');
       }
     }
   };
