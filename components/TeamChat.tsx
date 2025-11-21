@@ -281,10 +281,11 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
 
   // SIMPLIFIED MESSAGE LISTENER - Only update current channel
   useEffect(() => {
+    console.log('[TeamChat] Setting up realtime subscription for messages...');
     const msgSub = supabase.channel('public:chat_messages')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, async (payload) => {
         const newMsg = payload.new as any;
-        console.log('[TeamChat] New message received:', newMsg.id);
+        console.log('[TeamChat] ✅ REALTIME: New message received:', newMsg.id, newMsg);
 
         const formattedMsg: ChatMessage = {
           id: newMsg.id,
@@ -358,7 +359,9 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
           ));
         }
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[TeamChat] Message subscription status:', status);
+      });
 
     // Real-time reactions subscription
     const reactionsSub = supabase.channel('public:message_reactions')
@@ -481,17 +484,22 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
   const handleEditMessage = async (messageId: string) => {
     if (!editingText.trim()) return;
 
-    await editChatMessage(messageId, editingText);
+    try {
+      await editChatMessage(messageId, editingText);
 
-    setMessages(prev => prev.map(m =>
-      m.id === messageId
-        ? { ...m, text: editingText, isEdited: true, editedAt: new Date().toISOString() }
-        : m
-    ));
+      setMessages(prev => prev.map(m =>
+        m.id === messageId
+          ? { ...m, text: editingText, isEdited: true, editedAt: new Date().toISOString() }
+          : m
+      ));
 
-    setEditingMessageId(null);
-    setEditingText('');
-    addToast('success', 'Message updated');
+      setEditingMessageId(null);
+      setEditingText('');
+      addToast('success', 'Message updated');
+    } catch (error) {
+      console.error('Failed to edit message:', error);
+      addToast('error', 'Failed to update message');
+    }
   };
 
   const handleCancelEdit = () => {
@@ -610,7 +618,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
         left: '0',
         width: '100%',
         height: '100%',
-        zIndex: 9999,
+        zIndex: '9999',
         border: 'none'
       }
     });
@@ -642,8 +650,17 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
 
   // SIMPLIFIED SEND MESSAGE - No optimistic updates, wait for database
   const handleSendMessage = async () => {
-    if (!message.trim()) return;
+    console.log('[handleSendMessage] Starting...');
+    console.log('[handleSendMessage] Message text:', message);
+    console.log('[handleSendMessage] Active channel ID:', activeChannelId);
+
+    if (!message.trim()) {
+      console.log('[handleSendMessage] Empty message, aborting');
+      return;
+    }
+
     const currentCh = channels.find(c => c.id === activeChannelId);
+    console.log('[handleSendMessage] Current channel:', currentCh);
 
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
@@ -655,12 +672,53 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
       avatar: currentUser.avatarUrl || 'user'
     };
 
+    console.log('[handleSendMessage] Constructed message:', userMsg);
+
     const mentions = detectMentions(message.trim());
+    const messageText = message;
     setMessage('');
     setMentionDropdown(null);
 
     // Send to database - realtime listener will add it to UI
-    await sendChatMessage(userMsg);
+    console.log('[handleSendMessage] Calling sendChatMessage...');
+    try {
+      const result = await sendChatMessage(userMsg);
+      console.log('[handleSendMessage] Message sent successfully:', result);
+
+      // TEMPORARY WORKAROUND: Manually add message to UI since realtime might not be working
+      console.log('[handleSendMessage] Adding message to UI manually...');
+      const insertedMsg: ChatMessage = {
+        id: result.id,
+        channelId: result.channel_id,
+        sender: result.sender,
+        senderId: result.sender_id,
+        text: result.text,
+        timestamp: result.created_at,
+        isAi: result.is_ai,
+        avatar: result.avatar,
+        attachmentUrl: result.attachment_url,
+        attachmentType: result.attachment_type,
+        isEdited: result.is_edited,
+        editedAt: result.edited_at
+      };
+
+      setMessages(prev => {
+        // Check if already exists (in case realtime DID work)
+        if (prev.some(m => m.id === insertedMsg.id)) {
+          console.log('[handleSendMessage] Message already in UI (realtime worked!)');
+          return prev;
+        }
+        console.log('[handleSendMessage] Adding message to UI manually');
+        return [...prev, insertedMsg];
+      });
+      scrollToBottom();
+    } catch (error: any) {
+      console.error('[handleSendMessage] Failed to send message:', error);
+      console.error('[handleSendMessage] Error details:', error.message, error.details, error.hint);
+      addToast('error', `Failed to send message: ${error.message || 'Unknown error'}`);
+      setMessage(messageText); // Restore message on error
+      return;
+    }
 
     // Create Notification if DM
     if (currentCh?.type === 'dm') {

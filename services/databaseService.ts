@@ -291,21 +291,39 @@ export const fetchChatMessages = async (channelId: string): Promise<ChatMessage[
 };
 
 export const sendChatMessage = async (msg: ChatMessage) => {
-  const { error } = await supabase
-    .from('chat_messages')
-    .insert({
-      channel_id: msg.channelId,
-      sender: msg.sender,
-      sender_id: msg.senderId,
-      text: msg.text,
-      is_ai: msg.isAi || false,
-      avatar: msg.avatar,
-      created_at: msg.timestamp,
-      attachment_url: msg.attachmentUrl,
-      attachment_type: msg.attachmentType
-    });
+  console.log('[sendChatMessage] Starting with message:', msg);
 
-  if (error) console.error('Error sending message:', error);
+  const insertData = {
+    channel_id: msg.channelId,
+    sender: msg.sender,
+    sender_id: msg.senderId,
+    text: msg.text,
+    is_ai: msg.isAi || false,
+    avatar: msg.avatar,
+    created_at: msg.timestamp,
+    attachment_url: msg.attachmentUrl,
+    attachment_type: msg.attachmentType
+  };
+
+  console.log('[sendChatMessage] Insert data:', insertData);
+
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .insert(insertData)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('[sendChatMessage] Database error:', error);
+    console.error('[sendChatMessage] Error code:', error.code);
+    console.error('[sendChatMessage] Error message:', error.message);
+    console.error('[sendChatMessage] Error details:', error.details);
+    console.error('[sendChatMessage] Error hint:', error.hint);
+    throw error;
+  }
+
+  console.log('[sendChatMessage] Success! Inserted data:', data);
+  return data;
 };
 
 export const editChatMessage = async (messageId: string, newText: string) => {
@@ -318,7 +336,10 @@ export const editChatMessage = async (messageId: string, newText: string) => {
     })
     .eq('id', messageId);
 
-  if (error) console.error('Error editing message:', error);
+  if (error) {
+    console.error('Error editing message:', error);
+    throw error;
+  }
 };
 
 export const clearChatHistory = async (channelId: string) => {
