@@ -74,6 +74,9 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
     });
 
     console.log('📊 Loaded tasks:', tasks.length, '(removed', taskIds.size - tasks.length, 'duplicates)');
+    console.log('👥 Team profiles loaded:', profiles.map(p => ({ id: p.id, name: p.full_name || p.email })));
+    console.log('📌 Sample task assignments:', tasks.slice(0, 3).map(t => ({ title: t.title, assignedTo: t.assignedTo })));
+
     setAllTasks(tasks);
     setTeamProfiles(profiles);
     setLoading(false);
@@ -96,7 +99,25 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
         ? task.assignedTo
         : task.assignedTo ? [task.assignedTo] : [];
 
-      if (!assignedIds.includes(selectedUserId)) {
+      // Get selected user's name for matching
+      const selectedProfile = teamProfiles.find(p => p.id === selectedUserId);
+      const selectedUserName = selectedProfile?.full_name || selectedProfile?.email || '';
+      const isCurrentUser = selectedUserId === currentUser.id;
+      const currentUserName = currentUser.name;
+
+      // Check if user is assigned by ID OR by name
+      const isAssigned = assignedIds.some(assignedId => {
+        // Match by ID
+        if (assignedId === selectedUserId) return true;
+        // Match by current user ID
+        if (isCurrentUser && assignedId === currentUser.id) return true;
+        // Match by name (fallback for legacy data)
+        if (selectedUserName && assignedId === selectedUserName) return true;
+        if (isCurrentUser && assignedId === currentUserName) return true;
+        return false;
+      });
+
+      if (!isAssigned) {
         return false;
       }
     }
