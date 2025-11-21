@@ -64,8 +64,17 @@ jobs:
         with:
           node-version: 18
 
-      - name: Get latest tag
-        id: get_tag
+      - name: Get latest tag (Unix)
+        if: runner.os != 'Windows'
+        id: get_tag_unix
+        run: |
+          LATEST_TAG=$(git describe --tags --abbrev=0)
+          echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+
+      - name: Get latest tag (Windows)
+        if: runner.os == 'Windows'
+        id: get_tag_win
+        shell: bash
         run: |
           LATEST_TAG=$(git describe --tags --abbrev=0)
           echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
@@ -81,7 +90,7 @@ jobs:
       - name: Upload Release Assets
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ steps.get_tag.outputs.tag }}
+          tag_name: ${{ steps.get_tag_unix.outputs.tag || steps.get_tag_win.outputs.tag }}
           files: |
             dist/*.exe
             dist/*.dmg
