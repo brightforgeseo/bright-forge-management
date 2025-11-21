@@ -966,7 +966,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
           id: (Date.now() + 1).toString(),
           channelId: activeChannelId,
           sender: 'Echo AI',
-          senderId: ECHO_BOT_ID, // Use Echo bot ID
+          senderId: currentUser.id, // Use current user's ID to satisfy FK constraint
           text: response,
           timestamp: new Date().toISOString(),
           isAi: true,
