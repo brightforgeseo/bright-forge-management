@@ -1,26 +1,23 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { KeywordResult, AuditResult, ContentResult, Task } from '../types';
 import { getChatSystemPrompt, getSEOSystemPrompt } from './skillsLoader';
-import { config } from './config';
 
 const getClaudeClient = () => {
-  // Get API key from config.ts
-  let apiKey: string | undefined = config?.anthropicApiKey;
+  // Get API key from environment or localStorage
+  let apiKey = process.env.ANTHROPIC_API_KEY;
 
-  // Only try config file - simpler and works in browser
-  if (!apiKey || apiKey === 'your-anthropic-api-key-here') {
-    console.error('Claude API Key not found - AI features will not work');
-    console.error('To fix:');
-    console.error('1. Copy config.example.ts to config.ts');
-    console.error('2. Add your Anthropic API key to config.ts');
+  // For browser builds, try localStorage
+  if (!apiKey && typeof window !== 'undefined') {
+    apiKey = localStorage.getItem('ANTHROPIC_API_KEY') || undefined;
+  }
+
+  if (!apiKey) {
     throw new Error('ANTHROPIC_API_KEY not configured');
   }
 
-  console.log('✅ Using API key from config.ts');
-
   return new Anthropic({
     apiKey: apiKey,
-    dangerouslyAllowBrowser: true, // Required for browser usage
+    dangerouslyAllowBrowser: true,
   });
 };
 

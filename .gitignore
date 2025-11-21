@@ -29,3 +29,5 @@ config.ts
 *.njsproj
 *.sln
 *.sw?
+.env
+setup-api-key.html

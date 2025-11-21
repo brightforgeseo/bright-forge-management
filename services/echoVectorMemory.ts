@@ -5,12 +5,9 @@
 
 import OpenAI from 'openai';
 import { supabase } from '../lib/supabaseClient';
-import { config } from './config';
-
-// Import config
-let openaiApiKey: string | undefined = config?.openaiApiKey;
 
 const getOpenAIClient = () => {
+  const openaiApiKey = 'your-openai-api-key-here';
   if (!openaiApiKey || openaiApiKey === 'your-openai-api-key-here') {
     throw new Error('OpenAI API key not configured');
   }
