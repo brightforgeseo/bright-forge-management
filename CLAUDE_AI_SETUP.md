@@ -4,36 +4,36 @@
 
 Bright Forge Portal now uses **Claude AI 4.5** for superior performance and quality:
 
-- **Claude Haiku 3.5** → Chat (Ask AI) - Fast, cost-effective responses
-- **Claude Sonnet 4.5** → Content Generation, Keywords, SEO Audit, Strategy Planning - High-quality, detailed outputs
+- **Claude 4.5 Haiku** → Chat (Ask AI) - Fast, cost-effective responses
+- **Claude 4.5 Sonnet** → Content Generation, Keywords, SEO Audit, Strategy Planning - High-quality, detailed outputs
 
 ## Features
 
 ### 1. **Team Chat - Ask AI**
-Uses **Claude Haiku 3.5** for quick, intelligent responses in the #ask-ai channel.
+Uses **Claude 4.5 Haiku** for quick, intelligent responses in the #ask-ai channel.
 
 ### 2. **Content Generator**
-Uses **Claude Sonnet 4.5** to create:
+Uses **Claude 4.5 Sonnet** to create:
 - SEO-optimized blog posts
 - Meta descriptions
 - Structured markdown content
 
 ### 3. **Keyword Research**
-Uses **Claude Sonnet 4.5** for:
+Uses **Claude 4.5 Sonnet** for:
 - Long-tail keyword suggestions
 - Search volume estimates
 - Competition analysis
 - Trend data
 
 ### 4. **SEO Audit**
-Uses **Claude Sonnet 4.5** for:
+Uses **Claude 4.5 Sonnet** for:
 - Content analysis
 - SEO scoring (0-100)
 - Issue identification
 - Actionable recommendations
 
 ### 5. **AI Strategy & Task Planner** (NEW!)
-Uses **Claude Sonnet 4.5** to generate:
+Uses **Claude 4.5 Sonnet** to generate:
 - Comprehensive SEO strategies
 - Actionable task lists with priorities
 - Due dates and status assignments
@@ -92,12 +92,12 @@ This ensures the application continues working even if:
 ## Usage
 
 ### Chat (Ask AI)
-Just type in the #ask-ai channel. The bot will respond using Claude Haiku.
+Just type in the #ask-ai channel. The bot will respond using Claude 4.5 Haiku.
 
 ### Content Generation
 1. Go to **Content** tab
 2. Enter topic, tone, and keywords
-3. Click "Generate" - Uses Claude Sonnet 4.5
+3. Click "Generate" - Uses Claude 4.5 Sonnet
 
 ### SEO Strategy Generator (Projects)
 ```typescript
@@ -118,8 +118,8 @@ console.log(result.recommendations);  // SEO tips
 ## API Costs
 
 ### Claude Pricing (as of 2025)
-- **Haiku 3.5**: ~$0.25 per million input tokens (very affordable for chat)
-- **Sonnet 4.5**: ~$3 per million input tokens (premium quality)
+- **Claude 4.5 Haiku**: ~$0.25 per million input tokens (very affordable for chat)
+- **Claude 4.5 Sonnet**: ~$3 per million input tokens (premium quality)
 
 ### Typical Usage Costs
 - Chat message: ~$0.0001
@@ -160,16 +160,17 @@ This means Claude is unavailable and Gemini is being used instead.
 
 ## Model Information
 
-### Claude Haiku 3.5
+### Claude 4.5 Haiku
+- **Model ID**: claude-3-5-haiku-20241022
 - **Speed**: Very fast (~1-2s)
 - **Context**: 200K tokens
 - **Best for**: Chat, quick responses
 
-### Claude Sonnet 4.5
+### Claude 4.5 Sonnet
+- **Model ID**: claude-sonnet-4-20250514
 - **Speed**: Moderate (~5-8s)
 - **Context**: 200K tokens
 - **Best for**: Content creation, analysis, strategy
-- **Latest model**: claude-sonnet-4-20250514
 
 ## Support
 

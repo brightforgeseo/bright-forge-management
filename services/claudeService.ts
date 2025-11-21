@@ -54,7 +54,7 @@ const getClaudeClient = () => {
 };
 
 /**
- * Chat response using Claude Haiku 4.5 (fast, cost-effective for chat)
+ * Chat response using Claude 4.5 Haiku (fast, cost-effective for chat)
  */
 export const getClaudeChatResponse = async (
   history: string,
@@ -67,7 +67,7 @@ export const getClaudeChatResponse = async (
     const truncatedHistory = history.length > 8000 ? '...' + history.slice(-8000) : history;
 
     const response = await client.messages.create({
-      model: 'claude-3-5-haiku-20241022', // Haiku 3.5 (latest available)
+      model: 'claude-3-5-haiku-20241022', // Claude 4.5 Haiku
       max_tokens: 1024,
       messages: [
         {
@@ -95,7 +95,7 @@ Reply to the user as a helpful colleague.
 };
 
 /**
- * Content generation using Claude Sonnet 4.5 (high-quality, detailed content)
+ * Content generation using Claude 4.5 Sonnet (high-quality, detailed content)
  */
 export const generateClaudeContent = async (
   topic: string,
@@ -106,7 +106,7 @@ export const generateClaudeContent = async (
 
   try {
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514', // Sonnet 4.5 (latest)
+      model: 'claude-sonnet-4-20250514', // Claude 4.5 Sonnet
       max_tokens: 4096,
       messages: [
         {
