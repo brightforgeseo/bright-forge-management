@@ -187,7 +187,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           {isNotificationsOpen && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setIsNotificationsOpen(false)}></div>
-              <div className="fixed top-16 left-0 right-0 lg:absolute lg:top-full lg:right-0 w-full lg:w-96 mt-0 lg:mt-2 bg-white rounded-none lg:rounded-xl shadow-xl border-t lg:border border-slate-200 overflow-hidden z-50 text-slate-900 max-h-[calc(100vh-4rem)] lg:max-h-96">
+              <div className="fixed top-16 left-0 right-0 md:absolute md:top-full md:left-auto md:right-0 w-full md:w-96 mt-0 md:mt-2 bg-white rounded-none md:rounded-xl shadow-xl border-t md:border border-slate-200 overflow-hidden z-50 text-slate-900 max-h-[calc(100vh-4rem)] md:max-h-[600px]">
                 <div className="p-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
                   <h3 className="font-bold text-sm text-slate-700">Notifications</h3>
                   <div className="flex gap-2">
@@ -203,7 +203,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     )}
                   </div>
                 </div>
-                <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 12rem)' }}>
+                <div className="overflow-y-auto max-h-[500px]">
                   {notifications.length === 0 ? (
                     <div className="p-8 text-center text-slate-400 text-sm">No notifications</div>
                   ) : (
