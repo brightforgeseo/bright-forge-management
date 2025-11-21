@@ -28,8 +28,21 @@ jobs:
           NEW_TAG=$(echo $LATEST_TAG | awk -F. '{$NF = $NF + 1;} 1' | sed 's/ /./g')
           echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
 
+          # Extract version without 'v' prefix for package.json
+          VERSION=$(echo $NEW_TAG | sed 's/^v//')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
           echo "Latest tag: $LATEST_TAG"
           echo "New tag: $NEW_TAG"
+          echo "Version: $VERSION"
+
+      - name: Update package.json version
+        run: |
+          sed -i 's/"version": "[^"]*"/"version": "${{ steps.get_tag.outputs.version }}"/' package.json
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json
+          git commit -m "chore: bump version to ${{ steps.get_tag.outputs.version }}" || echo "No changes to commit"
 
       - name: Create Release
         id: create_release
