@@ -575,12 +575,15 @@ export const fetchChannelMembers = async (channelId: string) => {
     .from('channel_members')
     .select(`
       *,
-      user:profiles!channel_members_user_id_fkey(id, full_name, email, avatar_url)
+      user:profiles(id, full_name, email, avatar_url)
     `)
     .eq('channel_id', channelId)
     .order('joined_at', { ascending: true });
 
-  if (error) throw error;
+  if (error) {
+    console.error('Fetch channel members error:', error);
+    throw error;
+  }
   return data;
 };
 
