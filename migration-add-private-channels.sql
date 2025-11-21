@@ -36,6 +36,9 @@ DROP POLICY IF EXISTS "Authenticated users can view all channels" ON channels;
 DROP POLICY IF EXISTS "Authenticated users can create channels" ON channels;
 DROP POLICY IF EXISTS "Authenticated users can update channels" ON channels;
 DROP POLICY IF EXISTS "Authenticated users can delete channels" ON channels;
+DROP POLICY IF EXISTS "Users can view public channels and their private channels" ON channels;
+DROP POLICY IF EXISTS "Channel owners can update their channels" ON channels;
+DROP POLICY IF EXISTS "Channel owners can delete their channels" ON channels;
 
 -- Step 7: Create new RLS policies for channels (with private channel support)
 CREATE POLICY "Users can view public channels and their private channels"
