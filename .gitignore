@@ -13,10 +13,11 @@ dist-ssr
 *.local
 .parcel-cache
 
-# Environment variables
+# Environment variables and config
 .env
 .env.local
 .env.production
+config.ts
 
 # Editor directories and files
 .vscode/*
