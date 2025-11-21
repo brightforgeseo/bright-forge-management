@@ -13,43 +13,19 @@ try {
 }
 
 const getClaudeClient = () => {
-  // Try multiple ways to get the API key
-  let apiKey: string | undefined;
+  // Get API key from config.ts
+  let apiKey: string | undefined = configApiKey;
 
-  // 1. Try config file first (local development)
-  if (configApiKey && configApiKey !== 'your-anthropic-api-key-here') {
-    apiKey = configApiKey;
-    console.log('✅ Using API key from config.ts');
-  }
-
-  // 2. Try process.env (Node.js/Electron)
-  if (!apiKey) {
-    try {
-      apiKey = process?.env?.ANTHROPIC_API_KEY;
-      if (apiKey) console.log('Using API key from process.env');
-    } catch (e) {
-      // Ignore - process not available in browser
-    }
-  }
-
-  // 3. Try import.meta.env (Vite/Parcel)
-  if (!apiKey) {
-    try {
-      apiKey = (import.meta as any).env?.ANTHROPIC_API_KEY;
-      if (apiKey) console.log('Using API key from import.meta.env');
-    } catch (e) {
-      // Ignore
-    }
-  }
-
-  if (!apiKey) {
+  // Only try config file - simpler and works in browser
+  if (!apiKey || apiKey === 'your-anthropic-api-key-here') {
     console.error('Claude API Key not found - AI features will not work');
     console.error('To fix:');
     console.error('1. Copy config.example.ts to config.ts');
     console.error('2. Add your Anthropic API key to config.ts');
-    console.error('3. Or set ANTHROPIC_API_KEY environment variable');
     throw new Error('ANTHROPIC_API_KEY not configured');
   }
+
+  console.log('✅ Using API key from config.ts');
 
   return new Anthropic({
     apiKey: apiKey,
