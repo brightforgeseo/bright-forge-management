@@ -158,9 +158,9 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Sidebar */}
       <div className={`
-        w-64 bg-slate-900 text-white flex flex-col h-full fixed left-0 top-0 shadow-xl z-50 transition-transform duration-300
+        w-64 bg-slate-900 text-white flex flex-col h-full fixed left-0 top-0 shadow-xl transition-transform duration-300
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-      `}>
+      `} style={{ zIndex: 100 }}>
       {/* Brand Header */}
       <div className="p-4 lg:p-6 border-b border-slate-800 flex items-center justify-between">
         <div className="flex items-center gap-3 overflow-hidden">
@@ -187,8 +187,8 @@ const Sidebar: React.FC<SidebarProps> = ({
           {/* Notification Panel - Dropdown */}
           {isNotificationsOpen && (
             <>
-              <div className="fixed inset-0" style={{ zIndex: 9998 }} onClick={() => setIsNotificationsOpen(false)}></div>
-              <div className="fixed top-[4.5rem] left-[17rem] w-80 lg:w-96 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden text-slate-900 max-h-[calc(100vh-6rem)]" style={{ zIndex: 9999 }}>
+              <div className="fixed inset-0" style={{ zIndex: 10000 }} onClick={() => setIsNotificationsOpen(false)}></div>
+              <div className="fixed top-[4.5rem] left-[17rem] w-80 lg:w-96 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden text-slate-900 max-h-[calc(100vh-6rem)]" style={{ zIndex: 10001 }}>
                 <div className="p-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
                   <h3 className="font-bold text-sm text-slate-700">Notifications</h3>
                   <div className="flex gap-2">
