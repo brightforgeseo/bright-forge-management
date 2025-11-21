@@ -274,15 +274,12 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
                             </td>
                             <td className="py-3 px-4 text-center">
                               <span className={`inline-block px-2 py-1 text-xs font-semibold rounded whitespace-nowrap ${
-                                status === 'overdue' ? 'bg-red-100 text-red-700' :
-                                status === 'today' ? 'bg-blue-100 text-blue-700' :
-                                status === 'upcoming' ? 'bg-green-100 text-green-700' :
+                                task.status === 'Done' ? 'bg-green-100 text-green-700' :
+                                task.status === 'In Progress' ? 'bg-blue-100 text-blue-700' :
+                                task.status === 'Stuck' ? 'bg-red-100 text-red-700' :
                                 'bg-slate-100 text-slate-600'
                               }`}>
-                                {status === 'overdue' ? 'Overdue' :
-                                 status === 'today' ? 'Today' :
-                                 status === 'upcoming' ? 'This Week' :
-                                 'Future'}
+                                {task.status}
                               </span>
                             </td>
                             <td className="py-3 px-4 text-center">
@@ -420,6 +417,30 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
                 <div>
                   <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">Priority</label>
                   <p className="text-sm text-slate-700">{selectedTask.priority}</p>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">Assigned To</label>
+                  <div className="flex flex-wrap gap-1">
+                    {(() => {
+                      const assignedIds = Array.isArray(selectedTask.assignedTo)
+                        ? selectedTask.assignedTo
+                        : selectedTask.assignedTo ? [selectedTask.assignedTo] : [];
+
+                      if (assignedIds.length === 0) {
+                        return <p className="text-sm text-slate-400">Unassigned</p>;
+                      }
+
+                      return assignedIds.map(userId => {
+                        const profile = teamProfiles.find(p => p.id === userId);
+                        const userName = profile?.full_name || profile?.email || 'Unknown User';
+                        return (
+                          <span key={userId} className="inline-block px-2 py-1 bg-brand-100 text-brand-700 text-xs font-medium rounded">
+                            {userName}
+                          </span>
+                        );
+                      });
+                    })()}
+                  </div>
                 </div>
               </div>
 
