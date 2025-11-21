@@ -187,7 +187,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           {isNotificationsOpen && (
             <>
               <div className="fixed inset-0 z-[60]" onClick={() => setIsNotificationsOpen(false)}></div>
-              <div className="fixed top-16 right-0 md:right-4 w-full md:w-96 mt-0 md:mt-2 bg-white rounded-none md:rounded-xl shadow-xl border-t md:border border-slate-200 overflow-hidden z-[70] text-slate-900 max-h-[calc(100vh-4rem)] md:max-h-[600px]">
+              <div className="fixed top-20 right-4 w-[calc(100vw-2rem)] md:w-96 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden z-[70] text-slate-900 max-h-[calc(100vh-6rem)]">
                 <div className="p-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
                   <h3 className="font-bold text-sm text-slate-700">Notifications</h3>
                   <div className="flex gap-2">
