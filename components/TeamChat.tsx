@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check, Smile, Film, SmilePlus, Video, Phone, Lock, UserPlus } from 'lucide-react';
+import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check, Smile, Film, SmilePlus, Video, Phone, Lock, UserPlus, Menu } from 'lucide-react';
 import { ChatChannel, ChatMessage, User, ToastType, Profile, MessageReaction } from '../types';
 import { getChatResponse } from '../services/geminiService';
 import { fetchChatMessages, sendChatMessage, clearChatHistory, uploadFile, fetchChannels, createChannel, deleteChannel, fetchProfiles, getOrCreateDMChannel, createNotification, editChatMessage, fetchMessageReactions, addMessageReaction, removeMessageReaction, fetchChannelMembers, addChannelMember, removeChannelMember } from '../services/databaseService';
@@ -56,6 +56,9 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
   const [showMembersModal, setShowMembersModal] = useState(false);
   const [channelMembers, setChannelMembers] = useState<any[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
+
+  // Mobile sidebar state
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // Helper function to detect @mentions in text
   const detectMentions = (text: string): string[] => {
@@ -156,6 +159,13 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
       searchGifs('');
     }
   }, [showGifPicker]);
+
+  // Close mobile sidebar when channel changes
+  useEffect(() => {
+    if (activeChannelId && window.innerWidth < 768) {
+      setIsMobileSidebarOpen(false);
+    }
+  }, [activeChannelId]);
 
   // Load reactions for all visible messages
   useEffect(() => {
@@ -988,15 +998,37 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
 
   return (
     <div className="flex h-full overflow-hidden bg-slate-50">
+      {/* Mobile Sidebar Overlay */}
+      {isMobileSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+          onClick={() => setIsMobileSidebarOpen(false)}
+        />
+      )}
+
       {/* Channels Sidebar */}
-      <div className="w-64 bg-[#3F0E40] flex flex-col flex-shrink-0">
+      <div className={`
+        w-64 bg-[#3F0E40] flex flex-col flex-shrink-0
+        fixed md:relative inset-y-0 left-0 z-50
+        transform transition-transform duration-300 ease-in-out
+        ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+      `}>
         <div className="h-12 px-4 flex items-center justify-between border-b border-[#5d2c5d]">
           <h2 className="font-bold text-white truncate">Bright Forge</h2>
-          {currentUser.role === 'Owner' && (
-            <button onClick={() => setShowCreateChannel(true)} className="text-slate-300 hover:text-white" title="New Channel">
-              <Plus className="w-5 h-5" />
+          <div className="flex items-center gap-2">
+            {currentUser.role === 'Owner' && (
+              <button onClick={() => setShowCreateChannel(true)} className="text-slate-300 hover:text-white" title="New Channel">
+                <Plus className="w-5 h-5" />
+              </button>
+            )}
+            <button
+              onClick={() => setIsMobileSidebarOpen(false)}
+              className="md:hidden text-slate-300 hover:text-white"
+              title="Close"
+            >
+              <X className="w-5 h-5" />
             </button>
-          )}
+          </div>
         </div>
 
         {showCreateChannel && (
@@ -1185,8 +1217,15 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
 
       {/* Main Chat */}
       <div className="flex-1 flex flex-col min-w-0 bg-white h-full">
-        <div className="h-16 border-b border-slate-200 flex items-center justify-between px-6 flex-shrink-0 bg-white">
-          <div className="flex items-center gap-2">
+        <div className="h-14 md:h-16 border-b border-slate-200 flex items-center justify-between px-3 md:px-6 flex-shrink-0 bg-white">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <button
+              onClick={() => setIsMobileSidebarOpen(true)}
+              className="md:hidden p-2 hover:bg-slate-100 rounded-lg flex-shrink-0"
+              title="Open menu"
+            >
+              <Menu className="w-5 h-5 text-slate-600" />
+            </button>
             {activeChannel?.type === 'dm' ? (
               <div className="flex items-center gap-2">
                 {getDMInfo(activeChannel!).avatar ? (
@@ -1194,34 +1233,34 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                 ) : (
                   <UserIcon className="w-5 h-5 text-slate-400" />
                 )}
-                <h3 className="font-bold text-slate-900 truncate">{getDMInfo(activeChannel!).name}</h3>
+                <h3 className="font-bold text-slate-900 truncate text-sm md:text-base">{getDMInfo(activeChannel!).name}</h3>
               </div>
             ) : (
-              <div className="flex items-center gap-2">
-                <Hash className="w-5 h-5 text-slate-400" />
-                <h3 className="font-bold text-slate-900 truncate">{activeChannel?.name}</h3>
+              <div className="flex items-center gap-2 min-w-0">
+                <Hash className="w-4 h-4 md:w-5 md:h-5 text-slate-400 flex-shrink-0" />
+                <h3 className="font-bold text-slate-900 truncate text-sm md:text-base">{activeChannel?.name}</h3>
                 {activeChannel?.name === 'ask-ai' && (
-                  <span className="px-2 py-0.5 bg-brand-100 text-brand-700 text-xs rounded-full font-medium">AI</span>
+                  <span className="hidden sm:inline px-2 py-0.5 bg-brand-100 text-brand-700 text-xs rounded-full font-medium">AI</span>
                 )}
               </div>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
             {activeChannelId && (
               <>
                 <button
                   onClick={() => startCall(true)}
-                  className="p-2 hover:bg-green-50 rounded-lg transition-colors group"
+                  className="p-1.5 md:p-2 hover:bg-green-50 rounded-lg transition-colors group"
                   title="Start Video Call"
                 >
-                  <Video className="w-5 h-5 text-slate-400 group-hover:text-green-600" />
+                  <Video className="w-4 h-4 md:w-5 md:h-5 text-slate-400 group-hover:text-green-600" />
                 </button>
                 <button
                   onClick={() => startCall(false)}
-                  className="p-2 hover:bg-blue-50 rounded-lg transition-colors group"
+                  className="hidden sm:block p-1.5 md:p-2 hover:bg-blue-50 rounded-lg transition-colors group"
                   title="Start Voice Call"
                 >
-                  <Phone className="w-5 h-5 text-slate-400 group-hover:text-blue-600" />
+                  <Phone className="w-4 h-4 md:w-5 md:h-5 text-slate-400 group-hover:text-blue-600" />
                 </button>
               </>
             )}
@@ -1239,6 +1278,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                   }
                 }}
                 title="Clear History"
+                className="hidden sm:block p-1.5 md:p-2 hover:bg-red-50 rounded-lg transition-colors"
               >
                 <Trash2 className="w-4 h-4 text-slate-300 hover:text-red-500" />
               </button>
@@ -1246,34 +1286,34 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-3 md:p-6 space-y-4 md:space-y-6">
           {messages.map((msg) => (
-            <div key={msg.id} className={`flex gap-4 group ${msg.isAi ? 'bg-brand-50/30 -mx-6 px-6 py-2' : ''}`}>
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${msg.isAi ? 'bg-brand-500' : 'bg-slate-200'}`}>
+            <div key={msg.id} className={`flex gap-2 md:gap-4 group ${msg.isAi ? 'bg-brand-50/30 -mx-3 md:-mx-6 px-3 md:px-6 py-2' : ''}`}>
+              <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${msg.isAi ? 'bg-brand-500' : 'bg-slate-200'}`}>
                 {msg.isAi ? (
-                  <Bot className="w-6 h-6 text-white" />
+                  <Bot className="w-4 h-4 md:w-6 md:h-6 text-white" />
                 ) : msg.avatar && msg.avatar !== 'user' && msg.avatar.startsWith('http') ? (
                   <img src={msg.avatar} alt="" className="w-full h-full rounded-lg object-cover" />
                 ) : (
-                  <UserIcon className="w-6 h-6 text-slate-500" />
+                  <UserIcon className="w-4 h-4 md:w-6 md:h-6 text-slate-500" />
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-baseline gap-2">
-                  <span className="font-bold text-slate-900">{msg.sender}</span>
-                  <span className="text-xs text-slate-400">
+                <div className="flex items-baseline gap-1 md:gap-2">
+                  <span className="font-bold text-slate-900 text-sm md:text-base">{msg.sender}</span>
+                  <span className="text-[10px] md:text-xs text-slate-400">
                     {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     {msg.isEdited && <span className="ml-1 italic">(edited)</span>}
                   </span>
                 </div>
                 {msg.attachmentUrl && (
-                  <div className="mt-2 mb-1">
+                  <div className="mt-1 md:mt-2 mb-1">
                     {msg.attachmentType === 'image' ? (
                       <a href={msg.attachmentUrl} target="_blank" rel="noopener noreferrer">
-                        <img src={msg.attachmentUrl} alt="Attachment" className="max-h-60 rounded-lg border border-slate-200" />
+                        <img src={msg.attachmentUrl} alt="Attachment" className="max-h-48 md:max-h-60 rounded-lg border border-slate-200" />
                       </a>
                     ) : (
-                      <a href={msg.attachmentUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-brand-600 underline">
+                      <a href={msg.attachmentUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-brand-600 underline text-sm">
                         <FileText className="w-4 h-4" /> Attachment
                       </a>
                     )}
@@ -1284,7 +1324,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                     <textarea
                       value={editingText}
                       onChange={(e) => setEditingText(e.target.value)}
-                      className="w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none resize-none"
+                      className="w-full p-2 text-xs md:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none resize-none"
                       rows={3}
                       autoFocus
                       onKeyDown={(e) => {
@@ -1318,7 +1358,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                   </div>
                 ) : (
                   <div className="mt-1">
-                    <span className="text-slate-700 whitespace-pre-wrap">{msg.text}</span>
+                    <span className="text-slate-700 whitespace-pre-wrap text-sm md:text-base">{msg.text}</span>
                     {!msg.isAi && msg.senderId === currentUser.id && editingMessageId !== msg.id && (
                       <button
                         onClick={() => {
@@ -1385,8 +1425,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
           <div ref={messagesEndRef} />
         </div>
 
-        <div className="p-6 pt-2 flex-shrink-0 bg-white border-t border-slate-100">
-          <div className="border rounded-xl shadow-sm bg-white flex flex-col relative border-slate-300">
+        <div className="p-2 md:p-6 md:pt-2 flex-shrink-0 bg-white border-t border-slate-100">
+          <div className="border rounded-lg md:rounded-xl shadow-sm bg-white flex flex-col relative border-slate-300">
             {/* Mention Dropdown */}
             {mentionDropdown?.show && (
               <div className="absolute bottom-full left-0 mb-2 w-64 bg-white rounded-lg shadow-xl border border-slate-200 overflow-hidden z-[100] animate-fadeIn">
@@ -1475,16 +1515,16 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
               onPaste={handlePaste}
               placeholder={
                 activeChannel?.type === 'dm'
-                  ? `Message ${getDMInfo(activeChannel!).name}... (Use @name or @everyone to mention)`
-                  : `Message #${activeChannel?.name}... (Use @name or @everyone to mention)`
+                  ? `Message ${getDMInfo(activeChannel!).name}...`
+                  : `Message #${activeChannel?.name}...`
               }
-              className="w-full max-h-40 min-h-[60px] p-3 outline-none resize-none rounded-t-xl"
+              className="w-full max-h-40 min-h-[44px] md:min-h-[60px] p-2 md:p-3 text-sm md:text-base outline-none resize-none rounded-t-lg md:rounded-t-xl"
             />
-            <div className="flex justify-between items-center p-2 border-t rounded-b-xl bg-slate-50 border-slate-100">
-              <div className="flex gap-1 relative">
+            <div className="flex justify-between items-center p-1.5 md:p-2 border-t rounded-b-lg md:rounded-b-xl bg-slate-50 border-slate-100">
+              <div className="flex gap-0.5 md:gap-1 relative">
                 <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
-                <button onClick={() => fileInputRef.current?.click()} className="p-2 hover:bg-slate-200 rounded-full text-slate-500">
-                  <ImageIcon className="w-5 h-5" />
+                <button onClick={() => fileInputRef.current?.click()} className="p-1.5 md:p-2 hover:bg-slate-200 rounded-full text-slate-500">
+                  <ImageIcon className="w-4 h-4 md:w-5 md:h-5" />
                 </button>
 
                 <button
@@ -1492,9 +1532,9 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                     setShowEmojiPicker(!showEmojiPicker);
                     setShowGifPicker(false);
                   }}
-                  className="p-2 hover:bg-slate-200 rounded-full text-slate-500"
+                  className="p-1.5 md:p-2 hover:bg-slate-200 rounded-full text-slate-500"
                 >
-                  <Smile className="w-5 h-5" />
+                  <Smile className="w-4 h-4 md:w-5 md:h-5" />
                 </button>
 
                 <button
@@ -1506,21 +1546,21 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                       searchGifs('');
                     }
                   }}
-                  className="p-2 hover:bg-slate-200 rounded-full text-slate-500"
+                  className="hidden sm:block p-1.5 md:p-2 hover:bg-slate-200 rounded-full text-slate-500"
                 >
-                  <Film className="w-5 h-5" />
+                  <Film className="w-4 h-4 md:w-5 md:h-5" />
                 </button>
 
                 {/* Emoji Picker Dropdown */}
                 {showEmojiPicker && (
-                  <div className="absolute bottom-full left-0 mb-2 bg-white rounded-lg shadow-xl border border-slate-200 p-3 z-[100] w-80">
+                  <div className="absolute bottom-full left-0 mb-2 bg-white rounded-lg shadow-xl border border-slate-200 p-2 md:p-3 z-[100] w-72 md:w-80">
                     <div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-200">
                       <p className="text-sm font-bold text-slate-700">Emojis</p>
                       <button onClick={() => setShowEmojiPicker(false)} className="text-slate-400 hover:text-slate-600">
                         <X className="w-4 h-4" />
                       </button>
                     </div>
-                    <div className="grid grid-cols-8 gap-2 max-h-64 overflow-y-auto">
+                    <div className="grid grid-cols-6 md:grid-cols-8 gap-1 md:gap-2 max-h-64 overflow-y-auto">
                       {['😀', '😃', '😄', '😁', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '😣', '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬', '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗', '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯', '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '🤐', '🥴', '🤢', '🤮', '🤧', '😷', '🤒', '🤕', '🤑', '🤠', '👍', '👎', '👏', '🙌', '👋', '🤝', '🙏', '💪', '✌️', '🤞', '🤟', '🤘', '👌', '🤌', '🤏', '👈', '👉', '👆', '👇', '☝️', '✋', '🤚', '🖐️', '🖖', '👊', '✊', '🤛', '🤜', '💯', '🔥', '⚡', '💥', '💫', '⭐', '🌟', '✨', '💝', '💖', '💗', '💓', '💞', '💕', '💟', '❤️', '🧡', '💛', '💚', '💙', '💜', '🤎', '🖤', '🤍', '💔', '❣️', '💘', '💌', '👀', '👁️', '🧠', '🗣️', '👤', '👥', '🫂', '🎉', '🎊', '🎈', '🎁', '🏆', '🥇', '🥈', '🥉', '⚽', '🏀', '🏈', '⚾', '🎾', '🏐', '🏉', '🎱', '🎮', '🎯', '🎲'].map(emoji => (
                         <button
                           key={emoji}
@@ -1539,7 +1579,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
 
                 {/* GIF Picker Dropdown */}
                 {showGifPicker && (
-                  <div className="absolute bottom-full left-0 mb-2 bg-white rounded-lg shadow-xl border border-slate-200 p-3 z-[100] w-96">
+                  <div className="absolute bottom-full left-0 mb-2 bg-white rounded-lg shadow-xl border border-slate-200 p-2 md:p-3 z-[100] w-80 md:w-96">
                     <div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-200">
                       <p className="text-sm font-bold text-slate-700">GIFs</p>
                       <button onClick={() => setShowGifPicker(false)} className="text-slate-400 hover:text-slate-600">
@@ -1625,9 +1665,9 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
               <button
                 onClick={handleSendMessage}
                 disabled={loading || (!message.trim() && !isUploading)}
-                className="p-2 bg-green-700 text-white rounded-lg hover:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="p-1.5 md:p-2 bg-green-700 text-white rounded-lg hover:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                {isUploading ? <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin" /> : <Send className="w-4 h-4 md:w-5 md:h-5" />}
               </button>
             </div>
           </div>

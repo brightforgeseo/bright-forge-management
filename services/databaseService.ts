@@ -154,16 +154,48 @@ export const updateUserProfile = async (fullName: string) => {
 // --- Channels & DMs ---
 
 export const fetchChannels = async (): Promise<ChatChannel[]> => {
-  const { data, error } = await supabase
+  // Get the current user
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    console.error('No authenticated user');
+    return [];
+  }
+
+  // Fetch all channels
+  const { data: allChannels, error: channelsError } = await supabase
     .from('channels')
     .select('*')
     .order('created_at', { ascending: true });
 
-  if (error) {
-    console.error('Error fetching channels:', error);
+  if (channelsError) {
+    console.error('Error fetching channels:', channelsError);
     return [];
   }
-  return data as ChatChannel[];
+
+  // Fetch user's channel memberships
+  const { data: memberships, error: membershipsError } = await supabase
+    .from('channel_members')
+    .select('channel_id')
+    .eq('user_id', user.id);
+
+  if (membershipsError) {
+    console.error('Error fetching channel memberships:', membershipsError);
+    return allChannels?.filter(ch => !ch.is_private) || [];
+  }
+
+  // Get set of channel IDs user is a member of
+  const memberChannelIds = new Set(memberships?.map(m => m.channel_id) || []);
+
+  // Filter channels: show all public channels + private channels user is a member of
+  const filteredChannels = allChannels?.filter(channel => {
+    if (!channel.is_private) {
+      return true; // Show all public channels
+    }
+    return memberChannelIds.has(channel.id); // Only show private channels user is a member of
+  }) || [];
+
+  return filteredChannels as ChatChannel[];
 };
 
 export const createChannel = async (
