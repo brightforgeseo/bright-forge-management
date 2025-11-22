@@ -27,15 +27,11 @@ jobs:
       - name: List dist contents
         run: ls -la dist/
 
-      - name: Upload macOS assets
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            dist/Bright Forge Portal-*.dmg
-            dist/latest-mac.yml
-            dist/*.blockmap
+      - name: Upload to release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ github.event.release.tag_name }} dist/*.dmg dist/latest-mac.yml dist/*.blockmap --clobber
 
   build-win:
     runs-on: windows-latest
@@ -55,12 +51,8 @@ jobs:
       - name: List dist contents
         run: dir dist
 
-      - name: Upload Windows assets
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            dist/*.exe
-            dist/latest.yml
-            dist/*.blockmap
+      - name: Upload to release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ github.event.release.tag_name }} dist/*.exe dist/latest.yml dist/*.blockmap --clobber
