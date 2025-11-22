@@ -1,6 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /*
    Global CSS Styles
-   Tailwind is handled via CDN in index.html for this environment.
 */
 
 @keyframes fadeIn {

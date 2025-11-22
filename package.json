@@ -1,6 +1,6 @@
 {
   "name": "bright-forge-portal",
-  "version": "1.0.16",
+  "version": "1.0.17",
   "description": "Bright Forge Team Portal",
   "main": "electron.js",
   "targets": {
@@ -8,7 +8,7 @@
   },
   "scripts": {
     "start": "parcel index.html",
-    "build": "parcel build index.html",
+    "build": "parcel build index.html --public-url ./",
     "electron:dev": "concurrently \"cross-env BROWSER=none npm start\" \"wait-on http://localhost:1234 && electron .\"",
     "electron:build": "npm run build && electron-builder"
   },
