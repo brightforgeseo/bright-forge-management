@@ -31,7 +31,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload ${{ github.event.release.tag_name }} dist/*.dmg dist/latest-mac.yml dist/*.blockmap --clobber
+          for f in dist/*.dmg dist/latest-mac.yml dist/*.blockmap; do
+            [ -f "$f" ] && gh release upload "${{ github.event.release.tag_name }}" "$f" --clobber || echo "Skipping $f"
+          done
 
   build-win:
     runs-on: windows-latest
@@ -54,5 +56,8 @@ jobs:
       - name: Upload to release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
         run: |
-          gh release upload ${{ github.event.release.tag_name }} dist/*.exe dist/latest.yml dist/*.blockmap --clobber
+          for f in dist/*.exe dist/latest.yml dist/*.blockmap; do
+            [ -f "$f" ] && gh release upload "${{ github.event.release.tag_name }}" "$f" --clobber || echo "Skipping $f"
+          done
