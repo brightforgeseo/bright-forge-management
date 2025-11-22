@@ -9,13 +9,8 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      matrix:
-        os: [macos-latest, windows-latest]
-
+  build-mac:
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v3
 
@@ -27,24 +22,40 @@ jobs:
         run: npm install
 
       - name: Build Electron app
-        run: npm run build && npx electron-builder --publish never
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run build && npx electron-builder --mac --publish never
+
+      - name: List dist contents
+        run: ls -la dist/
 
       - name: Upload macOS assets
-        if: matrix.os == 'macos-latest'
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            dist/*.dmg
-            dist/*.zip
+            dist/Bright Forge Portal-*.dmg
             dist/latest-mac.yml
             dist/*.blockmap
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  build-win:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Electron app
+        run: npm run build && npx electron-builder --win --publish never
+
+      - name: List dist contents
+        run: dir dist
+
       - name: Upload Windows assets
-        if: matrix.os == 'windows-latest'
         uses: softprops/action-gh-release@v1
         with:
           files: |
