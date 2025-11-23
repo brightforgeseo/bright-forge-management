@@ -41,7 +41,7 @@
   "build": {
     "appId": "com.brightforge.portal",
     "productName": "Bright Forge Portal",
-    "artifactName": "${productName}-${version}-${arch}-${os}.${ext}",
+    "artifactName": "BrightForgePortal-${version}-${arch}-${os}.${ext}",
     "files": [
       "dist/**/*",
       "electron.js",
