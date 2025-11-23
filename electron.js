@@ -111,6 +111,12 @@ autoUpdater.on('update-downloaded', (info) => {
 autoUpdater.on('error', (err) => {
   console.log('Auto-update error:', err);
 
+  // Don't show dialog for code signature errors (happens in dev/unsigned builds)
+  if (err.message && err.message.includes('code signature')) {
+    console.log('Skipping update check - app is not code signed');
+    return;
+  }
+
   dialog.showMessageBox(mainWindow, {
     type: 'error',
     title: 'Update Error',
