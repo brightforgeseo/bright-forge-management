@@ -108,7 +108,8 @@ autoUpdater.on('update-downloaded', (info) => {
 
   if (response === 0) {
     // User clicked "Restart Now"
-    autoUpdater.quitAndInstall();
+    // Force quit without waiting for app to close gracefully (needed for unsigned Mac apps)
+    autoUpdater.quitAndInstall(false, true);
   }
 });
 
@@ -116,8 +117,10 @@ autoUpdater.on('error', (err) => {
   console.log('Auto-update error:', err);
 
   // Don't show dialog for code signature errors (happens in dev/unsigned builds)
-  if (err.message && err.message.includes('code signature')) {
-    console.log('Skipping update check - app is not code signed');
+  // Also catch related errors like "Cannot find latest.yml" or signature verification failures
+  const ignoredErrors = ['code signature', 'Code signature', 'ENOENT', 'ERR_UPDATER_INVALID_RELEASE'];
+  if (err.message && ignoredErrors.some(e => err.message.includes(e))) {
+    console.log('Skipping update error notification - likely unsigned build issue');
     return;
   }
 
@@ -146,8 +149,8 @@ ipcMain.on('focus-window', () => {
 app.whenReady().then(() => {
   createWindow();
 
-  // Check for updates only in production
-  if (!isDev) {
+  // Check for updates only in production (disabled on Mac until app is code signed)
+  if (!isDev && process.platform !== 'darwin') {
     autoUpdater.checkForUpdatesAndNotify();
 
     // Check for updates every hour
