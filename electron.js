@@ -30,6 +30,10 @@ const isDev = !app.isPackaged;
 // Configure auto-updater
 autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = true;
+// Disable code signing verification for unsigned builds (required for Mac without Apple Developer cert)
+if (process.platform === 'darwin') {
+  autoUpdater.forceCodeSigning = false;
+}
 
 let mainWindow;
 
