@@ -64,6 +64,11 @@ const Sidebar: React.FC<SidebarProps> = ({
           isRead: newNote.is_read,
           createdAt: newNote.created_at
         }, ...prev]);
+
+        // Show native OS notification (works even when app is in background)
+        if (window.electronAPI?.showNotification) {
+          window.electronAPI.showNotification(newNote.title, newNote.message);
+        }
       })
       .subscribe();
 

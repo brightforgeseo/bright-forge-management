@@ -1,7 +1,28 @@
 
-const { app, BrowserWindow, shell, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, shell, ipcMain, dialog, Notification } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
+
+// Helper function to show native OS notification
+function showNativeNotification(title, body) {
+  if (Notification.isSupported()) {
+    const notification = new Notification({
+      title: title,
+      body: body,
+      silent: false
+    });
+
+    notification.on('click', () => {
+      // Focus the main window when notification is clicked
+      if (mainWindow) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.focus();
+      }
+    });
+
+    notification.show();
+  }
+}
 
 // Determine if we are in development mode
 const isDev = !app.isPackaged;
@@ -19,8 +40,9 @@ function createWindow() {
     height: 800,
     title: "Bright Forge Portal",
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
       // This allows us to use the camera/mic if needed
       mediaHandlers: true,
     },
@@ -96,6 +118,18 @@ autoUpdater.on('error', (err) => {
     detail: err.message,
     buttons: ['OK']
   });
+});
+
+// IPC handlers for renderer process communication
+ipcMain.on('show-notification', (event, { title, body }) => {
+  showNativeNotification(title, body);
+});
+
+ipcMain.on('focus-window', () => {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  }
 });
 
 // This method will be called when Electron has finished initialization
