@@ -57,13 +57,28 @@ const detectMentions = (text: string, profiles: Profile[]): string[] => {
   return mentionedIds;
 };
 
-// Render text with highlighted @mentions
+// Render text with highlighted @mentions and clickable links
 const renderTextWithMentions = (text: string) => {
-  // Match @everyone or @Name (word characters and spaces until end of mention)
-  const mentionRegex = /(@everyone|@[\w\s]+?)(?=\s@|\s|$|[.,!?])/gi;
-  const parts = text.split(mentionRegex);
+  // Combined regex for URLs and @mentions
+  const combinedRegex = /(https?:\/\/[^\s]+)|(@everyone|@[\w\s]+?)(?=\s@|\s|$|[.,!?])/gi;
+  const parts = text.split(combinedRegex).filter(Boolean);
 
   return parts.map((part, index) => {
+    // Check if it's a URL
+    if (part.match(/^https?:\/\//i)) {
+      return (
+        <a
+          key={index}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 hover:text-blue-800 underline break-all"
+        >
+          {part}
+        </a>
+      );
+    }
+    // Check if it's a mention
     if (part.match(/^@/i)) {
       return (
         <span key={index} className="text-blue-600 font-semibold bg-blue-50 px-1 rounded">
