@@ -5,6 +5,48 @@ import { ToolView, BrandingConfig, User, AppNotification } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { fetchNotifications, markNotificationRead, markAllNotificationsRead, deleteAllNotifications } from '../services/databaseService';
 
+// Play notification sound when receiving notifications
+const playNotificationSound = async () => {
+  try {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+
+    if (audioContext.state === 'suspended') {
+      await audioContext.resume();
+    }
+
+    const oscillator1 = audioContext.createOscillator();
+    const oscillator2 = audioContext.createOscillator();
+    const oscillator3 = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator1.frequency.value = 800;
+    oscillator2.frequency.value = 1000;
+    oscillator3.frequency.value = 1200;
+
+    oscillator1.type = 'sine';
+    oscillator2.type = 'sine';
+    oscillator3.type = 'sine';
+
+    gainNode.gain.setValueAtTime(0.15, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+
+    oscillator1.connect(gainNode);
+    oscillator2.connect(gainNode);
+    oscillator3.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator1.start(audioContext.currentTime);
+    oscillator2.start(audioContext.currentTime + 0.1);
+    oscillator3.start(audioContext.currentTime + 0.2);
+
+    oscillator1.stop(audioContext.currentTime + 0.3);
+    oscillator2.stop(audioContext.currentTime + 0.4);
+    oscillator3.stop(audioContext.currentTime + 0.5);
+  } catch (error) {
+    console.error('Failed to play notification sound:', error);
+  }
+};
+
 interface SidebarProps {
   currentView: ToolView;
   onChangeView: (view: ToolView) => void;
@@ -76,6 +118,9 @@ const Sidebar: React.FC<SidebarProps> = ({
         if (window.electronAPI?.showNotification) {
           window.electronAPI.showNotification(newNote.title, newNote.message);
         }
+
+        // Play notification sound when receiving
+        playNotificationSound();
       })
       .subscribe();
 

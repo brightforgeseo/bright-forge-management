@@ -120,50 +120,6 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
     });
   };
 
-  // Play notification sound
-  const playNotificationSound = async () => {
-    try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-
-      // Resume audio context if suspended (required on Windows/some browsers)
-      if (audioContext.state === 'suspended') {
-        await audioContext.resume();
-      }
-
-      const oscillator1 = audioContext.createOscillator();
-      const oscillator2 = audioContext.createOscillator();
-      const oscillator3 = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-
-      oscillator1.frequency.value = 800;
-      oscillator2.frequency.value = 1000;
-      oscillator3.frequency.value = 1200;
-
-      oscillator1.connect(gainNode);
-      oscillator2.connect(gainNode);
-      oscillator3.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-
-      gainNode.gain.value = 0.8;
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-
-      oscillator1.start(audioContext.currentTime);
-      oscillator2.start(audioContext.currentTime);
-      oscillator3.start(audioContext.currentTime);
-
-      oscillator1.stop(audioContext.currentTime + 0.5);
-      oscillator2.stop(audioContext.currentTime + 0.5);
-      oscillator3.stop(audioContext.currentTime + 0.5);
-
-      // Close audio context after sound finishes to clean up resources
-      setTimeout(() => {
-        audioContext.close();
-      }, 600);
-    } catch (error) {
-      console.error('Failed to play notification sound:', error);
-    }
-  };
-
   // Search GIFs using Giphy API
   const searchGifs = async (query: string) => {
     if (!query.trim()) {
@@ -965,7 +921,6 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
             channelType: 'dm'
           }
         );
-        playNotificationSound();
       }
     }
 
@@ -987,7 +942,6 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
           );
         }
       }
-      playNotificationSound();
     }
 
     // AI Response for Echo AI DM channels
