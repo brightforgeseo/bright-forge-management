@@ -8,23 +8,24 @@ import { version } from '../package.json';
 
 // Flash favicon when receiving notifications
 let faviconFlashInterval: ReturnType<typeof setInterval> | null = null;
-const originalFavicon = './favicon.png';
+let originalFaviconHref: string | null = null;
 const notificationFavicon = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%23f97316"/><text x="50" y="70" font-size="60" text-anchor="middle" fill="white">!</text></svg>';
 
 const startFaviconFlash = () => {
   // Don't start if already flashing
   if (faviconFlashInterval) return;
 
-  const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]') || (() => {
-    const link = document.createElement('link');
-    link.rel = 'icon';
-    document.head.appendChild(link);
-    return link;
-  })();
+  const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+  if (!favicon) return;
+
+  // Store original favicon on first flash
+  if (!originalFaviconHref) {
+    originalFaviconHref = favicon.href;
+  }
 
   let isOriginal = true;
   faviconFlashInterval = setInterval(() => {
-    favicon.href = isOriginal ? notificationFavicon : originalFavicon;
+    favicon.href = isOriginal ? notificationFavicon : originalFaviconHref!;
     isOriginal = !isOriginal;
   }, 500);
 
@@ -33,7 +34,7 @@ const startFaviconFlash = () => {
     if (faviconFlashInterval) {
       clearInterval(faviconFlashInterval);
       faviconFlashInterval = null;
-      favicon.href = originalFavicon;
+      if (originalFaviconHref) favicon.href = originalFaviconHref;
     }
     window.removeEventListener('focus', stopFlashing);
   };
