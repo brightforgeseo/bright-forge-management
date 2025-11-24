@@ -6,6 +6,48 @@ import { supabase } from '../lib/supabaseClient';
 import { fetchNotifications, markNotificationRead, markAllNotificationsRead, deleteAllNotifications } from '../services/databaseService';
 import { version } from '../package.json';
 
+// Flash favicon when receiving notifications
+let faviconFlashInterval: ReturnType<typeof setInterval> | null = null;
+const originalFavicon = '/favicon.png';
+const notificationFavicon = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%23f97316"/><text x="50" y="70" font-size="60" text-anchor="middle" fill="white">!</text></svg>';
+
+const startFaviconFlash = () => {
+  // Don't start if already flashing
+  if (faviconFlashInterval) return;
+
+  const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]') || (() => {
+    const link = document.createElement('link');
+    link.rel = 'icon';
+    document.head.appendChild(link);
+    return link;
+  })();
+
+  let isOriginal = true;
+  faviconFlashInterval = setInterval(() => {
+    favicon.href = isOriginal ? notificationFavicon : originalFavicon;
+    isOriginal = !isOriginal;
+  }, 500);
+
+  // Stop flashing when window gains focus
+  const stopFlashing = () => {
+    if (faviconFlashInterval) {
+      clearInterval(faviconFlashInterval);
+      faviconFlashInterval = null;
+      favicon.href = originalFavicon;
+    }
+    window.removeEventListener('focus', stopFlashing);
+  };
+
+  window.addEventListener('focus', stopFlashing);
+
+  // Also stop after 30 seconds max
+  setTimeout(() => {
+    if (faviconFlashInterval) {
+      stopFlashing();
+    }
+  }, 30000);
+};
+
 // Play notification sound when receiving notifications
 const playNotificationSound = async () => {
   try {
@@ -122,6 +164,11 @@ const Sidebar: React.FC<SidebarProps> = ({
 
         // Play notification sound when receiving
         playNotificationSound();
+
+        // Flash favicon if window is not focused
+        if (!document.hasFocus()) {
+          startFaviconFlash();
+        }
       })
       .subscribe();
 
