@@ -8,8 +8,29 @@ on:
 permissions:
   contents: write
 
+env:
+  RELEASE_TAG: ${{ github.event.release.tag_name || '' }}
+
 jobs:
+  get-release-tag:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.get_tag.outputs.tag }}
+    steps:
+      - name: Get release tag
+        id: get_tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -n "${{ github.event.release.tag_name }}" ]; then
+            echo "tag=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+          else
+            TAG=$(gh release list --repo ${{ github.repository }} --limit 1 --json tagName -q '.[0].tagName')
+            echo "tag=$TAG" >> $GITHUB_OUTPUT
+          fi
+
   build-mac:
+    needs: get-release-tag
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v3
@@ -31,11 +52,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          for f in dist/*.dmg dist/latest-mac.yml dist/*.blockmap; do
-            [ -f "$f" ] && gh release upload "${{ github.event.release.tag_name }}" "$f" --clobber || echo "Skipping $f"
+          for f in dist/*.dmg dist/*.zip dist/latest-mac.yml dist/*.blockmap; do
+            [ -f "$f" ] && gh release upload "${{ needs.get-release-tag.outputs.tag }}" "$f" --clobber || echo "Skipping $f"
           done
 
   build-win:
+    needs: get-release-tag
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v3
@@ -59,10 +81,11 @@ jobs:
         shell: bash
         run: |
           for f in dist/*.exe dist/latest.yml dist/*.blockmap; do
-            [ -f "$f" ] && gh release upload "${{ github.event.release.tag_name }}" "$f" --clobber || echo "Skipping $f"
+            [ -f "$f" ] && gh release upload "${{ needs.get-release-tag.outputs.tag }}" "$f" --clobber || echo "Skipping $f"
           done
 
   build-android:
+    needs: get-release-tag
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -104,4 +127,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload "${{ github.event.release.tag_name }}" android/app/build/outputs/apk/debug/BrightForgePortal-${{ steps.version.outputs.VERSION }}-android.apk --clobber
+          gh release upload "${{ needs.get-release-tag.outputs.tag }}" android/app/build/outputs/apk/debug/BrightForgePortal-${{ steps.version.outputs.VERSION }}-android.apk --clobber
