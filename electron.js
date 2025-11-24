@@ -4,9 +4,9 @@ const { autoUpdater } = require('electron-updater');
 const path = require('path');
 
 // Set App User Model ID for Windows notifications
-// Using product name format for better visibility in Windows Settings
+// Must match the appId in electron-builder config for proper Windows integration
 if (process.platform === 'win32') {
-  app.setAppUserModelId('Bright Forge Portal');
+  app.setAppUserModelId('com.brightforge.portal');
 }
 
 // Helper function to show native OS notification
