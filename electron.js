@@ -3,9 +3,10 @@ const { app, BrowserWindow, shell, ipcMain, dialog, Notification } = require('el
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 
-// Set App User Model ID for Windows notifications (must match appId in package.json build config)
+// Set App User Model ID for Windows notifications
+// Using product name format for better visibility in Windows Settings
 if (process.platform === 'win32') {
-  app.setAppUserModelId('com.brightforge.portal');
+  app.setAppUserModelId('Bright Forge Portal');
 }
 
 // Helper function to show native OS notification
