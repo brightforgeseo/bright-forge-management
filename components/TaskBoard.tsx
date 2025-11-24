@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Plus, Sparkles, ChevronDown, ChevronUp, ChevronRight, Trash2, Briefcase, CheckCircle2, Settings, Mail, Phone, Globe, X, Image as ImageIcon, Edit3, Palette, Loader2, Upload, UserCircle, Link as LinkIcon, MessageCircle, Send } from 'lucide-react';
+import { Plus, Sparkles, ChevronDown, ChevronUp, ChevronRight, Trash2, Briefcase, CheckCircle2, Settings, Mail, Phone, Globe, X, Image as ImageIcon, Edit3, Palette, Loader2, Upload, UserCircle, Link as LinkIcon, MessageCircle, Send, Search } from 'lucide-react';
 import { Task, TaskGroup, User, ClientBoard, ToastType, LabelDefinition, Profile, TaskComment } from '../types';
 import { generateProjectTasks } from '../services/geminiService';
 import { fetchClientBoards, saveClientBoard, deleteClientBoard, uploadFile, fetchProfiles, createNotification } from '../services/databaseService';
@@ -147,6 +147,9 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [teamProfiles, setTeamProfiles] = useState<Profile[]>([]);
+  const [clientSearchQuery, setClientSearchQuery] = useState('');
+  const [isClientSearchFocused, setIsClientSearchFocused] = useState(false);
+  const clientSearchRef = useRef<HTMLInputElement>(null);
 
   // Fetch Data on Mount
   useEffect(() => {
@@ -707,6 +710,66 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                     <Settings className="w-5 h-5" />
                 </button>
             )}
+
+            {/* Client Search Bar */}
+            <div className="relative ml-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  ref={clientSearchRef}
+                  type="text"
+                  placeholder="Search clients..."
+                  value={clientSearchQuery}
+                  onChange={(e) => setClientSearchQuery(e.target.value)}
+                  onFocus={() => setIsClientSearchFocused(true)}
+                  onBlur={() => setTimeout(() => setIsClientSearchFocused(false), 200)}
+                  className="w-64 pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 placeholder-slate-400 focus:bg-white focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition-all"
+                />
+              </div>
+
+              {/* Search Results Dropdown */}
+              {isClientSearchFocused && clientSearchQuery && (
+                <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden z-50 animate-fadeIn">
+                  <div className="p-2 max-h-60 overflow-y-auto">
+                    {clients
+                      .filter(c =>
+                        c.name.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+                        c.email?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+                        c.website?.toLowerCase().includes(clientSearchQuery.toLowerCase())
+                      )
+                      .map(c => (
+                        <button
+                          key={c.id}
+                          onClick={() => {
+                            setSelectedClientId(c.id);
+                            setClientSearchQuery('');
+                            setIsClientSearchFocused(false);
+                          }}
+                          className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 hover:bg-slate-50 transition-colors ${c.id === selectedClientId ? 'bg-brand-50 text-brand-900' : 'text-slate-700'}`}
+                        >
+                          <div className="w-8 h-8 rounded bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-xs font-bold text-slate-600 uppercase border border-slate-200">
+                            {c.logoUrl ? <img src={c.logoUrl} className="w-full h-full object-cover rounded" /> : c.initials}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="font-medium truncate block">{c.name}</span>
+                            {c.email && <span className="text-xs text-slate-400 truncate block">{c.email}</span>}
+                          </div>
+                          {c.id === selectedClientId && <CheckCircle2 className="w-4 h-4 text-brand-600 flex-shrink-0" />}
+                        </button>
+                      ))}
+                    {clients.filter(c =>
+                      c.name.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+                      c.email?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+                      c.website?.toLowerCase().includes(clientSearchQuery.toLowerCase())
+                    ).length === 0 && (
+                      <div className="px-4 py-3 text-sm text-slate-500 text-center">
+                        No clients found
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {isClientDropdownOpen && (
               <>
