@@ -59,7 +59,11 @@ const Login: React.FC<LoginProps> = ({ onLogin, branding }) => {
                   });
                   
                   if (signUpError) {
-                      // Sometimes 'User already registered' appears if they exist in Auth but not in local storage session
+                      // 'User already registered' means they already activated their account
+                      // The password they entered might be their old temp password, not their current one
+                      if (signUpError.message.includes('already registered')) {
+                          throw new Error("Your account is already activated. Please use the password you set when you first logged in, or contact Ben to reset it.");
+                      }
                       // Try signing in one more time just in case
                       const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({ email, password });
                       if (!retryError && retryData.user) {
