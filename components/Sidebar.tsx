@@ -321,6 +321,11 @@ const Sidebar: React.FC<SidebarProps> = ({
               </>
             )}
         </div>
+
+        {/* Version Number */}
+        <div className="text-center">
+          <span className="text-xs text-slate-600">v1.0.22</span>
+        </div>
       </div>
     </div>
     </>
