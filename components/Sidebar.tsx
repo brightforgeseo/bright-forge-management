@@ -4,6 +4,7 @@ import { LayoutDashboard, Search, PenTool, BarChart, Settings, TableProperties, 
 import { ToolView, BrandingConfig, User, AppNotification } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { fetchNotifications, markNotificationRead, markAllNotificationsRead, deleteAllNotifications } from '../services/databaseService';
+import { version } from '../package.json';
 
 // Play notification sound when receiving notifications
 const playNotificationSound = async () => {
@@ -369,7 +370,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Version Number */}
         <div className="text-center">
-          <span className="text-xs text-slate-600">v1.0.25</span>
+          <span className="text-xs text-slate-600">v{version}</span>
         </div>
       </div>
     </div>
