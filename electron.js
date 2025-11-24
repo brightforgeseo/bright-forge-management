@@ -41,6 +41,12 @@ function showNativeNotification(title, body) {
 
       notification.on('show', () => {
         console.log('[Notification] Notification shown successfully');
+        // Bounce dock icon on macOS, flash taskbar on Windows
+        if (process.platform === 'darwin') {
+          app.dock.bounce('informational');
+        } else if (mainWindow) {
+          mainWindow.flashFrame(true);
+        }
       });
 
       notification.on('failed', (_, error) => {
