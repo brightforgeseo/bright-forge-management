@@ -57,6 +57,24 @@ const detectMentions = (text: string, profiles: Profile[]): string[] => {
   return mentionedIds;
 };
 
+// Render text with highlighted @mentions
+const renderTextWithMentions = (text: string) => {
+  // Match @everyone or @Name (word characters and spaces until end of mention)
+  const mentionRegex = /(@everyone|@[\w\s]+?)(?=\s@|\s|$|[.,!?])/gi;
+  const parts = text.split(mentionRegex);
+
+  return parts.map((part, index) => {
+    if (part.match(/^@/i)) {
+      return (
+        <span key={index} className="text-blue-600 font-semibold bg-blue-50 px-1 rounded">
+          {part}
+        </span>
+      );
+    }
+    return part;
+  });
+};
+
 // Play notification sound - LOUD bell sound
 const playNotificationSound = async () => {
   try {
@@ -1329,7 +1347,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                               })}
                             </span>
                           </div>
-                          <p className="text-sm text-slate-700 whitespace-pre-wrap">{comment.text}</p>
+                          <p className="text-sm text-slate-700 whitespace-pre-wrap">{renderTextWithMentions(comment.text)}</p>
                         </div>
                       </div>
                     ))
