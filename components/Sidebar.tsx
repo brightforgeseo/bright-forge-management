@@ -8,7 +8,7 @@ import { version } from '../package.json';
 
 // Flash favicon when receiving notifications
 let faviconFlashInterval: ReturnType<typeof setInterval> | null = null;
-const originalFavicon = '/favicon.png';
+const originalFavicon = './favicon.png';
 const notificationFavicon = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%23f97316"/><text x="50" y="70" font-size="60" text-anchor="middle" fill="white">!</text></svg>';
 
 const startFaviconFlash = () => {
