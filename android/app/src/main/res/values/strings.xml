@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Bright Forge Portal</string>
+    <string name="title_activity_main">Bright Forge Portal</string>
+    <string name="package_name">com.brightforge.portal</string>
+    <string name="custom_url_scheme">com.brightforge.portal</string>
+</resources>
