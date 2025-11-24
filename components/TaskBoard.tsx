@@ -737,6 +737,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                         c.email?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
                         c.website?.toLowerCase().includes(clientSearchQuery.toLowerCase())
                       )
+                      .sort((a, b) => a.name.localeCompare(b.name))
                       .map(c => (
                         <button
                           key={c.id}
@@ -776,7 +777,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
               <div className="fixed inset-0 z-30" onClick={() => setIsClientDropdownOpen(false)}></div>
               <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden z-40 animate-fadeIn">
                  <div className="p-2 max-h-60 overflow-y-auto">
-                    {clients.map(c => (
+                    {[...clients].sort((a, b) => a.name.localeCompare(b.name)).map(c => (
                       <button
                         key={c.id}
                         onClick={() => { setSelectedClientId(c.id); setIsClientDropdownOpen(false); }}
