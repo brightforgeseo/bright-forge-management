@@ -3,24 +3,55 @@ const { app, BrowserWindow, shell, ipcMain, dialog, Notification } = require('el
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 
+// Set App User Model ID for Windows notifications (must match appId in package.json build config)
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.brightforge.portal');
+}
+
 // Helper function to show native OS notification
 function showNativeNotification(title, body) {
+  console.log('[Notification] Attempting to show notification:', { title, body, supported: Notification.isSupported() });
+
   if (Notification.isSupported()) {
-    const notification = new Notification({
-      title: title,
-      body: body,
-      silent: false
-    });
+    try {
+      // Build notification options
+      const notificationOptions = {
+        title: title,
+        body: body,
+        silent: false
+      };
 
-    notification.on('click', () => {
-      // Focus the main window when notification is clicked
-      if (mainWindow) {
-        if (mainWindow.isMinimized()) mainWindow.restore();
-        mainWindow.focus();
+      // Add icon if it exists (for Windows/Linux - macOS uses app icon automatically)
+      const fs = require('fs');
+      const iconPath = path.join(__dirname, 'assets', 'icon.png');
+      if (fs.existsSync(iconPath)) {
+        notificationOptions.icon = iconPath;
       }
-    });
 
-    notification.show();
+      const notification = new Notification(notificationOptions);
+
+      notification.on('click', () => {
+        // Focus the main window when notification is clicked
+        if (mainWindow) {
+          if (mainWindow.isMinimized()) mainWindow.restore();
+          mainWindow.focus();
+        }
+      });
+
+      notification.on('show', () => {
+        console.log('[Notification] Notification shown successfully');
+      });
+
+      notification.on('failed', (_, error) => {
+        console.error('[Notification] Failed to show notification:', error);
+      });
+
+      notification.show();
+    } catch (err) {
+      console.error('[Notification] Error creating notification:', err);
+    }
+  } else {
+    console.warn('[Notification] Notifications not supported on this platform');
   }
 }
 
@@ -76,9 +107,15 @@ function createWindow() {
   return mainWindow;
 }
 
-// Auto-updater event handlers
+// Auto-updater event handlers (only active on Windows - Mac is disabled due to code signing requirement)
 autoUpdater.on('update-available', (info) => {
   console.log('Update available:', info);
+
+  // Skip on Mac - auto-update doesn't work without code signing
+  if (process.platform === 'darwin') {
+    console.log('Skipping update dialog on Mac - code signing required for auto-updates');
+    return;
+  }
 
   // Show notification that update is available
   dialog.showMessageBox(mainWindow, {
@@ -116,9 +153,15 @@ autoUpdater.on('update-downloaded', (info) => {
 autoUpdater.on('error', (err) => {
   console.log('Auto-update error:', err);
 
+  // Never show update errors on Mac - auto-update is disabled anyway
+  if (process.platform === 'darwin') {
+    console.log('Skipping update error on Mac - auto-updates disabled');
+    return;
+  }
+
   // Don't show dialog for code signature errors (happens in dev/unsigned builds)
   // Also catch related errors like "Cannot find latest.yml" or signature verification failures
-  const ignoredErrors = ['code signature', 'Code signature', 'ENOENT', 'ERR_UPDATER_INVALID_RELEASE'];
+  const ignoredErrors = ['code signature', 'Code signature', 'ENOENT', 'ERR_UPDATER_INVALID_RELEASE', 'Could not get code signature'];
   if (err.message && ignoredErrors.some(e => err.message.includes(e))) {
     console.log('Skipping update error notification - likely unsigned build issue');
     return;

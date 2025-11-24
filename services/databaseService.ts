@@ -285,10 +285,22 @@ export const fetchClientBoards = async (): Promise<ClientBoard[]> => {
     return [];
   }
 
-  return data.map((row: any) => ({
-    ...row.board_data,
-    db_id: row.id
-  }));
+  // Deduplicate by board_data.id - keep only the first occurrence (oldest by created_at)
+  const seen = new Set<string>();
+  const uniqueBoards: ClientBoard[] = [];
+
+  for (const row of data) {
+    const boardId = row.board_data?.id;
+    if (boardId && !seen.has(boardId)) {
+      seen.add(boardId);
+      uniqueBoards.push({
+        ...row.board_data,
+        db_id: row.id
+      });
+    }
+  }
+
+  return uniqueBoards;
 };
 
 export const saveClientBoard = async (board: ClientBoard) => {

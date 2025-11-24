@@ -58,10 +58,15 @@ const detectMentions = (text: string, profiles: Profile[]): string[] => {
 };
 
 // Play notification sound - LOUD bell sound
-const playNotificationSound = () => {
+const playNotificationSound = async () => {
   try {
     // Create oscillator for a loud bell-like sound
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+
+    // Resume audio context if suspended (required on Windows/some browsers)
+    if (audioContext.state === 'suspended') {
+      await audioContext.resume();
+    }
 
     // Create three oscillators for a rich bell sound
     const oscillator1 = audioContext.createOscillator();
@@ -91,6 +96,11 @@ const playNotificationSound = () => {
     oscillator1.stop(audioContext.currentTime + 0.5);
     oscillator2.stop(audioContext.currentTime + 0.5);
     oscillator3.stop(audioContext.currentTime + 0.5);
+
+    // Close audio context after sound finishes to clean up resources
+    setTimeout(() => {
+      audioContext.close();
+    }, 600);
 
     console.log('🔔 Notification sound played!');
   } catch (error) {

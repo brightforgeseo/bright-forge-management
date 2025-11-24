@@ -35,6 +35,13 @@ const Sidebar: React.FC<SidebarProps> = ({
     setIsMobileMenuOpen(false);
   };
 
+  // Request notification permission on mount
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
+
   useEffect(() => {
     if (!currentUser || currentUser.id === 'guest') return;
 
