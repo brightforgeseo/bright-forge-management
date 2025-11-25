@@ -722,7 +722,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   return (
     <div className="flex flex-col h-full overflow-hidden bg-white relative">
       {/* Header - Fixed */}
-      <div className="flex-none px-8 py-6 border-b border-slate-100 bg-white flex justify-between items-start z-20">
+      <div className="flex-none px-4 lg:px-8 py-4 lg:py-6 border-b border-slate-100 bg-white flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4 z-20">
          <div className="space-y-3">
           <div className="relative flex items-center gap-4">
             <button 
@@ -740,7 +740,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
             )}
 
             {/* Client Search Bar */}
-            <div className="relative ml-4">
+            <div className="relative ml-0 lg:ml-4 hidden lg:block">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input
@@ -751,13 +751,13 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                   onChange={(e) => setClientSearchQuery(e.target.value)}
                   onFocus={() => setIsClientSearchFocused(true)}
                   onBlur={() => setTimeout(() => setIsClientSearchFocused(false), 200)}
-                  className="w-64 pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 placeholder-slate-400 focus:bg-white focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition-all"
+                  className="w-48 xl:w-64 pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 placeholder-slate-400 focus:bg-white focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition-all"
                 />
               </div>
 
               {/* Search Results Dropdown */}
               {isClientSearchFocused && clientSearchQuery && (
-                <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden z-50 animate-fadeIn">
+                <div className="absolute top-full left-0 mt-2 w-64 xl:w-72 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden z-50 animate-fadeIn">
                   <div className="p-2 max-h-60 overflow-y-auto">
                     {clients
                       .filter(c =>
@@ -803,7 +803,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
             {isClientDropdownOpen && (
               <>
               <div className="fixed inset-0 z-30" onClick={() => setIsClientDropdownOpen(false)}></div>
-              <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden z-40 animate-fadeIn">
+              <div className="absolute top-full left-0 mt-2 w-64 lg:w-72 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden z-40 animate-fadeIn max-w-[calc(100vw-2rem)]">
                  <div className="p-2 max-h-60 overflow-y-auto">
                     {[...clients].sort((a, b) => a.name.localeCompare(b.name)).map(c => (
                       <button
@@ -866,15 +866,16 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
          </div>
 
          {activeClient && (
-             <div className="flex items-center gap-2">
+             <div className="flex items-center gap-2 flex-wrap">
                {/* Person Filter Dropdown */}
                <div className="relative">
                  <button
                    onClick={() => setIsPersonFilterOpen(!isPersonFilterOpen)}
-                   className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors text-sm font-semibold text-slate-700"
+                   className="flex items-center gap-2 px-3 lg:px-4 py-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors text-sm font-semibold text-slate-700"
                  >
                    <UserCircle className="w-4 h-4" />
-                   {selectedPersonFilter ? teamProfiles.find(p => p.id === selectedPersonFilter)?.full_name || 'All Tasks' : 'All Tasks'}
+                   <span className="hidden sm:inline">{selectedPersonFilter ? teamProfiles.find(p => p.id === selectedPersonFilter)?.full_name || 'All Tasks' : 'All Tasks'}</span>
+                   <span className="sm:hidden">{selectedPersonFilter ? 'Filtered' : 'All'}</span>
                    <ChevronDown className="w-4 h-4 text-slate-400" />
                  </button>
                  {isPersonFilterOpen && (
@@ -913,14 +914,14 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                </div>
 
                {isGenerating ? (
-                 <div className="flex items-center gap-2 bg-white shadow-lg border border-brand-100 rounded-xl p-1 pr-2 animate-slideIn">
+                 <div className="flex items-center gap-2 bg-white shadow-lg border border-brand-100 rounded-xl p-1 pr-2 animate-slideIn w-full sm:w-auto">
                     <input
                       autoFocus
                       value={goal}
                       onChange={(e) => setGoal(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleGenerateGroup(activeClient.id)}
                       placeholder="e.g. Launch Q4 Campaign"
-                      className="outline-none text-sm px-3 py-1.5 w-64"
+                      className="outline-none text-sm px-3 py-1.5 flex-1 sm:w-48 lg:w-64 min-w-0"
                     />
                     <button
                       onClick={() => handleGenerateGroup(activeClient.id)}
@@ -934,24 +935,25 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                ) : (
                  <button
                    onClick={() => setIsGenerating(true)}
-                   className="flex items-center gap-2 px-4 py-2 bg-brand-50 text-brand-700 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors text-sm font-semibold"
+                   className="flex items-center gap-2 px-3 lg:px-4 py-2 bg-brand-50 text-brand-700 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors text-sm font-semibold"
                  >
                     <Sparkles className="w-4 h-4" />
-                    AI Plan Generator
+                    <span className="hidden sm:inline">AI Plan Generator</span>
+                    <span className="sm:hidden">AI</span>
                  </button>
                )}
                <button
                   onClick={() => handleAddGroup(activeClient.id)}
-                  className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors text-sm font-semibold shadow-lg shadow-slate-900/20"
+                  className="flex items-center gap-2 px-3 lg:px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors text-sm font-semibold shadow-lg shadow-slate-900/20"
                >
-                  <Plus className="w-4 h-4" /> New Group
+                  <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Group</span>
                </button>
              </div>
          )}
       </div>
 
       {/* Board Area - Scrollable */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-8 pt-2 bg-white">
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-4 lg:p-8 pt-2 bg-white">
         {activeClient ? (
             <div className="space-y-8 pb-20">
                {activeClient.groups.map((group) => {
@@ -991,18 +993,18 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
 
                     {/* Tasks Table */}
                     {!group.isCollapsed && (
-                      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden ml-8">
+                      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden ml-0 lg:ml-8">
                          <div className="overflow-x-auto custom-scrollbar">
-                           <table className="w-full min-w-[800px]">
+                           <table className="w-full min-w-[600px] lg:min-w-[800px]">
                               <thead className="bg-slate-50 border-b border-slate-200">
                                 <tr>
-                                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-1/4 sticky left-0 bg-slate-50 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">Item</th>
-                                  <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-40">Person</th>
-                                  <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-40">Status</th>
-                                  <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-40">Priority</th>
-                                  <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-40">Due Date</th>
-                                  <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-48">Worksheet</th>
-                                  <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-48">Client Sheet</th>
+                                  <th className="text-left py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-1/3 lg:w-1/4 sticky left-0 bg-slate-50 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">Item</th>
+                                  <th className="text-center py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-24 lg:w-40">Person</th>
+                                  <th className="text-center py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-24 lg:w-40">Status</th>
+                                  <th className="text-center py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-24 lg:w-40 hidden sm:table-cell">Priority</th>
+                                  <th className="text-center py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-28 lg:w-40">Due</th>
+                                  <th className="text-center py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-32 lg:w-48 hidden lg:table-cell">Worksheet</th>
+                                  <th className="text-center py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-32 lg:w-48 hidden lg:table-cell">Client Sheet</th>
                                   <th className="w-10"></th>
                                 </tr>
                               </thead>
@@ -1013,21 +1015,21 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                     
                                     return (
                                       <tr key={task.id} className="group hover:bg-slate-50/80 transition-colors">
-                                        <td className="py-2 px-4 sticky left-0 bg-white group-hover:bg-slate-50/80 transition-colors z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] border-r border-transparent group-hover:border-slate-100">
-                                            <div className="flex items-center gap-3">
-                                                <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <td className="py-2 px-2 lg:px-4 sticky left-0 bg-white group-hover:bg-slate-50/80 transition-colors z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] border-r border-transparent group-hover:border-slate-100">
+                                            <div className="flex items-center gap-2 lg:gap-3">
+                                                <div className="hidden lg:flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <button onClick={() => moveTask(activeClient.id, group.id, task.id, 'up')}><ChevronUp className="w-3 h-3 text-slate-400 hover:text-brand-600" /></button>
                                                     <button onClick={() => moveTask(activeClient.id, group.id, task.id, 'down')}><ChevronDown className="w-3 h-3 text-slate-400 hover:text-brand-600" /></button>
                                                 </div>
-                                                <div className="w-1.5 h-8 rounded-full" style={{ backgroundColor: group.color }}></div>
+                                                <div className="w-1 lg:w-1.5 h-6 lg:h-8 rounded-full flex-shrink-0" style={{ backgroundColor: group.color }}></div>
                                                 <input
                                                   value={task.title}
                                                   onChange={(e) => updateTaskField(activeClient.id, group.id, task.id, 'title', e.target.value)}
                                                   onClick={() => setTaskModal({ task, groupId: group.id, clientId: activeClient.id, groupTitle: group.title, groupColor: group.color })}
-                                                  className="flex-1 bg-transparent outline-none text-sm font-medium text-slate-700 cursor-pointer hover:text-brand-600"
+                                                  className="flex-1 min-w-0 bg-transparent outline-none text-xs lg:text-sm font-medium text-slate-700 cursor-pointer hover:text-brand-600"
                                                 />
                                                 {(task.comments && task.comments.length > 0) && (
-                                                  <MessageCircle className="w-4 h-4 text-slate-400" />
+                                                  <MessageCircle className="w-4 h-4 text-slate-400 flex-shrink-0" />
                                                 )}
                                             </div>
                                         </td>
@@ -1062,8 +1064,8 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                               {statusDef.label}
                                            </button>
                                         </td>
-                                        <td className="py-2 px-2 text-center">
-                                           <button 
+                                        <td className="py-2 px-2 text-center hidden sm:table-cell">
+                                           <button
                                              onClick={(e) => handleLabelClick(e, 'priority', task.id, group.id, activeClient.id)}
                                              className="w-full py-1.5 text-xs font-bold text-white rounded shadow-sm hover:opacity-90 transition-opacity"
                                              style={{ backgroundColor: priorityDef.color }}
@@ -1085,7 +1087,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                              onFocus={(e) => e.target.showPicker?.()}
                                            />
                                         </td>
-                                        <td className="py-2 px-2 text-center">
+                                        <td className="py-2 px-2 text-center hidden lg:table-cell">
                                            <div className="flex items-center justify-center gap-1">
                                              {task.worksheet ? (
                                                <a
@@ -1109,7 +1111,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                              />
                                            </div>
                                         </td>
-                                        <td className="py-2 px-2 text-center">
+                                        <td className="py-2 px-2 text-center hidden lg:table-cell">
                                            <div className="flex items-center justify-center gap-1">
                                              {task.clientSheet ? (
                                                <a
@@ -1194,10 +1196,10 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
         <>
          <div className="fixed inset-0 z-[55]" onClick={() => setActivePicker(null)}></div>
          <div
-           className="fixed z-[60] bg-white rounded-xl shadow-xl border border-slate-200 w-48 p-2 animate-fadeIn"
+           className="fixed z-[60] bg-white rounded-xl shadow-xl border border-slate-200 w-48 p-2 animate-fadeIn max-h-[70vh] overflow-y-auto"
            style={{
-             top: activePicker.anchor?.getBoundingClientRect().bottom ?? 0,
-             left: activePicker.anchor?.getBoundingClientRect().left ?? 0
+             top: Math.min(activePicker.anchor?.getBoundingClientRect().bottom ?? 0, window.innerHeight - 250),
+             left: Math.min(Math.max(activePicker.anchor?.getBoundingClientRect().left ?? 0, 8), window.innerWidth - 200)
            }}
          >
             <div className="space-y-1 max-h-48 overflow-y-auto">
@@ -1235,10 +1237,10 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
           <>
            <div className="fixed inset-0 z-[55]" onClick={() => setActivePersonPicker(null)}></div>
            <div
-             className="fixed z-[60] bg-white rounded-xl shadow-xl border border-slate-200 w-64 p-2 animate-fadeIn"
+             className="fixed z-[60] bg-white rounded-xl shadow-xl border border-slate-200 w-64 p-2 animate-fadeIn max-h-[70vh] overflow-y-auto"
              style={{
-               top: activePersonPicker.anchor?.getBoundingClientRect().bottom ?? 0,
-               left: activePersonPicker.anchor?.getBoundingClientRect().left ?? 0
+               top: Math.min(activePersonPicker.anchor?.getBoundingClientRect().bottom ?? 0, window.innerHeight - 300),
+               left: Math.min(Math.max(activePersonPicker.anchor?.getBoundingClientRect().left ?? 0, 8), window.innerWidth - 270)
              }}
            >
               <div className="px-3 py-2 border-b border-slate-200 mb-1">
