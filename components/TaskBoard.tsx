@@ -361,6 +361,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const triggerSave = useCallback((updatedClients: ClientBoard[], changedClientId: string) => {
+    console.log('[TaskBoard] triggerSave called for:', changedClientId);
     setClients(updatedClients);
     clientsRef.current = updatedClients; // Update ref immediately for subsequent changes
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -368,7 +369,10 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
       // Use ref to get the latest data at save time
       const clientToSave = clientsRef.current.find(c => c.id === changedClientId);
       if (clientToSave) {
+        console.log('[TaskBoard] Saving board:', clientToSave.id, clientToSave.name);
         await saveClientBoard(clientToSave);
+      } else {
+        console.error('[TaskBoard] Board not found for save:', changedClientId);
       }
     }, 1500);
   }, []);
