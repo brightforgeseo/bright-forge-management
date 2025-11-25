@@ -340,7 +340,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto custom-scrollbar">
+      <nav className="flex-1 px-4 py-6 space-y-2 overflow-hidden">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentView === item.id;

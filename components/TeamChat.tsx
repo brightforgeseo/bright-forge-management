@@ -1068,7 +1068,14 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
               const ids = parseDMChannel(currentCh.name);
               const otherId = ids.find(id => id !== currentUser.id);
               if (otherId && otherId !== currentUser.id) {
-                await createNotification(otherId, 'New Attachment', `${currentUser.name} sent an image`, 'message', 'TEAM_CHAT');
+                await createNotification(
+                  otherId,
+                  'New Attachment',
+                  `${currentUser.name} sent an image`,
+                  'message',
+                  'TEAM_CHAT',
+                  { channelId: activeChannelId, channelName: currentCh.name, channelType: 'dm' }
+                );
               }
             }
           } else {
@@ -1118,7 +1125,14 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
         const ids = parseDMChannel(currentCh.name);
         const otherId = ids.find(id => id !== currentUser.id);
         if (otherId && otherId !== currentUser.id) {
-          await createNotification(otherId, 'New Attachment', `${currentUser.name} sent an attachment`, 'message', 'TEAM_CHAT');
+          await createNotification(
+            otherId,
+            'New Attachment',
+            `${currentUser.name} sent an attachment`,
+            'message',
+            'TEAM_CHAT',
+            { channelId: activeChannelId, channelName: currentCh.name, channelType: 'dm' }
+          );
         }
       }
     } else {
