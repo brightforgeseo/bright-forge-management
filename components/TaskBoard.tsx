@@ -755,8 +755,8 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
         }
 
         if (!targetGroupId) {
-          // Just update status in place
-          return { ...c, groups: c.groups.map(g => g.id === gid ? { ...g, tasks: g.tasks.map(t => t.id === tid ? { ...t, [f]: v } : t) } : g) };
+          // Just update status in place - use currentGroupId (where task was found) instead of gid parameter
+          return { ...c, groups: c.groups.map(g => g.id === currentGroupId ? { ...g, tasks: g.tasks.map(t => t.id === tid ? { ...t, [f]: v } : t) } : g) };
         }
 
         // Remove originalGroupId from task when moving back
@@ -775,7 +775,8 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
       }
 
       // CASE 3: Normal field update (not related to Done group moves)
-      return { ...c, groups: c.groups.map(g => g.id === gid ? { ...g, tasks: g.tasks.map(t => t.id === tid ? { ...t, [f]: v } : t) } : g) };
+      // Use currentGroupId (where task was found) instead of gid parameter (which may be stale)
+      return { ...c, groups: c.groups.map(g => g.id === currentGroupId ? { ...g, tasks: g.tasks.map(t => t.id === tid ? { ...t, [f]: v } : t) } : g) };
     });
   };
   const deleteTask = (cid: string, gid: string, tid: string) => updateClient(cid, c => ({ ...c, groups: c.groups.map(g => g.id === gid ? { ...g, tasks: g.tasks.filter(t => t.id !== tid) } : g) }));

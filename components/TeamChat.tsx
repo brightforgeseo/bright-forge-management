@@ -1016,8 +1016,30 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
           avatar: 'bot'
         };
 
-        await sendChatMessage(aiMsg);
-        // Don't manually add to messages array - real-time listener will handle it
+        const aiResult = await sendChatMessage(aiMsg);
+        // Manually add AI message to UI (same as user messages) since realtime may be unreliable
+        const insertedAiMsg: ChatMessage = {
+          id: aiResult.id,
+          channelId: aiResult.channel_id,
+          sender: aiResult.sender,
+          senderId: aiResult.sender_id,
+          text: aiResult.text,
+          timestamp: aiResult.created_at,
+          isAi: aiResult.is_ai,
+          avatar: aiResult.avatar,
+          attachmentUrl: aiResult.attachment_url,
+          attachmentType: aiResult.attachment_type,
+          isEdited: aiResult.is_edited,
+          editedAt: aiResult.edited_at,
+          taskLink: aiResult.task_link
+        };
+        setMessages(prev => {
+          if (prev.some(m => m.id === insertedAiMsg.id)) {
+            return prev;
+          }
+          return [...prev, insertedAiMsg];
+        });
+        scrollToBottom();
 
         // Store conversation for future memory
         try {

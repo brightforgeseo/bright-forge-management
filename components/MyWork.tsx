@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Table as TableIcon, CheckCircle2, AlertCircle, Clock, ChevronLeft, ChevronRight, Users, Filter } from 'lucide-react';
-import { User, ToastType, Task, TaskGroup, ClientBoard, Profile } from '../types';
-import { fetchClientBoards, fetchProfiles } from '../services/databaseService';
+import { Calendar, Table as TableIcon, CheckCircle2, AlertCircle, Clock, ChevronLeft, ChevronRight, Users, Filter, MessageCircle, X, Send } from 'lucide-react';
+import { User, ToastType, Task, TaskGroup, ClientBoard, Profile, TaskComment } from '../types';
+import { fetchClientBoards, fetchProfiles, saveClientBoard, createNotification } from '../services/databaseService';
 
 interface MyWorkProps {
   currentUser: User;
@@ -33,6 +33,13 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
   const [selectedTask, setSelectedTask] = useState<TaskWithContext | null>(null);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
 
+  // Editing state
+  const [newComment, setNewComment] = useState('');
+  const [showStatusPicker, setShowStatusPicker] = useState(false);
+  const [showPriorityPicker, setShowPriorityPicker] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [allBoards, setAllBoards] = useState<ClientBoard[]>([]);
+
   useEffect(() => {
     loadData();
   }, []);
@@ -40,6 +47,9 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
   const loadData = async () => {
     setLoading(true);
     const [boards, profiles] = await Promise.all([fetchClientBoards(), fetchProfiles()]);
+
+    // Store all boards for updating
+    setAllBoards(boards);
 
     // Extract all tasks with context
     const tasks: TaskWithContext[] = [];
@@ -78,14 +88,119 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
     setLoading(false);
   };
 
+  // Update task in the source board and save
+  const updateTaskInBoard = async (
+    task: TaskWithContext,
+    field: keyof Task,
+    value: any
+  ) => {
+    setIsSaving(true);
+    try {
+      // Find the board
+      const boardIndex = allBoards.findIndex(b => b.id === task.clientId);
+      if (boardIndex === -1) throw new Error('Board not found');
+
+      const board = allBoards[boardIndex];
+
+      // Find and update the task in the board
+      const updatedGroups = board.groups.map(group => {
+        if (group.id === task.groupId) {
+          return {
+            ...group,
+            tasks: group.tasks.map(t =>
+              t.id === task.id ? { ...t, [field]: value } : t
+            )
+          };
+        }
+        return group;
+      });
+
+      const updatedBoard = { ...board, groups: updatedGroups };
+
+      // Update local state
+      const newBoards = [...allBoards];
+      newBoards[boardIndex] = updatedBoard;
+      setAllBoards(newBoards);
+
+      // Update the task in allTasks
+      setAllTasks(prev =>
+        prev.map(t =>
+          t.id === task.id && t.clientId === task.clientId && t.groupId === task.groupId
+            ? { ...t, [field]: value, boardData: updatedBoard }
+            : t
+        )
+      );
+
+      // Update selected task if open
+      if (selectedTask && selectedTask.id === task.id) {
+        setSelectedTask({
+          ...selectedTask,
+          [field]: value,
+          boardData: updatedBoard
+        });
+      }
+
+      // Save to database
+      await saveClientBoard(updatedBoard);
+      addToast('success', 'Task updated');
+    } catch (error) {
+      console.error('Failed to update task:', error);
+      addToast('error', 'Failed to update task');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Add comment to task
+  const handleAddComment = async () => {
+    if (!newComment.trim() || !selectedTask) return;
+
+    const comment: TaskComment = {
+      id: Date.now().toString(),
+      author: currentUser.name,
+      authorId: currentUser.id,
+      text: newComment.trim(),
+      timestamp: new Date().toISOString(),
+      avatar: currentUser.avatarUrl
+    };
+
+    const updatedComments = [...(selectedTask.comments || []), comment];
+    await updateTaskInBoard(selectedTask, 'comments', updatedComments);
+    setNewComment('');
+
+    // Send notification to assigned users
+    const assignedIds = Array.isArray(selectedTask.assignedTo)
+      ? selectedTask.assignedTo
+      : selectedTask.assignedTo ? [selectedTask.assignedTo] : [];
+
+    for (const userId of assignedIds) {
+      if (userId !== currentUser.id) {
+        await createNotification(
+          userId,
+          `New comment on "${selectedTask.title}"`,
+          `${currentUser.name}: ${newComment.substring(0, 100)}`,
+          'info',
+          'MY_WORK',
+          {
+            taskId: selectedTask.id,
+            boardId: selectedTask.clientId,
+            groupId: selectedTask.groupId
+          }
+        );
+      }
+    }
+  };
+
   // Get all unique statuses across all boards
-  const allStatuses = Array.from(
-    new Map(
-      allTasks.flatMap(task =>
-        task.boardData.statusDefs.map(def => [def.id, { id: def.id, label: def.label, color: def.color }])
-      )
-    ).values()
-  );
+  const statusMap = new Map<string, { id: string; label: string; color: string }>();
+  allTasks.forEach(task => {
+    task.boardData.statusDefs.forEach((def: { id: string; label: string; color: string }) => {
+      if (!statusMap.has(def.id)) {
+        statusMap.set(def.id, { id: def.id, label: def.label, color: def.color });
+      }
+    });
+  });
+  const allStatuses = Array.from(statusMap.values());
 
   // Filter tasks by selected user and status
   const filteredTasks = allTasks.filter(task => {
@@ -501,93 +616,134 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
         )}
       </div>
 
-      {/* Task Modal - Simple view-only modal */}
+      {/* Task Modal - Full editing modal */}
       {isTaskModalOpen && selectedTask && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setIsTaskModalOpen(false)}>
-          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="p-6 border-b border-slate-200">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => { setIsTaskModalOpen(false); setShowStatusPicker(false); setShowPriorityPicker(false); }}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="p-6 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white rounded-t-2xl">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="w-1 h-8 rounded-full" style={{ backgroundColor: selectedTask.groupColor }}></div>
-                    <h2 className="text-2xl font-bold text-slate-900">{selectedTask.title}</h2>
+                    <h2 className="text-xl font-bold text-slate-900">{selectedTask.title}</h2>
                   </div>
                   <p className="text-sm text-slate-500">{selectedTask.clientName} → {selectedTask.groupTitle}</p>
                 </div>
                 <button
-                  onClick={() => setIsTaskModalOpen(false)}
+                  onClick={() => { setIsTaskModalOpen(false); setShowStatusPicker(false); setShowPriorityPicker(false); }}
                   className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
                 >
-                  <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  <X className="w-5 h-5 text-slate-400" />
                 </button>
               </div>
             </div>
 
-            <div className="p-6 space-y-4">
+            {/* Modal Body - Scrollable */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Task Details Grid */}
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">Due Date</label>
-                  <p className="text-sm text-slate-700">{new Date(selectedTask.dueDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+                {/* Status - Clickable */}
+                <div className="relative">
+                  <label className="text-xs font-semibold text-slate-500 uppercase block mb-2">Status</label>
+                  <button
+                    onClick={() => { setShowStatusPicker(!showStatusPicker); setShowPriorityPicker(false); }}
+                    disabled={isSaving}
+                    className="w-full py-2.5 px-3 text-sm font-bold text-white rounded-lg shadow-sm hover:opacity-90 transition-opacity flex items-center gap-2 disabled:opacity-50"
+                    style={{ backgroundColor: selectedTask.boardData.statusDefs.find(s => s.id === selectedTask.status)?.color || '#94a3b8' }}
+                  >
+                    <div className="w-3 h-3 rounded-full bg-white/30"></div>
+                    {selectedTask.boardData.statusDefs.find(s => s.id === selectedTask.status)?.label || selectedTask.status}
+                  </button>
+                  {showStatusPicker && (
+                    <div className="absolute top-full left-0 mt-2 w-full bg-white rounded-lg shadow-xl border border-slate-200 z-10 overflow-hidden">
+                      {selectedTask.boardData.statusDefs.map(def => (
+                        <button
+                          key={def.id}
+                          onClick={() => {
+                            updateTaskInBoard(selectedTask, 'status', def.id);
+                            setShowStatusPicker(false);
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm font-medium hover:bg-slate-50 flex items-center gap-2"
+                        >
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: def.color }}></div>
+                          {def.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">Status</label>
-                  {(() => {
-                    const statusDef = selectedTask.boardData.statusDefs.find(s => s.id === selectedTask.status);
-                    const statusLabel = statusDef?.label || selectedTask.status;
-                    const statusColor = statusDef?.color || '#94a3b8';
-                    return (
-                      <span
-                        className="inline-block px-3 py-1.5 text-sm font-semibold rounded"
-                        style={{
-                          backgroundColor: statusColor + '20',
-                          color: statusColor
-                        }}
-                      >
-                        {statusLabel}
-                      </span>
-                    );
-                  })()}
+
+                {/* Priority - Clickable */}
+                <div className="relative">
+                  <label className="text-xs font-semibold text-slate-500 uppercase block mb-2">Priority</label>
+                  <button
+                    onClick={() => { setShowPriorityPicker(!showPriorityPicker); setShowStatusPicker(false); }}
+                    disabled={isSaving}
+                    className="w-full py-2.5 px-3 text-sm font-bold text-white rounded-lg shadow-sm hover:opacity-90 transition-opacity flex items-center gap-2 disabled:opacity-50"
+                    style={{ backgroundColor: selectedTask.boardData.priorityDefs.find(p => p.id === selectedTask.priority)?.color || '#94a3b8' }}
+                  >
+                    <div className="w-3 h-3 rounded-full bg-white/30"></div>
+                    {selectedTask.boardData.priorityDefs.find(p => p.id === selectedTask.priority)?.label || selectedTask.priority}
+                  </button>
+                  {showPriorityPicker && (
+                    <div className="absolute top-full left-0 mt-2 w-full bg-white rounded-lg shadow-xl border border-slate-200 z-10 overflow-hidden">
+                      {selectedTask.boardData.priorityDefs.map(def => (
+                        <button
+                          key={def.id}
+                          onClick={() => {
+                            updateTaskInBoard(selectedTask, 'priority', def.id);
+                            setShowPriorityPicker(false);
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm font-medium hover:bg-slate-50 flex items-center gap-2"
+                        >
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: def.color }}></div>
+                          {def.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
+
+                {/* Due Date - Editable */}
                 <div>
-                  <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">Priority</label>
-                  {(() => {
-                    const priorityDef = selectedTask.boardData.priorityDefs.find(p => p.id === selectedTask.priority);
-                    const priorityLabel = priorityDef?.label || selectedTask.priority;
-                    const priorityColor = priorityDef?.color || '#94a3b8';
-                    return (
-                      <span
-                        className="inline-block px-3 py-1.5 text-sm font-semibold rounded"
-                        style={{
-                          backgroundColor: priorityColor + '20',
-                          color: priorityColor
-                        }}
-                      >
-                        {priorityLabel}
-                      </span>
-                    );
-                  })()}
+                  <label className="text-xs font-semibold text-slate-500 uppercase block mb-2">Due Date</label>
+                  <input
+                    type="date"
+                    value={selectedTask.dueDate}
+                    onChange={(e) => updateTaskInBoard(selectedTask, 'dueDate', e.target.value)}
+                    disabled={isSaving}
+                    className="w-full p-2.5 text-sm text-slate-700 font-medium bg-slate-50 border border-slate-200 rounded-lg outline-none hover:border-brand-500 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 cursor-pointer disabled:opacity-50"
+                  />
                 </div>
+
+                {/* Assigned To - Display only */}
                 <div>
-                  <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">Assigned To</label>
-                  <div className="flex flex-wrap gap-1">
+                  <label className="text-xs font-semibold text-slate-500 uppercase block mb-2">Assigned To</label>
+                  <div className="flex flex-wrap items-center gap-2 min-h-[2.75rem] p-2 bg-slate-50 border border-slate-200 rounded-lg">
                     {(() => {
                       const assignedIds = Array.isArray(selectedTask.assignedTo)
                         ? selectedTask.assignedTo
                         : selectedTask.assignedTo ? [selectedTask.assignedTo] : [];
 
                       if (assignedIds.length === 0) {
-                        return <p className="text-sm text-slate-400">Unassigned</p>;
+                        return <span className="text-sm text-slate-400">Unassigned</span>;
                       }
 
                       return assignedIds.map(userId => {
                         const profile = teamProfiles.find(p => p.id === userId);
                         const userName = profile?.full_name || profile?.email || 'Unknown User';
                         return (
-                          <span key={userId} className="inline-block px-2 py-1 bg-brand-100 text-brand-700 text-xs font-medium rounded">
-                            {userName}
-                          </span>
+                          <div key={userId} className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-md border border-slate-200">
+                            {profile?.avatar_url ? (
+                              <img src={profile.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover" />
+                            ) : (
+                              <div className="w-5 h-5 rounded-full bg-brand-100 flex items-center justify-center text-[10px] font-bold text-brand-700">
+                                {userName.charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                            <span className="text-xs font-medium text-slate-700">{userName}</span>
+                          </div>
                         );
                       });
                     })()}
@@ -595,10 +751,85 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
                 </div>
               </div>
 
+              {/* Comments Section */}
+              <div className="border-t border-slate-200 pt-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <MessageCircle className="w-5 h-5 text-slate-600" />
+                  <h4 className="font-bold text-slate-900">Comments</h4>
+                  <span className="text-xs text-slate-400">({selectedTask.comments?.length || 0})</span>
+                </div>
+
+                {/* Comments List */}
+                <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
+                  {selectedTask.comments && selectedTask.comments.length > 0 ? (
+                    selectedTask.comments.map(comment => (
+                      <div key={comment.id} className="flex gap-3 p-3 bg-slate-50 rounded-lg">
+                        {comment.avatar ? (
+                          <img src={comment.avatar} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-xs font-bold text-brand-700 flex-shrink-0">
+                            {comment.author.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-sm font-bold text-slate-900">{comment.author}</span>
+                            <span className="text-xs text-slate-400">
+                              {new Date(comment.timestamp).toLocaleString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: 'numeric',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          </div>
+                          <p className="text-sm text-slate-700 whitespace-pre-wrap break-words">{comment.text}</p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-6 text-slate-400 text-sm">
+                      No comments yet. Be the first to comment!
+                    </div>
+                  )}
+                </div>
+
+                {/* Add Comment */}
+                <div className="flex gap-2">
+                  <div className="flex-shrink-0">
+                    {currentUser.avatarUrl ? (
+                      <img src={currentUser.avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-brand-600 flex items-center justify-center text-xs font-bold text-white">
+                        {currentUser.initials}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 flex gap-2">
+                    <input
+                      type="text"
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}
+                      placeholder="Add a comment..."
+                      disabled={isSaving}
+                      className="flex-1 p-2.5 border border-slate-300 rounded-lg outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 text-sm disabled:opacity-50"
+                    />
+                    <button
+                      onClick={handleAddComment}
+                      disabled={!newComment.trim() || isSaving}
+                      className="px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Send className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Open in Project Tasks button */}
               <div className="pt-4 border-t border-slate-200">
                 <button
                   onClick={() => {
-                    // Navigate to Project Tasks and open the full modal
                     localStorage.setItem('openTaskModal', JSON.stringify({
                       taskId: selectedTask.id,
                       boardId: selectedTask.clientId,
@@ -609,9 +840,9 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
                       onNavigateToTasks();
                     }
                   }}
-                  className="w-full py-2 px-4 bg-brand-600 hover:bg-brand-700 text-white rounded-lg font-medium transition-colors"
+                  className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors text-sm"
                 >
-                  Open Full Details in Project Tasks
+                  Open in Project Tasks for More Options
                 </button>
               </div>
             </div>
