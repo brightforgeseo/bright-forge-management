@@ -313,29 +313,23 @@ export const fetchClientBoards = async (): Promise<ClientBoard[]> => {
 };
 
 export const saveClientBoard = async (board: ClientBoard) => {
-  const { data: existing, error: findError } = await supabase
-    .from('client_boards')
-    .select('id')
-    .filter('board_data->>id', 'eq', board.id)
-    .single();
+  // Use db_id if available (set when board was loaded from database)
+  const dbId = (board as any).db_id;
 
-  if (findError && findError.code !== 'PGRST116') {
-    console.error('Error finding board to save:', findError);
-    return;
-  }
-
-  if (existing) {
+  if (dbId) {
+    // Update existing board using the database row ID
     const { error: updateError } = await supabase
       .from('client_boards')
       .update({ board_data: board, updated_at: new Date().toISOString() })
-      .eq('id', existing.id);
+      .eq('id', dbId);
 
     if (updateError) {
       console.error('Error updating board:', updateError);
     } else {
-      console.log('Board saved successfully:', board.id, board.name);
+      console.log('Board updated successfully:', board.id, board.name);
     }
   } else {
+    // New board - insert it
     const { error: insertError } = await supabase
       .from('client_boards')
       .insert({ board_data: board });
