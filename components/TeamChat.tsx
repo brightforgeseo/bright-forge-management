@@ -5,7 +5,7 @@ import { getChatResponse } from '../services/geminiService';
 import { storeEchoConversation, buildConversationContext } from '../services/echoMemory';
 import { fetchChatMessages, sendChatMessage, clearChatHistory, uploadFile, fetchChannels, createChannel, deleteChannel, fetchProfiles, getOrCreateDMChannel, createNotification, editChatMessage, fetchMessageReactions, addMessageReaction, removeMessageReaction, fetchChannelMembers, addChannelMember, removeChannelMember, deleteChatMessage } from '../services/databaseService';
 import { supabase } from '../lib/supabaseClient';
-import DailyIframe from '@daily-co/daily-js';
+import VideoCall from './VideoCall';
 
 interface TeamChatProps {
   currentUser: User;
@@ -46,8 +46,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
   // Video call state
   const [isInCall, setIsInCall] = useState(false);
-  const [callFrame, setCallFrame] = useState<any>(null);
-  const callContainerRef = useRef<HTMLDivElement>(null);
+  const [callVideoEnabled, setCallVideoEnabled] = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -835,84 +834,28 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
   // Video/Voice Call Functions
   const startCall = async (videoEnabled: boolean = true) => {
-    try {
-      const response = await fetch('https://api.daily.co/v1/rooms', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer d4eae6d1fbed74640d5203ffb203db8ed8fc6d7e3ec7d8c22ccf5b6cd4922f2b'
-        },
-        body: JSON.stringify({
-          properties: {
-            enable_screenshare: true,
-            enable_chat: false,
-            start_video_off: !videoEnabled,
-            start_audio_off: false
-          }
-        })
-      });
+    // Generate a unique room ID based on channel
+    const roomId = `${activeChannelId}-${Date.now()}`;
 
-      const room = await response.json();
-      const roomUrl = room.url;
+    // Send message to channel about the call
+    const callMsg: ChatMessage = {
+      id: Date.now().toString(),
+      channelId: activeChannelId,
+      sender: currentUser.name,
+      senderId: currentUser.id,
+      text: `${videoEnabled ? '📹' : '📞'} Started a ${videoEnabled ? 'video' : 'voice'} call`,
+      timestamp: new Date().toISOString(),
+      avatar: currentUser.avatarUrl || 'user'
+    };
+    await sendChatMessage(callMsg);
 
-      const callMsg: ChatMessage = {
-        id: Date.now().toString(),
-        channelId: activeChannelId,
-        sender: currentUser.name,
-        senderId: currentUser.id,
-        text: `${videoEnabled ? '📹' : '📞'} Started a ${videoEnabled ? 'video' : 'voice'} call: ${roomUrl}`,
-        timestamp: new Date().toISOString(),
-        avatar: currentUser.avatarUrl || 'user'
-      };
-      await sendChatMessage(callMsg);
-
-      joinCall(roomUrl, videoEnabled);
-      addToast('success', `${videoEnabled ? 'Video' : 'Voice'} call started!`);
-    } catch (error) {
-      console.error('Error starting call:', error);
-      addToast('error', 'Failed to start call');
-    }
-  };
-
-  const joinCall = (roomUrl: string, videoEnabled: boolean = true) => {
-    if (!callContainerRef.current) return;
-
-    const frame = DailyIframe.createFrame(callContainerRef.current, {
-      showLeaveButton: true,
-      iframeStyle: {
-        position: 'fixed',
-        top: '0',
-        left: '0',
-        width: '100%',
-        height: '100%',
-        zIndex: '9999',
-        border: 'none'
-      }
-    });
-
-    frame.join({
-      url: roomUrl,
-      userName: currentUser.name,
-      startVideoOff: !videoEnabled
-    });
-
-    frame.on('left-meeting', () => {
-      frame.destroy();
-      setCallFrame(null);
-      setIsInCall(false);
-    });
-
-    setCallFrame(frame);
+    setCallVideoEnabled(videoEnabled);
     setIsInCall(true);
+    addToast('success', `${videoEnabled ? 'Video' : 'Voice'} call started!`);
   };
 
-  const endCall = () => {
-    if (callFrame) {
-      callFrame.leave();
-      callFrame.destroy();
-      setCallFrame(null);
-      setIsInCall(false);
-    }
+  const handleCloseCall = () => {
+    setIsInCall(false);
   };
 
   // SIMPLIFIED SEND MESSAGE - No optimistic updates, wait for database
@@ -1908,8 +1851,16 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
         </div>
       </div>
 
-      {/* Video Call Container */}
-      <div ref={callContainerRef} />
+      {/* Video Call */}
+      {isInCall && (
+        <VideoCall
+          roomId={activeChannelId}
+          currentUser={currentUser}
+          channelName={channels.find(c => c.id === activeChannelId)?.name || 'Call'}
+          videoEnabled={callVideoEnabled}
+          onClose={handleCloseCall}
+        />
+      )}
 
       {/* Members Management Modal */}
       {showMembersModal && (
