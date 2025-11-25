@@ -134,10 +134,54 @@ const playNotificationSound = async () => {
     setTimeout(() => {
       audioContext.close();
     }, 600);
-
-    console.log('🔔 Notification sound played!');
   } catch (error) {
     console.error('Failed to play notification sound:', error);
+  }
+};
+
+// Helper to send comment notifications to mentioned and assigned users
+const sendCommentNotifications = async (
+  commentText: string,
+  task: Task,
+  boardId: string,
+  groupId: string,
+  boardName: string,
+  mentions: string[],
+  currentUserId: string,
+  currentUserName: string
+) => {
+  const usersToNotify = new Set<string>();
+
+  // Add mentioned users
+  mentions.forEach(id => usersToNotify.add(id));
+
+  // Add assigned users
+  if (task.assignedTo) {
+    const assignedIds = Array.isArray(task.assignedTo) ? task.assignedTo : [task.assignedTo];
+    assignedIds.forEach(id => usersToNotify.add(id));
+  }
+
+  // Send notifications (skip self)
+  for (const userId of usersToNotify) {
+    if (userId !== currentUserId) {
+      const wasMentioned = mentions.includes(userId);
+      const title = wasMentioned
+        ? `${currentUserName} mentioned you`
+        : `New comment on "${task.title}"`;
+
+      await createNotification(
+        userId,
+        title,
+        `${currentUserName}: ${commentText.substring(0, 100)}`,
+        'message',
+        'TASKS',
+        { taskId: task.id, boardId, groupId, boardName }
+      );
+    }
+  }
+
+  if (usersToNotify.size > 0) {
+    playNotificationSound();
   }
 };
 
@@ -156,13 +200,6 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
     const loadData = async () => {
       setIsLoadingData(true);
       const [boards, profiles] = await Promise.all([fetchClientBoards(), fetchProfiles()]);
-
-      console.log('🎯 Loaded boards:');
-      boards.forEach((b, idx) => {
-        console.log(`  [${idx}] Board ID: "${b.id}" Name: "${b.name}"`);
-      });
-
-      // Don't check localStorage here - let the separate useEffect handle deep linking
       // Just set default board
       const defaultBoardId = boards.length > 0 ? boards[0].id : '';
 
@@ -183,85 +220,57 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
 
     const checkForDeepLink = () => {
       const openTaskData = localStorage.getItem('openTaskModal');
-      console.log('🔍 Deep link check - data exists:', !!openTaskData, 'clients loaded:', clients.length);
+      if (!openTaskData) return;
 
-      if (openTaskData) {
-        // If clients aren't loaded yet, wait a bit and retry
-        if (clients.length === 0 && retryCount < maxRetries) {
-          retryCount++;
-          console.log(`⏳ Clients not loaded yet, retry ${retryCount}/${maxRetries} in 500ms...`);
-          setTimeout(checkForDeepLink, 500);
-          return;
-        }
+      // If clients aren't loaded yet, wait and retry
+      if (clients.length === 0 && retryCount < maxRetries) {
+        retryCount++;
+        setTimeout(checkForDeepLink, 500);
+        return;
+      }
 
-        if (clients.length === 0) {
-          console.error('❌ Failed to load clients after maximum retries');
-          addToast('Unable to open task - boards not loaded. Please try again.', 'error');
-          localStorage.removeItem('openTaskModal');
-          return;
-        }
-        try {
-          const linkData = JSON.parse(openTaskData);
-          const { taskId, boardId, groupId, boardName } = linkData;
+      if (clients.length === 0) {
+        addToast('Unable to open task - boards not loaded. Please try again.', 'error');
+        localStorage.removeItem('openTaskModal');
+        return;
+      }
 
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-          console.log('📂 NOTIFICATION DEEP LINK (from separate effect)');
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-          console.log('Looking for:');
-          console.log('  boardId:', boardId);
-          console.log('  groupId:', groupId);
-          console.log('  taskId:', taskId);
-          console.log('  boardName:', boardName);
-          console.log('');
-          console.log('Available boards:');
-          clients.forEach((b, idx) => {
-            console.log(`  [${idx}] id: "${b.id}" name: "${b.name}"`);
-          });
-          console.log('');
+      try {
+        const linkData = JSON.parse(openTaskData);
+        const { taskId, boardId, groupId } = linkData;
 
-          const board = clients.find(b => b.id === boardId);
-          if (board) {
-            console.log('✅ FOUND BOARD:', board.name);
-            setSelectedClientId(board.id);
-
-            const group = board.groups.find(g => g.id === groupId);
-            if (group) {
-              console.log('✅ FOUND GROUP:', group.title);
-              const task = group.tasks.find(t => t.id === taskId);
-              if (task) {
-                console.log('✅ FOUND TASK:', task.title);
-                // Use requestAnimationFrame for more reliable DOM updates
+        const board = clients.find(b => b.id === boardId);
+        if (board) {
+          setSelectedClientId(board.id);
+          const group = board.groups.find(g => g.id === groupId);
+          if (group) {
+            const task = group.tasks.find(t => t.id === taskId);
+            if (task) {
+              requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
-                  requestAnimationFrame(() => {
-                    console.log('🎯 Opening task modal NOW');
-                    setTaskModal({
-                      task,
-                      groupId: group.id,
-                      clientId: board.id,
-                      groupTitle: group.title,
-                      groupColor: group.color
-                    });
+                  setTaskModal({
+                    task,
+                    groupId: group.id,
+                    clientId: board.id,
+                    groupTitle: group.title,
+                    groupColor: group.color
                   });
                 });
-              } else {
-                console.warn('⚠️ Task not found, navigating to board only');
-                addToast('Task not found. Showing board instead.', 'error');
-              }
+              });
             } else {
-              console.warn('⚠️ Group not found, navigating to board only');
-              addToast('Task group not found. Showing board instead.', 'error');
+              addToast('Task not found. Showing board instead.', 'error');
             }
           } else {
-            console.error('❌ Board not found!');
-            addToast('Board not found. The board may have been deleted.', 'error');
+            addToast('Task group not found. Showing board instead.', 'error');
           }
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-          localStorage.removeItem('openTaskModal');
-        } catch (e) {
-          console.error('Error processing deep link:', e);
-          addToast('Failed to open notification link. Please try again.', 'error');
-          localStorage.removeItem('openTaskModal');
+        } else {
+          addToast('Board not found. The board may have been deleted.', 'error');
         }
+        localStorage.removeItem('openTaskModal');
+      } catch (e) {
+        console.error('Error processing deep link:', e);
+        addToast('Failed to open notification link. Please try again.', 'error');
+        localStorage.removeItem('openTaskModal');
       }
     };
 
@@ -277,8 +286,6 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
     const interval = setInterval(() => {
       const data = localStorage.getItem('openTaskModal');
       if (data && clients.length > 0) {
-        console.log('📍 Found pending deep link, triggering processing...');
-        // Force trigger the check
         setClients(prev => [...prev]);
         clearInterval(interval);
       }
@@ -465,12 +472,9 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
       setNewItemText(prev => ({ ...prev, [gid]: '' }));
   };
   const updateTaskField = (cid: string, gid: string, tid: string, f: keyof Task, v: string) => {
-    console.log('updateTaskField called:', { f, v, tid, gid });
-
     updateClient(cid, c => {
       // Find the Done status ID from status definitions
       const doneStatusId = c.statusDefs.find(s => s.label === 'Done')?.id;
-      console.log('Done status ID:', doneStatusId, 'Selected value:', v);
 
       // Find the task and current group
       let currentTask: Task | undefined;
@@ -488,7 +492,6 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
       }
 
       if (!currentTask) {
-        console.log('Task not found!');
         return c;
       }
 
@@ -496,11 +499,8 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
       const isChangingToDone = f === 'status' && v === doneStatusId;
       const isChangingFromDone = f === 'status' && isCurrentlyDone && v !== doneStatusId;
 
-      console.log('Task status check:', { isCurrentlyDone, isChangingToDone, isChangingFromDone, currentGroup: currentGroup?.title });
-
       // CASE 1: Moving TO Done group
       if (isChangingToDone && currentGroup?.title !== 'Done') {
-        console.log('Moving task to Done group');
 
         // Store original group ID in task metadata
         const taskToMove = {
@@ -513,23 +513,14 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
         const updatedGroups = c.groups.map(g => {
           if (g.title === 'Done') {
             doneGroupExists = true;
-            console.log('Adding task to existing Done group');
-            return {
-              ...g,
-              tasks: [...g.tasks, taskToMove]
-            };
+            return { ...g, tasks: [...g.tasks, taskToMove] };
           } else if (g.id === currentGroupId) {
-            console.log('Removing task from source group');
-            return {
-              ...g,
-              tasks: g.tasks.filter(t => t.id !== tid)
-            };
+            return { ...g, tasks: g.tasks.filter(t => t.id !== tid) };
           }
           return g;
         });
 
         if (!doneGroupExists) {
-          console.log('Creating new Done group');
           updatedGroups.push({
             id: generateId(),
             title: 'Done',
@@ -543,23 +534,17 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
 
       // CASE 2: Moving FROM Done group back to original
       if (isChangingFromDone && currentGroup?.title === 'Done') {
-        console.log('Moving task back from Done group');
-
         const taskToMove = { ...currentTask, [f]: v };
         const originalGroupId = (currentTask as any).originalGroupId;
-
-        console.log('Original group ID:', originalGroupId);
 
         // Find the original group, or use first non-Done group
         let targetGroupId = originalGroupId;
         if (!targetGroupId || !c.groups.find(g => g.id === targetGroupId)) {
           const firstNonDoneGroup = c.groups.find(g => g.title !== 'Done');
           targetGroupId = firstNonDoneGroup?.id;
-          console.log('Original group not found, using first non-Done group:', targetGroupId);
         }
 
         if (!targetGroupId) {
-          console.log('No target group found, keeping in Done');
           // Just update status in place
           return { ...c, groups: c.groups.map(g => g.id === gid ? { ...g, tasks: g.tasks.map(t => t.id === tid ? { ...t, [f]: v } : t) } : g) };
         }
@@ -569,17 +554,9 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
 
         const updatedGroups = c.groups.map(g => {
           if (g.id === targetGroupId) {
-            console.log('Adding task to target group:', g.title);
-            return {
-              ...g,
-              tasks: [...g.tasks, taskToMove]
-            };
+            return { ...g, tasks: [...g.tasks, taskToMove] };
           } else if (g.id === currentGroupId) {
-            console.log('Removing task from Done group');
-            return {
-              ...g,
-              tasks: g.tasks.filter(t => t.id !== tid)
-            };
+            return { ...g, tasks: g.tasks.filter(t => t.id !== tid) };
           }
           return g;
         });
@@ -1461,23 +1438,16 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                         const textBeforeCursor = value.substring(0, cursorPos);
                         const lastAtIndex = textBeforeCursor.lastIndexOf('@');
 
-                        console.log('🔍 Input changed:', { value, cursorPos, lastAtIndex, textBeforeCursor });
-
                         if (lastAtIndex !== -1 && cursorPos > lastAtIndex) {
                           const searchText = textBeforeCursor.substring(lastAtIndex + 1);
                           const charBeforeAt = lastAtIndex > 0 ? textBeforeCursor[lastAtIndex - 1] : ' ';
-                          console.log('📝 @ detected:', { searchText, charBeforeAt, lastAtIndex });
-
                           // Only show if @ is at start or after space
                           if (charBeforeAt === ' ' || lastAtIndex === 0) {
-                            console.log('✅ Showing mention dropdown');
                             setMentionDropdown({ show: true, search: searchText.toLowerCase(), position: cursorPos });
                           } else {
-                            console.log('❌ @ not at valid position');
                             setMentionDropdown(null);
                           }
                         } else {
-                          console.log('❌ No @ found or cursor not after @');
                           setMentionDropdown(null);
                         }
                       }}
@@ -1489,11 +1459,8 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                       }}
                       onKeyPress={async (e) => {
                         if (e.key === 'Enter' && newComment.trim()) {
-                          setMentionDropdown(null); // Close dropdown when submitting
-                          console.log('💬 Adding comment:', newComment.trim());
+                          setMentionDropdown(null);
                           const mentions = detectMentions(newComment.trim(), teamProfiles);
-                          console.log('👥 Detected mentions:', mentions);
-                          console.log('👤 Team profiles:', teamProfiles.map(p => ({ id: p.id, name: p.full_name })));
 
                           const comment: TaskComment = {
                             id: Date.now().toString(),
@@ -1512,43 +1479,18 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                           setTaskModal({ ...taskModal, task: updatedTask });
                           setNewComment('');
 
-                          // Create notifications for mentioned users
-                          if (mentions.length > 0) {
-                            console.log('📢 Creating notifications for', mentions.length, 'users');
-                            // Get the board name for the notification
-                            const currentBoard = clients.find(c => c.id === taskModal.clientId);
-                            const boardName = currentBoard?.name || 'Project';
-
-                            console.log('🔍 Notification linkData will be:', {
-                              taskId: taskModal.task.id,
-                              boardId: taskModal.clientId,
-                              groupId: taskModal.groupId,
-                              boardName: boardName
-                            });
-
-                            for (const mentionedId of mentions) {
-                              if (mentionedId !== currentUser.id) { // Don't notify self
-                                console.log('✉️ Notifying user:', mentionedId);
-                                await createNotification(
-                                  mentionedId,
-                                  `${currentUser.name} mentioned you`,
-                                  `In "${taskModal.task.title}": ${newComment.trim().substring(0, 100)}`,
-                                  'message',
-                                  'TASKS',
-                                  {
-                                    taskId: taskModal.task.id,
-                                    boardId: taskModal.clientId,
-                                    groupId: taskModal.groupId,
-                                    boardName: boardName
-                                  }
-                                );
-                              }
-                            }
-                            console.log('🔔 Playing notification sound');
-                            playNotificationSound();
-                          } else {
-                            console.log('⚠️ No mentions detected in comment');
-                          }
+                          // Send notifications to mentioned and assigned users
+                          const currentBoard = clients.find(c => c.id === taskModal.clientId);
+                          await sendCommentNotifications(
+                            newComment.trim(),
+                            taskModal.task,
+                            taskModal.clientId,
+                            taskModal.groupId,
+                            currentBoard?.name || 'Project',
+                            mentions,
+                            currentUser.id,
+                            currentUser.name
+                          );
                         }
                       }}
                       placeholder="Add a comment... (Use @name or @everyone to mention)"
@@ -1556,9 +1498,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                     />
 
                     {/* Mention Dropdown */}
-                    {mentionDropdown?.show && (() => {
-                      console.log('🎨 Rendering mention dropdown:', mentionDropdown, 'profiles:', teamProfiles.length);
-                      return (
+                    {mentionDropdown?.show && (
                       <div className="absolute bottom-full left-0 mb-2 w-64 bg-white rounded-lg shadow-xl border border-slate-200 overflow-hidden z-[100] animate-fadeIn">
                         <div className="p-2 bg-slate-50 border-b border-slate-200">
                           <p className="text-xs font-bold text-slate-500 uppercase">Mention Someone</p>
@@ -1619,15 +1559,12 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                             ))}
                         </div>
                       </div>
-                      );
-                    })()}
+                    )}
 
                     <button
                       onClick={async () => {
                         if (newComment.trim()) {
-                          console.log('💬 Adding comment (button):', newComment.trim());
                           const mentions = detectMentions(newComment.trim(), teamProfiles);
-                          console.log('👥 Detected mentions:', mentions);
 
                           const comment: TaskComment = {
                             id: Date.now().toString(),
@@ -1646,43 +1583,18 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                           setTaskModal({ ...taskModal, task: updatedTask });
                           setNewComment('');
 
-                          // Create notifications for mentioned users
-                          if (mentions.length > 0) {
-                            console.log('📢 Creating notifications for', mentions.length, 'users');
-                            // Get the board name for the notification
-                            const currentBoard = clients.find(c => c.id === taskModal.clientId);
-                            const boardName = currentBoard?.name || 'Project';
-
-                            console.log('🔍 Notification linkData will be:', {
-                              taskId: taskModal.task.id,
-                              boardId: taskModal.clientId,
-                              groupId: taskModal.groupId,
-                              boardName: boardName
-                            });
-
-                            for (const mentionedId of mentions) {
-                              if (mentionedId !== currentUser.id) { // Don't notify self
-                                console.log('✉️ Notifying user:', mentionedId);
-                                await createNotification(
-                                  mentionedId,
-                                  `${currentUser.name} mentioned you`,
-                                  `In "${taskModal.task.title}": ${newComment.trim().substring(0, 100)}`,
-                                  'message',
-                                  'TASKS',
-                                  {
-                                    taskId: taskModal.task.id,
-                                    boardId: taskModal.clientId,
-                                    groupId: taskModal.groupId,
-                                    boardName: boardName
-                                  }
-                                );
-                              }
-                            }
-                            console.log('🔔 Playing notification sound');
-                            playNotificationSound();
-                          } else {
-                            console.log('⚠️ No mentions detected in comment');
-                          }
+                          // Send notifications to mentioned and assigned users
+                          const currentBoard = clients.find(c => c.id === taskModal.clientId);
+                          await sendCommentNotifications(
+                            newComment.trim(),
+                            taskModal.task,
+                            taskModal.clientId,
+                            taskModal.groupId,
+                            currentBoard?.name || 'Project',
+                            mentions,
+                            currentUser.id,
+                            currentUser.name
+                          );
                         }
                       }}
                       className="p-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"

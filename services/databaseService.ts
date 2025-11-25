@@ -359,8 +359,6 @@ export const fetchChatMessages = async (channelId: string): Promise<ChatMessage[
 };
 
 export const sendChatMessage = async (msg: ChatMessage) => {
-  console.log('[sendChatMessage] Starting with message:', msg);
-
   const insertData = {
     channel_id: msg.channelId,
     sender: msg.sender,
@@ -373,8 +371,6 @@ export const sendChatMessage = async (msg: ChatMessage) => {
     attachment_type: msg.attachmentType
   };
 
-  console.log('[sendChatMessage] Insert data:', insertData);
-
   const { data, error } = await supabase
     .from('chat_messages')
     .insert(insertData)
@@ -382,15 +378,10 @@ export const sendChatMessage = async (msg: ChatMessage) => {
     .single();
 
   if (error) {
-    console.error('[sendChatMessage] Database error:', error);
-    console.error('[sendChatMessage] Error code:', error.code);
-    console.error('[sendChatMessage] Error message:', error.message);
-    console.error('[sendChatMessage] Error details:', error.details);
-    console.error('[sendChatMessage] Error hint:', error.hint);
+    console.error('[sendChatMessage] Error:', error.message);
     throw error;
   }
 
-  console.log('[sendChatMessage] Success! Inserted data:', data);
   return data;
 };
 
@@ -415,26 +406,15 @@ export const clearChatHistory = async (channelId: string) => {
 }
 
 export const deleteChatMessage = async (messageId: string) => {
-  console.log('[databaseService] Attempting to delete message:', messageId);
-
-  const { data, error, count, status, statusText } = await supabase
+  const { data, error } = await supabase
     .from('chat_messages')
     .delete()
     .eq('id', messageId)
     .select();
 
-  console.log('[databaseService] Delete response:', { data, error, count, status, statusText });
-
   if (error) {
-    console.error('[databaseService] Error deleting message:', error);
-    console.error('[databaseService] Error details:', JSON.stringify(error, null, 2));
+    console.error('[deleteChatMessage] Error:', error.message);
     throw error;
-  }
-
-  if (!data || data.length === 0) {
-    console.warn('[databaseService] No rows deleted - message may not exist or RLS policy blocking');
-  } else {
-    console.log('[databaseService] Successfully deleted message:', data);
   }
 
   return data;
@@ -515,20 +495,17 @@ export const uploadFile = async (file: File, bucket: string = 'uploads'): Promis
     const fileExt = file.name.split('.').pop();
     const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
 
-    console.log(`[Upload] Uploading to bucket: ${bucket}, file: ${fileName}`);
-    const { data: uploadData, error } = await supabase.storage.from(bucket).upload(fileName, file);
+    const { error } = await supabase.storage.from(bucket).upload(fileName, file);
 
     if (error) {
-      console.error(`[Upload] Error uploading file:`, error);
+      console.error('[Upload] Error:', error.message);
       return null;
     }
 
-    console.log(`[Upload] Upload successful:`, uploadData);
     const { data } = supabase.storage.from(bucket).getPublicUrl(fileName);
-    console.log(`[Upload] Public URL:`, data.publicUrl);
     return data.publicUrl;
   } catch (e) {
-    console.error(`[Upload] Unexpected error:`, e);
+    console.error('[Upload] Unexpected error:', e);
     return null;
   }
 };
@@ -556,12 +533,16 @@ export const checkDueDateNotifications = async (currentUserId: string) => {
       if (!group.tasks) continue;
 
       for (const task of group.tasks) {
-        if (task.dueDate === today && task.assignedTo) {
-          const assignedIds = Array.isArray(task.assignedTo) ? task.assignedTo : [task.assignedTo];
+        if (!task.dueDate || !task.assignedTo) continue;
 
-          if (!assignedIds.includes(currentUserId)) continue;
+        const assignedIds = Array.isArray(task.assignedTo) ? task.assignedTo : [task.assignedTo];
+        if (!assignedIds.includes(currentUserId)) continue;
 
-          // Check for duplicate notification - check both by link_data AND by message text
+        const taskDueDate = new Date(task.dueDate);
+        const daysOverdue = Math.floor((now.getTime() - taskDueDate.getTime()) / (1000 * 60 * 60 * 24));
+
+        // Notification 1: Task due today
+        if (task.dueDate === today) {
           const taskMessage = `"${task.title}" is due today on ${boardData.name}`;
           const { data: existing } = await supabase
             .from('notifications')
@@ -571,11 +552,8 @@ export const checkDueDateNotifications = async (currentUserId: string) => {
             .eq('title', 'Task Due Today')
             .gte('created_at', today + 'T00:00:00');
 
-          // Check if this exact task notification already exists
           const isDuplicate = existing?.some(notif => {
-            // Check by message text (always works)
             if (notif.message === taskMessage) return true;
-            // Check by link_data if it exists
             if (notif.link_data) {
               const linkData = typeof notif.link_data === 'string'
                 ? JSON.parse(notif.link_data)
@@ -585,20 +563,63 @@ export const checkDueDateNotifications = async (currentUserId: string) => {
             return false;
           });
 
-          if (isDuplicate) continue;
+          if (!isDuplicate) {
+            await createNotification(
+              currentUserId,
+              'Task Due Today',
+              `"${task.title}" is due today on ${boardData.name}`,
+              'alert',
+              'TASKS',
+              {
+                taskId: task.id,
+                boardId: boardData.id,
+                groupId: group.id
+              }
+            );
+          }
+        }
 
-          await createNotification(
-            currentUserId,
-            'Task Due Today',
-            `"${task.title}" is due today on ${boardData.name}`,
-            'alert',
-            'TASKS',
-            {
-              taskId: task.id,
-              boardId: boardData.id,
-              groupId: group.id
+        // Notification 3: Task overdue for 2+ days with no comments
+        if (daysOverdue >= 2) {
+          const hasComments = task.comments && task.comments.length > 0;
+
+          if (!hasComments) {
+            const warningMessage = `"${task.title}" is ${daysOverdue} days overdue with no updates on ${boardData.name}`;
+
+            // Check if we already sent this warning today
+            const { data: existing } = await supabase
+              .from('notifications')
+              .select('id, link_data, message')
+              .eq('user_id', currentUserId)
+              .eq('type', 'alert')
+              .eq('title', 'Overdue Task Warning')
+              .gte('created_at', today + 'T00:00:00');
+
+            const isDuplicate = existing?.some(notif => {
+              if (notif.link_data) {
+                const linkData = typeof notif.link_data === 'string'
+                  ? JSON.parse(notif.link_data)
+                  : notif.link_data;
+                return linkData.taskId === task.id && linkData.boardId === boardData.id;
+              }
+              return false;
+            });
+
+            if (!isDuplicate) {
+              await createNotification(
+                currentUserId,
+                'Overdue Task Warning',
+                warningMessage,
+                'alert',
+                'TASKS',
+                {
+                  taskId: task.id,
+                  boardId: boardData.id,
+                  groupId: group.id
+                }
+              );
             }
-          );
+          }
         }
       }
     }
@@ -641,23 +662,18 @@ export const removeChannelMember = async (channelId: string, userId: string) => 
 };
 
 export const fetchChannelMembers = async (channelId: string) => {
-  console.log('[fetchChannelMembers] Fetching members for channel:', channelId);
-
-  // First, try a simple query to check if table exists and is accessible
-  const { data: testData, error: testError } = await supabase
+  // First, check if channel_members table is accessible
+  const { error: testError } = await supabase
     .from('channel_members')
-    .select('*')
+    .select('id')
     .eq('channel_id', channelId)
     .limit(1);
 
   if (testError) {
-    console.error('[fetchChannelMembers] Basic query failed:', testError);
     throw new Error(`Cannot access channel_members table: ${testError.message}`);
   }
 
-  console.log('[fetchChannelMembers] Basic query successful, now fetching with profiles');
-
-  // Now try with the join - specify which foreign key to use
+  // Fetch members with profile data
   const { data, error } = await supabase
     .from('channel_members')
     .select(`
@@ -677,16 +693,9 @@ export const fetchChannelMembers = async (channelId: string) => {
     .order('joined_at', { ascending: true });
 
   if (error) {
-    console.error('[fetchChannelMembers] Error details:', {
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
-      code: error.code
-    });
     throw new Error(`${error.message} (Code: ${error.code})`);
   }
 
-  console.log('[fetchChannelMembers] Successfully fetched members:', data);
   return data;
 };
 
