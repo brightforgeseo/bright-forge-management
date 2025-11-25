@@ -315,13 +315,17 @@ class WebRTCService {
         audio: false
       });
 
-      // Replace video track in all peer connections
+      // Replace or add video track in all peer connections
       const videoTrack = this.screenStream.getVideoTracks()[0];
 
       this.peerConnections.forEach((pc) => {
         const sender = pc.getSenders().find(s => s.track?.kind === 'video');
         if (sender) {
+          // Replace existing video track
           sender.replaceTrack(videoTrack);
+        } else {
+          // No existing video track (audio-only call), add the screen share track
+          pc.addTrack(videoTrack, this.screenStream!);
         }
       });
 

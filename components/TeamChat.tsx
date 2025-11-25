@@ -1165,20 +1165,20 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
         transform transition-transform duration-300 ease-in-out
         ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
       `}>
-        <div className="h-12 px-4 flex items-center justify-between border-b border-[#5d2c5d]">
-          <h2 className="font-bold text-white truncate">Bright Forge</h2>
-          <div className="flex items-center gap-2">
+        <div className="h-11 px-3 flex items-center justify-between border-b border-[#5d2c5d] flex-shrink-0">
+          <h2 className="font-bold text-white truncate text-sm">Bright Forge</h2>
+          <div className="flex items-center gap-1">
             {currentUser.role === 'Owner' && (
-              <button onClick={() => setShowCreateChannel(true)} className="text-slate-300 hover:text-white" title="New Channel">
-                <Plus className="w-5 h-5" />
+              <button onClick={() => setShowCreateChannel(true)} className="p-1 text-slate-300 hover:text-white hover:bg-[#5d2c5d] rounded transition-colors" title="New Channel">
+                <Plus className="w-4 h-4" />
               </button>
             )}
             <button
               onClick={() => setIsMobileSidebarOpen(false)}
-              className="md:hidden text-slate-300 hover:text-white"
+              className="md:hidden p-1 text-slate-300 hover:text-white hover:bg-[#5d2c5d] rounded transition-colors"
               title="Close"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -1209,22 +1209,22 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar py-4 space-y-6">
+        <div className="flex-1 overflow-y-auto custom-scrollbar py-2 space-y-3 min-h-0">
           {/* AI Assistant Section */}
           <div>
-            <div className="px-4 flex items-center justify-between group text-[#bcabbc] mb-2">
-              <span className="text-xs font-medium uppercase tracking-wider">AI Assistant</span>
+            <div className="px-3 flex items-center justify-between group text-[#bcabbc] mb-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wider">AI Assistant</span>
             </div>
             <ul>
               {echoAIChannel ? (
                 <li
                   key={echoAIChannel.id}
                   onClick={() => setActiveChannelId(echoAIChannel.id)}
-                  className={`px-4 py-1 flex items-center justify-between cursor-pointer mx-2 rounded-md group ${activeChannelId === echoAIChannel.id ? 'bg-[#1164A3] text-white' : 'text-[#bcabbc] hover:bg-[#350d36]'}`}
+                  className={`px-3 py-1 flex items-center justify-between cursor-pointer mx-1.5 rounded group ${activeChannelId === echoAIChannel.id ? 'bg-[#1164A3] text-white' : 'text-[#bcabbc] hover:bg-[#350d36]'}`}
                 >
-                  <div className="flex items-center gap-2 truncate">
-                    <Bot className="w-4 h-4 text-brand-400" />
-                    <span className={`truncate ${echoAIChannel.unread ? 'font-bold text-white' : ''}`}>
+                  <div className="flex items-center gap-1.5 truncate">
+                    <Bot className="w-3.5 h-3.5 text-brand-400" />
+                    <span className={`truncate text-sm ${echoAIChannel.unread ? 'font-bold text-white' : ''}`}>
                       Echo AI {echoAIChannel.unread ? `(${echoAIChannel.unread})` : ''}
                     </span>
                   </div>
@@ -1232,10 +1232,10 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
               ) : (
                 <li
                   onClick={handleStartEchoAI}
-                  className="px-4 py-1 flex items-center gap-2 mx-2 rounded-md text-[#bcabbc] hover:bg-[#350d36] cursor-pointer"
+                  className="px-3 py-1 flex items-center gap-1.5 mx-1.5 rounded text-[#bcabbc] hover:bg-[#350d36] cursor-pointer"
                 >
-                  <Bot className="w-4 h-4 text-brand-400" />
-                  <span className="truncate">Start Echo AI Chat</span>
+                  <Bot className="w-3.5 h-3.5 text-brand-400" />
+                  <span className="truncate text-sm">Start Echo AI Chat</span>
                 </li>
               )}
             </ul>
@@ -1243,23 +1243,23 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
           {/* Public Channels */}
           <div>
-            <div className="px-4 flex items-center justify-between group text-[#bcabbc] mb-2">
-              <span className="text-xs font-medium uppercase tracking-wider">Channels</span>
+            <div className="px-3 flex items-center justify-between group text-[#bcabbc] mb-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wider">Channels</span>
             </div>
             <ul>
               {publicChannels.map(channel => (
                 <li
                   key={channel.id}
                   onClick={() => setActiveChannelId(channel.id)}
-                  className={`px-4 py-1 flex items-center justify-between cursor-pointer mx-2 rounded-md group ${activeChannelId === channel.id ? 'bg-[#1164A3] text-white' : 'text-[#bcabbc] hover:bg-[#350d36]'}`}
+                  className={`px-3 py-1 flex items-center justify-between cursor-pointer mx-1.5 rounded group ${activeChannelId === channel.id ? 'bg-[#1164A3] text-white' : 'text-[#bcabbc] hover:bg-[#350d36]'}`}
                 >
                   <div className="flex items-center truncate">
                     {channel.is_private ? (
-                      <Lock className="w-4 h-4 mr-2 opacity-70" />
+                      <Lock className="w-3.5 h-3.5 mr-1.5 opacity-70" />
                     ) : (
-                      <Hash className="w-4 h-4 mr-2 opacity-70" />
+                      <Hash className="w-3.5 h-3.5 mr-1.5 opacity-70" />
                     )}
-                    <span className={`truncate ${channel.unread ? 'font-bold text-white' : ''}`}>
+                    <span className={`truncate text-sm ${channel.unread ? 'font-bold text-white' : ''}`}>
                       {channel.name} {channel.unread ? `(${channel.unread})` : ''}
                     </span>
                   </div>
@@ -1299,10 +1299,10 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
           {/* Direct Messages List */}
           <div>
-            <div className="px-4 flex items-center justify-between group text-[#bcabbc] mb-2">
-              <span className="text-xs font-medium uppercase tracking-wider">Direct Messages</span>
+            <div className="px-3 flex items-center justify-between group text-[#bcabbc] mb-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wider">Direct Messages</span>
               <button onClick={refreshData} title="Refresh List" className={`${isRefreshing ? 'animate-spin' : ''} hover:text-white`}>
-                <RefreshCw className="w-3 h-3" />
+                <RefreshCw className="w-2.5 h-2.5" />
               </button>
             </div>
             <ul>
@@ -1311,7 +1311,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                 return (
                   <li
                     key={channel.id}
-                    className={`px-4 py-1 flex items-center gap-2 mx-2 rounded-md group ${activeChannelId === channel.id ? 'bg-[#1164A3] text-white' : 'text-[#bcabbc] hover:bg-[#350d36]'}`}
+                    className={`px-3 py-1 flex items-center gap-1.5 mx-1.5 rounded group ${activeChannelId === channel.id ? 'bg-[#1164A3] text-white' : 'text-[#bcabbc] hover:bg-[#350d36]'}`}
                   >
                     <div
                       className="relative w-4 h-4 flex-shrink-0 cursor-pointer"
@@ -1352,33 +1352,33 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                   </li>
                 );
               })}
-              {dmChannels.length === 0 && <li className="px-4 text-xs text-slate-500 italic">No active chats</li>}
+              {dmChannels.length === 0 && <li className="px-3 text-[10px] text-slate-500 italic">No active chats</li>}
             </ul>
           </div>
 
           {/* All Team Members */}
           <div>
-            <div className="px-4 flex items-center justify-between group text-[#bcabbc] mb-2">
-              <span className="text-xs font-medium uppercase tracking-wider">Team</span>
-              <Users className="w-3 h-3" />
+            <div className="px-3 flex items-center justify-between group text-[#bcabbc] mb-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wider">Team</span>
+              <Users className="w-2.5 h-2.5" />
             </div>
             <ul>
               {profiles.map(p => (
                 <li
                   key={p.id}
                   onClick={() => handleStartDM(p.id)}
-                  className="px-4 py-1 flex items-center gap-2 mx-2 text-[#bcabbc] hover:bg-[#350d36] rounded-md cursor-pointer transition-colors"
+                  className="px-3 py-1 flex items-center gap-1.5 mx-1.5 text-[#bcabbc] hover:bg-[#350d36] rounded cursor-pointer transition-colors"
                 >
                   <div className="relative">
                     {p.avatar_url ? (
-                      <img src={p.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
+                      <img src={p.avatar_url} alt="" className="w-3.5 h-3.5 rounded-full object-cover" />
                     ) : (
-                      <div className="w-4 h-4 rounded-full bg-slate-500 flex items-center justify-center text-[8px] text-white font-bold">
+                      <div className="w-3.5 h-3.5 rounded-full bg-slate-500 flex items-center justify-center text-[7px] text-white font-bold">
                         {p.full_name?.charAt(0) || '?'}
                       </div>
                     )}
                     <div
-                      className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-[#3F0E40] ${
+                      className={`absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full border border-[#3F0E40] ${
                         p.isOnline ? 'bg-green-500' : 'bg-slate-400'
                       }`}
                       title={p.isOnline ? 'Online' : 'Offline'}
@@ -1389,7 +1389,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                     {p.id === currentUser.id && ' (You)'}
                   </span>
                   {p.isOnline && p.id !== currentUser.id && (
-                    <span className="text-[10px] text-green-400 font-medium">●</span>
+                    <span className="text-[9px] text-green-400 font-medium">●</span>
                   )}
                 </li>
               ))}

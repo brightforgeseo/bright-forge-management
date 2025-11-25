@@ -1141,8 +1141,11 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                              className={`font-bold text-lg bg-transparent outline-none text-[${group.color}] w-full`}
                              style={{ color: group.color }}
                            />
-                           <span className="text-xs font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-                             {filteredTasks.length}{selectedPersonFilter && ` of ${group.tasks.length}`} items
+                           <span className="text-xs font-semibold px-2.5 py-1 rounded-lg" style={{
+                             backgroundColor: `${group.color}15`,
+                             color: group.color
+                           }}>
+                             {filteredTasks.length}{selectedPersonFilter && ` of ${group.tasks.length}`} {filteredTasks.length === 1 ? 'item' : 'items'}
                            </span>
                        </div>
                        <button onClick={(e) => { e.stopPropagation(); handleDeleteGroup(activeClient.id, group.id); }} className="opacity-0 group-hover:opacity-100 p-2 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded transition-all">

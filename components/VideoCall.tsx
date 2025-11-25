@@ -16,7 +16,7 @@ interface VideoCallProps {
 
 interface RemoteParticipant {
   odisconnectionuserId: string;
-  userName: string;
+  odisconnectionuserName: string;
   stream: MediaStream;
 }
 
@@ -59,16 +59,16 @@ const VideoCall: React.FC<VideoCallProps> = ({
         }
       };
 
-      webrtcService.onParticipantJoined = (odisconnectionuserId, userName, stream) => {
-        console.log('[VideoCall] Participant joined:', userName);
+      webrtcService.onParticipantJoined = (odisconnectionuserId: string, odisconnectionuserName: string, stream: MediaStream) => {
+        console.log('[VideoCall] Participant joined:', odisconnectionuserName);
         setRemoteParticipants(prev => {
           const updated = new Map(prev);
-          updated.set(odisconnectionuserId, { odisconnectionuserId, userName, stream });
+          updated.set(odisconnectionuserId, { odisconnectionuserId, odisconnectionuserName, stream });
           return updated;
         });
       };
 
-      webrtcService.onParticipantLeft = (odisconnectionuserId) => {
+      webrtcService.onParticipantLeft = (odisconnectionuserId: string) => {
         console.log('[VideoCall] Participant left:', odisconnectionuserId);
         setRemoteParticipants(prev => {
           const updated = new Map(prev);
@@ -114,6 +114,10 @@ const VideoCall: React.FC<VideoCallProps> = ({
       const stream = await webrtcService.startScreenShare();
       if (stream) {
         setIsScreenSharing(true);
+        // Update local video to show screen share
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+        }
       }
     }
   };
@@ -191,9 +195,9 @@ const VideoCall: React.FC<VideoCallProps> = ({
                 autoPlay
                 muted
                 playsInline
-                className={`w-full h-full object-cover ${!videoEnabled ? 'hidden' : ''}`}
+                className={`w-full h-full object-cover ${!videoEnabled && !isScreenSharing ? 'hidden' : ''}`}
               />
-              {!videoEnabled && (
+              {!videoEnabled && !isScreenSharing && (
                 <div className="absolute inset-0 flex items-center justify-center bg-slate-700">
                   <div className="w-20 h-20 rounded-full bg-brand-600 flex items-center justify-center">
                     <span className="text-2xl font-bold text-white">
@@ -203,7 +207,9 @@ const VideoCall: React.FC<VideoCallProps> = ({
                 </div>
               )}
               <div className="absolute bottom-3 left-3 px-3 py-1 bg-black/50 rounded-lg">
-                <span className="text-white text-sm font-medium">You</span>
+                <span className="text-white text-sm font-medium">
+                  {isScreenSharing ? 'Screen Share' : 'You'}
+                </span>
               </div>
               {!audioEnabled && (
                 <div className="absolute top-3 right-3 p-2 bg-red-500 rounded-full">
@@ -279,15 +285,33 @@ const VideoCall: React.FC<VideoCallProps> = ({
 const RemoteVideo: React.FC<{ participant: RemoteParticipant }> = ({ participant }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [hasVideo, setHasVideo] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   useEffect(() => {
     if (videoRef.current && participant.stream) {
       videoRef.current.srcObject = participant.stream;
 
       // Try to play the video
-      videoRef.current.play().catch(err => {
-        console.log('[RemoteVideo] Autoplay failed, will retry on user interaction:', err);
-      });
+      const playVideo = async () => {
+        try {
+          await videoRef.current?.play();
+          setIsPlaying(true);
+        } catch (err) {
+          console.log('[RemoteVideo] Autoplay failed, will retry on user interaction:', err);
+          // Add click handler to retry play
+          const handleClick = async () => {
+            try {
+              await videoRef.current?.play();
+              setIsPlaying(true);
+              document.removeEventListener('click', handleClick);
+            } catch (e) {
+              console.log('[RemoteVideo] Retry play failed:', e);
+            }
+          };
+          document.addEventListener('click', handleClick);
+        }
+      };
+      playVideo();
 
       // Check if video tracks exist and are enabled
       const checkVideoTracks = () => {
@@ -309,6 +333,16 @@ const RemoteVideo: React.FC<{ participant: RemoteParticipant }> = ({ participant
         track.onunmute = () => setHasVideo(true);
         track.onended = () => setHasVideo(false);
       });
+
+      // Also listen for new tracks added after initial setup
+      participant.stream.addEventListener('addtrack', (e) => {
+        if (e.track.kind === 'video') {
+          e.track.onmute = () => setHasVideo(false);
+          e.track.onunmute = () => setHasVideo(true);
+          e.track.onended = () => setHasVideo(false);
+          checkVideoTracks();
+        }
+      });
     }
   }, [participant.stream]);
 
@@ -325,13 +359,13 @@ const RemoteVideo: React.FC<{ participant: RemoteParticipant }> = ({ participant
         <div className="absolute inset-0 flex items-center justify-center bg-slate-700">
           <div className="w-20 h-20 rounded-full bg-slate-600 flex items-center justify-center">
             <span className="text-2xl font-bold text-white">
-              {participant.userName.charAt(0).toUpperCase()}
+              {participant.odisconnectionuserName.charAt(0).toUpperCase()}
             </span>
           </div>
         </div>
       )}
       <div className="absolute bottom-3 left-3 px-3 py-1 bg-black/50 rounded-lg">
-        <span className="text-white text-sm font-medium">{participant.userName}</span>
+        <span className="text-white text-sm font-medium">{participant.odisconnectionuserName}</span>
       </div>
     </div>
   );
