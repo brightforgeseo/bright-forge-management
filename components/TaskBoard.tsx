@@ -208,8 +208,9 @@ const sendCommentNotifications = async (
 };
 
 const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
-  
+
   const [clients, setClients] = useState<ClientBoard[]>([]);
+  const clientsRef = useRef<ClientBoard[]>([]); // Keep a ref for immediate access
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [teamProfiles, setTeamProfiles] = useState<Profile[]>([]);
@@ -227,6 +228,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
 
       if (boards.length > 0) {
         setClients(boards);
+        clientsRef.current = boards; // Initialize ref with loaded data
         setSelectedClientId(defaultBoardId);
       }
       setTeamProfiles(profiles);
@@ -360,9 +362,11 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
 
   const triggerSave = useCallback((updatedClients: ClientBoard[], changedClientId: string) => {
     setClients(updatedClients);
+    clientsRef.current = updatedClients; // Update ref immediately for subsequent changes
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(async () => {
-      const clientToSave = updatedClients.find(c => c.id === changedClientId);
+      // Use ref to get the latest data at save time
+      const clientToSave = clientsRef.current.find(c => c.id === changedClientId);
       if (clientToSave) {
         await saveClientBoard(clientToSave);
       }
@@ -630,7 +634,8 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   };
 
   const updateClient = (clientId: string, updateFn: (c: ClientBoard) => ClientBoard) => {
-    const updatedClients = clients.map(c => c.id === clientId ? updateFn(c) : c);
+    // Use ref for immediate access to latest data (avoids stale closure issues)
+    const updatedClients = clientsRef.current.map(c => c.id === clientId ? updateFn(c) : c);
     triggerSave(updatedClients, clientId);
   };
 
