@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrandingConfig, ToastType, User } from '../types';
-import { Save, Monitor, User as UserIcon, Upload, Loader2 } from 'lucide-react';
+import { Save, Monitor, User as UserIcon, Upload, Loader2, Users, Key, Trash2, Shield, X } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
-import { uploadFile } from '../services/databaseService';
+import { uploadFile, fetchAllAuthUsers, resetUserPassword, deleteAuthUser, updateUserRole, AuthUser } from '../services/databaseService';
 
 interface SettingsProps {
   branding: BrandingConfig;
@@ -18,6 +18,68 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
   const [avatarUrl, setAvatarUrl] = React.useState(currentUser.avatarUrl || '');
   const [isUploadingAvatar, setIsUploadingAvatar] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // User management state
+  const [authUsers, setAuthUsers] = useState<AuthUser[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [resetPasswordModal, setResetPasswordModal] = useState<{ open: boolean; user: AuthUser | null }>({ open: false, user: null });
+  const [newPassword, setNewPassword] = useState('');
+  const [deleteModal, setDeleteModal] = useState<{ open: boolean; user: AuthUser | null }>({ open: false, user: null });
+  const [actionLoading, setActionLoading] = useState(false);
+
+  // Fetch users on mount for Owners
+  useEffect(() => {
+    if (currentUser.role === 'Owner') {
+      loadUsers();
+    }
+  }, [currentUser.role]);
+
+  const loadUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const users = await fetchAllAuthUsers();
+      setAuthUsers(users);
+    } catch (error) {
+      console.error('Failed to load users:', error);
+      addToast('error', 'Failed to load users');
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetPasswordModal.user || !newPassword) return;
+
+    setActionLoading(true);
+    try {
+      await resetUserPassword(resetPasswordModal.user.id, newPassword);
+      addToast('success', `Password reset for ${resetPasswordModal.user.email}`);
+      setResetPasswordModal({ open: false, user: null });
+      setNewPassword('');
+    } catch (error) {
+      console.error('Failed to reset password:', error);
+      addToast('error', 'Failed to reset password');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!deleteModal.user) return;
+
+    setActionLoading(true);
+    try {
+      await deleteAuthUser(deleteModal.user.id);
+      addToast('success', `User ${deleteModal.user.email} deleted`);
+      setDeleteModal({ open: false, user: null });
+      loadUsers(); // Refresh list
+    } catch (error) {
+      console.error('Failed to delete user:', error);
+      addToast('error', 'Failed to delete user');
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const handleSave = () => {
     setBranding(localConfig);
@@ -247,6 +309,168 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
                 <Save className="w-4 h-4" />
                 {saved ? 'Changes Saved' : 'Save Settings'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* User Management - Only visible to Owners */}
+      {currentUser.role === 'Owner' && (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Users className="w-5 h-5 text-slate-500" />
+              <h3 className="font-semibold text-slate-900">User Management</h3>
+            </div>
+            <button
+              onClick={loadUsers}
+              disabled={loadingUsers}
+              className="text-sm text-brand-600 hover:text-brand-700 font-medium"
+            >
+              {loadingUsers ? 'Loading...' : 'Refresh'}
+            </button>
+          </div>
+
+          <div className="p-6">
+            {loadingUsers ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+              </div>
+            ) : authUsers.length === 0 ? (
+              <p className="text-slate-500 text-center py-8">No users found</p>
+            ) : (
+              <div className="space-y-3">
+                {authUsers.map(user => (
+                  <div
+                    key={user.id}
+                    className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-slate-900 truncate">
+                        {user.user_metadata?.full_name || user.email.split('@')[0]}
+                      </p>
+                      <p className="text-sm text-slate-500 truncate">{user.email}</p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Last login: {user.last_sign_in_at
+                          ? new Date(user.last_sign_in_at).toLocaleDateString()
+                          : 'Never'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 ml-4">
+                      <button
+                        onClick={() => setResetPasswordModal({ open: true, user })}
+                        className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                        title="Reset Password"
+                      >
+                        <Key className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setDeleteModal({ open: true, user })}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete User"
+                        disabled={user.email === currentUser.email}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Reset Password Modal */}
+      {resetPasswordModal.open && resetPasswordModal.user && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Key className="w-5 h-5 text-amber-600" />
+                <h3 className="font-semibold text-slate-900">Reset Password</h3>
+              </div>
+              <button
+                onClick={() => { setResetPasswordModal({ open: false, user: null }); setNewPassword(''); }}
+                className="p-2 hover:bg-slate-100 rounded-lg"
+              >
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-slate-600">
+                Set a new password for <strong>{resetPasswordModal.user.email}</strong>
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">New Password</label>
+                <input
+                  type="text"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Enter new password"
+                  className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none"
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => { setResetPasswordModal({ open: false, user: null }); setNewPassword(''); }}
+                  className="flex-1 px-4 py-3 border border-slate-200 text-slate-700 rounded-xl font-medium hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleResetPassword}
+                  disabled={!newPassword || actionLoading}
+                  className="flex-1 px-4 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Key className="w-4 h-4" />}
+                  Reset Password
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete User Modal */}
+      {deleteModal.open && deleteModal.user && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Trash2 className="w-5 h-5 text-red-600" />
+                <h3 className="font-semibold text-slate-900">Delete User</h3>
+              </div>
+              <button
+                onClick={() => setDeleteModal({ open: false, user: null })}
+                className="p-2 hover:bg-slate-100 rounded-lg"
+              >
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="p-4 bg-red-50 border border-red-100 rounded-xl">
+                <p className="text-red-800">
+                  Are you sure you want to delete <strong>{deleteModal.user.email}</strong>?
+                  This action cannot be undone.
+                </p>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setDeleteModal({ open: false, user: null })}
+                  className="flex-1 px-4 py-3 border border-slate-200 text-slate-700 rounded-xl font-medium hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteUser}
+                  disabled={actionLoading}
+                  className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                  Delete User
+                </button>
+              </div>
             </div>
           </div>
         </div>

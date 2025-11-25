@@ -1,5 +1,5 @@
 
-import { supabase } from '../lib/supabaseClient';
+import { supabase, supabaseAdmin } from '../lib/supabaseClient';
 import { ClientBoard, ChatMessage, ChatChannel, Profile, AppNotification } from '../types';
 
 // --- Allowlist (Invites) ---
@@ -715,4 +715,67 @@ export const isChannelMember = async (channelId: string, userId: string): Promis
 
   if (error && error.code !== 'PGRST116') throw error; // PGRST116 is "no rows returned"
   return !!data;
+};
+
+// =====================================================
+// ADMIN USER MANAGEMENT FUNCTIONS
+// =====================================================
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  created_at: string;
+  last_sign_in_at: string | null;
+  user_metadata: {
+    full_name?: string;
+  };
+}
+
+export const fetchAllAuthUsers = async (): Promise<AuthUser[]> => {
+  const { data, error } = await supabaseAdmin.auth.admin.listUsers();
+
+  if (error) {
+    console.error('Error fetching auth users:', error);
+    throw error;
+  }
+
+  return data.users.map(user => ({
+    id: user.id,
+    email: user.email || '',
+    created_at: user.created_at,
+    last_sign_in_at: user.last_sign_in_at || null,
+    user_metadata: user.user_metadata || {}
+  }));
+};
+
+export const resetUserPassword = async (userId: string, newPassword: string): Promise<void> => {
+  const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+    password: newPassword
+  });
+
+  if (error) {
+    console.error('Error resetting password:', error);
+    throw error;
+  }
+};
+
+export const deleteAuthUser = async (userId: string): Promise<void> => {
+  const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
+
+  if (error) {
+    console.error('Error deleting user:', error);
+    throw error;
+  }
+};
+
+export const updateUserRole = async (email: string, newRole: string): Promise<void> => {
+  const { error } = await supabase
+    .from('allowed_users')
+    .update({ role: newRole })
+    .eq('email', email.toLowerCase());
+
+  if (error) {
+    console.error('Error updating user role:', error);
+    throw error;
+  }
 };
