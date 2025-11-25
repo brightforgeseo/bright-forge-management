@@ -139,7 +139,7 @@ const playNotificationSound = async () => {
   }
 };
 
-// Helper to send comment notifications to mentioned and assigned users
+// Helper to send comment notifications to relevant users
 const sendCommentNotifications = async (
   commentText: string,
   task: Task,
@@ -150,24 +150,46 @@ const sendCommentNotifications = async (
   currentUserId: string,
   currentUserName: string
 ) => {
-  const usersToNotify = new Set<string>();
+  // Track who to notify and why (for appropriate message)
+  const notifyReasons = new Map<string, 'mentioned' | 'assigned' | 'reply'>();
 
-  // Add mentioned users
-  mentions.forEach(id => usersToNotify.add(id));
+  // 1. Add mentioned users (highest priority)
+  mentions.forEach(id => notifyReasons.set(id, 'mentioned'));
 
-  // Add assigned users
+  // 2. Add assigned users
   if (task.assignedTo) {
     const assignedIds = Array.isArray(task.assignedTo) ? task.assignedTo : [task.assignedTo];
-    assignedIds.forEach(id => usersToNotify.add(id));
+    assignedIds.forEach(id => {
+      if (!notifyReasons.has(id)) notifyReasons.set(id, 'assigned');
+    });
+  }
+
+  // 3. Add the last commenter as a "reply" (if they're not already being notified)
+  if (task.comments && task.comments.length > 0) {
+    // Find the last comment that wasn't from the current user
+    const previousComments = task.comments.filter(c => c.authorId !== currentUserId);
+    if (previousComments.length > 0) {
+      const lastComment = previousComments[previousComments.length - 1];
+      if (lastComment.authorId && !notifyReasons.has(lastComment.authorId)) {
+        notifyReasons.set(lastComment.authorId, 'reply');
+      }
+    }
   }
 
   // Send notifications (skip self)
-  for (const userId of usersToNotify) {
+  for (const [userId, reason] of notifyReasons) {
     if (userId !== currentUserId) {
-      const wasMentioned = mentions.includes(userId);
-      const title = wasMentioned
-        ? `${currentUserName} mentioned you`
-        : `New comment on "${task.title}"`;
+      let title: string;
+      switch (reason) {
+        case 'mentioned':
+          title = `${currentUserName} mentioned you`;
+          break;
+        case 'reply':
+          title = `${currentUserName} replied to you`;
+          break;
+        default:
+          title = `New comment on "${task.title}"`;
+      }
 
       await createNotification(
         userId,
@@ -180,7 +202,7 @@ const sendCommentNotifications = async (
     }
   }
 
-  if (usersToNotify.size > 0) {
+  if (notifyReasons.size > 0) {
     playNotificationSound();
   }
 };
