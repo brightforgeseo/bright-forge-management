@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Hexagon, Mail, Lock, ArrowRight, Loader2, AlertTriangle, User } from 'lucide-react';
 import { BrandingConfig } from '../types';
 import { supabase } from '../lib/supabaseClient';
-import { checkAllowlist, verifyPreProvisionedUser } from '../services/databaseService';
+import { checkAllowlist, verifyPreProvisionedUser, consumePreProvisionedUser } from '../services/databaseService';
 
 interface LoginProps {
   onLogin: (email: string) => void;
@@ -11,7 +11,7 @@ interface LoginProps {
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin, branding }) => {
-  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -30,6 +30,28 @@ const Login: React.FC<LoginProps> = ({ onLogin, branding }) => {
     checkConfig();
   }, []);
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSuccessMsg('');
+    setLoading(true);
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin
+      });
+
+      if (error) throw error;
+
+      setSuccessMsg('Password reset email sent! Check your inbox (and spam folder).');
+    } catch (err: any) {
+      console.error('Reset password error:', err);
+      setError(err.message || 'Failed to send reset email.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -37,6 +59,12 @@ const Login: React.FC<LoginProps> = ({ onLogin, branding }) => {
     setLoading(true);
 
     try {
+      if (mode === 'forgot') {
+        await handleForgotPassword(e);
+        setLoading(false);
+        return;
+      }
+
       if (mode === 'login') {
           // 1. Attempt Standard Login
           const { data, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
@@ -51,35 +79,42 @@ const Login: React.FC<LoginProps> = ({ onLogin, branding }) => {
           if (loginError) {
               const preUser = await verifyPreProvisionedUser(email, password);
               if (preUser) {
-                  // Auto-create account in Supabase Auth
+                  // Try to create account first (for new users)
                   const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
                       email,
                       password,
                       options: { data: { full_name: preUser.name } }
                   });
-                  
+
                   if (signUpError) {
-                      // 'User already registered' means they already activated their account
-                      // The password they entered might be their old temp password, not their current one
+                      // User already exists - they need a password reset
+                      // We'll use the admin workaround: delete and recreate
                       if (signUpError.message.includes('already registered')) {
-                          throw new Error("Your account is already activated. Please use the password you set when you first logged in, or contact Ben to reset it.");
-                      }
-                      // Try signing in one more time just in case
-                      const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({ email, password });
-                      if (!retryError && retryData.user) {
-                         onLogin(email);
-                         return;
+                          // Show message to contact admin for now
+                          // The temp_password matched, so they are who they say they are
+                          throw new Error(
+                            "Your temp password is correct, but your account already exists with a different password. " +
+                            "Please contact Ben to reset your password, or try the password you set when you first logged in."
+                          );
                       }
                       throw new Error("Activation failed: " + signUpError.message);
                   }
-                  
-                  // If successful, log them in immediately
+
+                  // If successful, clear temp password and log them in
                   if (signUpData.session) {
+                      await consumePreProvisionedUser(email);
                       onLogin(email);
                       return;
-                  } else {
-                      // This only happens if 'Enable Email Confirmations' is ON in Supabase settings
-                      setSuccessMsg('Account activated! If you do not see the dashboard, please check your email for a confirmation link.');
+                  } else if (signUpData.user && !signUpData.session) {
+                      // User created but needs email confirmation - try to sign in anyway
+                      // (This happens when email confirmation is enabled)
+                      const { data: loginData, error: loginErr } = await supabase.auth.signInWithPassword({ email, password });
+                      if (!loginErr && loginData.session) {
+                          await consumePreProvisionedUser(email);
+                          onLogin(email);
+                          return;
+                      }
+                      setSuccessMsg('Account activated! Please check your email for a confirmation link, then try logging in again.');
                       return;
                   }
               }
@@ -116,10 +151,20 @@ const Login: React.FC<LoginProps> = ({ onLogin, branding }) => {
 
     } catch (err: any) {
       console.error('Auth error:', err);
-      const errorMsg = err.message || 'Authentication failed.';
-      setError(errorMsg.includes('Database error')
-        ? 'Activation failed: Database error saving new user'
-        : errorMsg);
+      let errorMsg = err.message || 'Authentication failed.';
+
+      // Translate common Supabase errors to user-friendly messages
+      if (errorMsg.includes('Invalid login credentials')) {
+        errorMsg = 'Invalid email or password. Please try again or use "Forgot Password" below.';
+      } else if (errorMsg.includes('Email not confirmed')) {
+        errorMsg = 'Please check your email and click the confirmation link before signing in.';
+      } else if (errorMsg.includes('Database error') || errorMsg.includes('Unexpected failure')) {
+        errorMsg = 'Server error. Please try again in a few minutes. If this persists, contact support.';
+      } else if (errorMsg.includes('rate limit') || errorMsg.includes('too many requests')) {
+        errorMsg = 'Too many login attempts. Please wait a few minutes before trying again.';
+      }
+
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -136,7 +181,9 @@ const Login: React.FC<LoginProps> = ({ onLogin, branding }) => {
           </div>
           <h1 className="text-2xl font-bold text-slate-900">{branding.companyName}</h1>
           <p className="text-slate-500 mt-2 text-sm">
-             {mode === 'login' ? 'Sign in to access your team portal' : 'Create your team account'}
+             {mode === 'login' && 'Sign in to access your team portal'}
+             {mode === 'signup' && 'Create your team account'}
+             {mode === 'forgot' && 'Reset your password'}
           </p>
         </div>
 
@@ -183,12 +230,13 @@ const Login: React.FC<LoginProps> = ({ onLogin, branding }) => {
             </div>
           </div>
 
+          {mode !== 'forgot' && (
           <div className="space-y-2">
             <label className="block text-sm font-medium text-slate-700">Password</label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-              <input 
-                type="password" 
+              <input
+                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none"
@@ -197,6 +245,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, branding }) => {
               />
             </div>
           </div>
+          )}
 
           {error && <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm font-medium border border-red-100 text-center">{error}</div>}
           {successMsg && <div className="p-3 rounded-lg bg-green-50 text-green-600 text-sm font-medium border border-green-100 text-center">{successMsg}</div>}
@@ -206,17 +255,43 @@ const Login: React.FC<LoginProps> = ({ onLogin, branding }) => {
             disabled={loading}
             className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-70"
           >
-            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>{mode === 'login' ? 'Sign In' : 'Create Account'} <ArrowRight className="w-5 h-5" /></>}
+            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+              <>
+                {mode === 'login' && 'Sign In'}
+                {mode === 'signup' && 'Create Account'}
+                {mode === 'forgot' && 'Send Reset Link'}
+                <ArrowRight className="w-5 h-5" />
+              </>
+            )}
           </button>
+
+          {mode === 'login' && (
+            <button
+              type="button"
+              onClick={() => { setMode('forgot'); setError(''); setSuccessMsg(''); }}
+              className="w-full mt-3 text-sm text-slate-500 hover:text-brand-600"
+            >
+              Forgot your password?
+            </button>
+          )}
         </form>
-        
-        <div className="p-6 border-t border-slate-50 bg-slate-50/50 text-center">
-           <button 
-             onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError(''); setSuccessMsg(''); }}
-             className="text-sm text-brand-600 hover:text-brand-700 font-medium"
-           >
-             {mode === 'login' ? 'Invited to the team? Sign Up' : 'Already have an account? Sign In'}
-           </button>
+
+        <div className="p-6 border-t border-slate-50 bg-slate-50/50 text-center space-y-2">
+           {mode === 'forgot' ? (
+             <button
+               onClick={() => { setMode('login'); setError(''); setSuccessMsg(''); }}
+               className="text-sm text-brand-600 hover:text-brand-700 font-medium"
+             >
+               Back to Sign In
+             </button>
+           ) : (
+             <button
+               onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError(''); setSuccessMsg(''); }}
+               className="text-sm text-brand-600 hover:text-brand-700 font-medium"
+             >
+               {mode === 'login' ? 'Invited to the team? Sign Up' : 'Already have an account? Sign In'}
+             </button>
+           )}
         </div>
       </div>
     </div>
