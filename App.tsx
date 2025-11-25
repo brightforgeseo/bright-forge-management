@@ -232,7 +232,8 @@ ${currentUser.name}`;
         setIsMobileMenuOpen={setIsMobileMenuOpen}
       />
 
-      {/* Mobile Header */}
+      {/* Mobile Header - Hidden on TeamChat which has its own header */}
+      {currentView !== ToolView.TEAM_CHAT && (
       <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-slate-200 z-30 flex items-center px-4 gap-3">
         <button
           onClick={() => setIsMobileMenuOpen(true)}
@@ -251,8 +252,9 @@ ${currentUser.name}`;
           <span className="font-bold text-slate-900 truncate">{branding.companyName}</span>
         </div>
       </div>
+      )}
 
-      <main className={`flex-1 lg:ml-64 h-full overflow-hidden relative ${isFullHeight ? '' : 'bg-slate-50'} pt-16 lg:pt-0`}>
+      <main className={`flex-1 lg:ml-64 h-full overflow-hidden relative ${isFullHeight ? '' : 'bg-slate-50'} ${currentView === ToolView.TEAM_CHAT ? '' : 'pt-16'} lg:pt-0`}>
         {isFullHeight ? renderContent() : <ScrollablePageWrapper>{renderContent()}</ScrollablePageWrapper>}
       </main>
       <ToastContainer toasts={toasts} removeToast={removeToast} />
