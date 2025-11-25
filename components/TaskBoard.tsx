@@ -1153,18 +1153,18 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                     {/* Tasks Table */}
                     {!group.isCollapsed && (
                       <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden ml-0 lg:ml-8">
-                         <div className="overflow-x-auto custom-scrollbar">
-                           <table className="w-full min-w-[600px] lg:min-w-[800px]">
+                         <div className="overflow-y-auto custom-scrollbar">
+                           <table className="w-full table-fixed">
                               <thead className="bg-slate-50 border-b border-slate-200">
                                 <tr>
-                                  <th className="text-left py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-1/3 lg:w-1/4 sticky left-0 bg-slate-50 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">Item</th>
-                                  <th className="text-center py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-24 lg:w-40">Person</th>
-                                  <th className="text-center py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-24 lg:w-40">Status</th>
-                                  <th className="text-center py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-24 lg:w-40 hidden sm:table-cell">Priority</th>
-                                  <th className="text-center py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-28 lg:w-40">Due</th>
-                                  <th className="text-center py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-32 lg:w-48 hidden lg:table-cell">Worksheet</th>
-                                  <th className="text-center py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-32 lg:w-48 hidden lg:table-cell">Client Sheet</th>
-                                  <th className="w-10"></th>
+                                  <th className="text-left py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-[25%] lg:w-[20%]">Item</th>
+                                  <th className="text-center py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-[15%] lg:w-[12%]">Person</th>
+                                  <th className="text-center py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-[15%] lg:w-[12%]">Status</th>
+                                  <th className="text-center py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-[15%] lg:w-[12%] hidden sm:table-cell">Priority</th>
+                                  <th className="text-center py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-[15%] lg:w-[12%]">Due</th>
+                                  <th className="text-center py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-[14%] hidden lg:table-cell">Worksheet</th>
+                                  <th className="text-center py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-[14%] hidden lg:table-cell">Client Sheet</th>
+                                  <th className="w-[5%] lg:w-[4%]"></th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100">
@@ -1174,7 +1174,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                     
                                     return (
                                       <tr key={task.id} className="group hover:bg-slate-50/80 transition-colors">
-                                        <td className="py-2 px-2 lg:px-4 sticky left-0 bg-white group-hover:bg-slate-50/80 transition-colors z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] border-r border-transparent group-hover:border-slate-100">
+                                        <td className="py-2 px-2 lg:px-4 bg-white group-hover:bg-slate-50/80 transition-colors">
                                             <div className="flex items-center gap-2 lg:gap-3">
                                                 <div className="hidden lg:flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <button onClick={() => moveTask(activeClient.id, group.id, task.id, 'up')}><ChevronUp className="w-3 h-3 text-slate-400 hover:text-brand-600" /></button>
@@ -1185,7 +1185,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                                   value={task.title}
                                                   onChange={(e) => updateTaskField(activeClient.id, group.id, task.id, 'title', e.target.value)}
                                                   onClick={() => setTaskModal({ task, groupId: group.id, clientId: activeClient.id, groupTitle: group.title, groupColor: group.color })}
-                                                  className="flex-1 min-w-0 bg-transparent outline-none text-xs lg:text-sm font-medium text-slate-700 cursor-pointer hover:text-brand-600"
+                                                  className="flex-1 min-w-0 bg-transparent outline-none text-xs lg:text-sm font-medium text-slate-700 cursor-pointer hover:text-brand-600 truncate"
                                                 />
                                                 {(task.comments && task.comments.length > 0) && (
                                                   <MessageCircle className="w-4 h-4 text-slate-400 flex-shrink-0" />
