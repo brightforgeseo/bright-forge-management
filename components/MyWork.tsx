@@ -102,18 +102,103 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
 
       const board = allBoards[boardIndex];
 
-      // Find and update the task in the board
-      const updatedGroups = board.groups.map(group => {
-        if (group.id === task.groupId) {
-          return {
-            ...group,
-            tasks: group.tasks.map(t =>
-              t.id === task.id ? { ...t, [field]: value } : t
-            )
-          };
+      // Find the task's ACTUAL current group (it may have moved)
+      let actualGroupId = task.groupId;
+      let currentTask: Task | undefined;
+      for (const group of board.groups) {
+        const found = group.tasks.find(t => t.id === task.id);
+        if (found) {
+          actualGroupId = group.id;
+          currentTask = found;
+          break;
         }
-        return group;
-      });
+      }
+
+      if (!currentTask) {
+        throw new Error('Task not found in board');
+      }
+
+      // Handle Done status group movement (same logic as TaskBoard)
+      const doneStatusId = board.statusDefs.find(s => s.label === 'Done')?.id;
+      const currentGroup = board.groups.find(g => g.id === actualGroupId);
+      const isCurrentlyDone = currentTask.status === doneStatusId;
+      const isChangingToDone = field === 'status' && value === doneStatusId;
+      const isChangingFromDone = field === 'status' && isCurrentlyDone && value !== doneStatusId;
+
+      let updatedGroups = board.groups;
+
+      // CASE 1: Moving TO Done group
+      if (isChangingToDone && currentGroup?.title !== 'Done') {
+        const taskToMove = {
+          ...currentTask,
+          [field]: value,
+          originalGroupId: actualGroupId
+        };
+
+        let doneGroupExists = false;
+        updatedGroups = board.groups.map(g => {
+          if (g.title === 'Done') {
+            doneGroupExists = true;
+            return { ...g, tasks: [...g.tasks, taskToMove] };
+          } else if (g.id === actualGroupId) {
+            return { ...g, tasks: g.tasks.filter(t => t.id !== task.id) };
+          }
+          return g;
+        });
+
+        if (!doneGroupExists) {
+          updatedGroups.push({
+            id: Date.now().toString(),
+            title: 'Done',
+            color: '#00D084',
+            tasks: [taskToMove]
+          });
+        }
+      }
+      // CASE 2: Moving FROM Done group back to original
+      else if (isChangingFromDone && currentGroup?.title === 'Done') {
+        const taskToMove = { ...currentTask, [field]: value };
+        const originalGroupId = (currentTask as any).originalGroupId;
+
+        let targetGroupId = originalGroupId;
+        if (!targetGroupId || !board.groups.find(g => g.id === targetGroupId)) {
+          const firstNonDoneGroup = board.groups.find(g => g.title !== 'Done');
+          targetGroupId = firstNonDoneGroup?.id;
+        }
+
+        if (targetGroupId) {
+          delete (taskToMove as any).originalGroupId;
+          updatedGroups = board.groups.map(g => {
+            if (g.id === targetGroupId) {
+              return { ...g, tasks: [...g.tasks, taskToMove] };
+            } else if (g.id === actualGroupId) {
+              return { ...g, tasks: g.tasks.filter(t => t.id !== task.id) };
+            }
+            return g;
+          });
+        } else {
+          // Just update in place
+          updatedGroups = board.groups.map(g =>
+            g.id === actualGroupId
+              ? { ...g, tasks: g.tasks.map(t => t.id === task.id ? { ...t, [field]: value } : t) }
+              : g
+          );
+        }
+      }
+      // CASE 3: Normal field update
+      else {
+        updatedGroups = board.groups.map(group => {
+          if (group.id === actualGroupId) {
+            return {
+              ...group,
+              tasks: group.tasks.map(t =>
+                t.id === task.id ? { ...t, [field]: value } : t
+              )
+            };
+          }
+          return group;
+        });
+      }
 
       const updatedBoard = { ...board, groups: updatedGroups };
 
@@ -122,10 +207,10 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
       newBoards[boardIndex] = updatedBoard;
       setAllBoards(newBoards);
 
-      // Update the task in allTasks
+      // Update the task in allTasks (find by task ID only, group may have changed)
       setAllTasks(prev =>
         prev.map(t =>
-          t.id === task.id && t.clientId === task.clientId && t.groupId === task.groupId
+          t.id === task.id && t.clientId === task.clientId
             ? { ...t, [field]: value, boardData: updatedBoard }
             : t
         )
