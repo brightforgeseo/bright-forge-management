@@ -314,12 +314,12 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto p-4 lg:p-8">
+      <div className="flex-1 overflow-hidden p-4 lg:p-8 flex flex-col">
         {viewMode === 'table' ? (
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-slate-50 border-b border-slate-200">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden">
+            <div className="overflow-auto flex-1">
+              <table className="w-full min-w-[800px]">
+                <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
                   <tr>
                     <th className="text-left py-3 px-4 lg:px-6 text-xs font-semibold text-slate-500 uppercase">Task</th>
                     <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase w-32 lg:w-48">Group</th>
