@@ -391,12 +391,16 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   const [chatChannels, setChatChannels] = useState<ChatChannel[]>([]);
   const [isLoadingChannels, setIsLoadingChannels] = useState(false);
   const [isSharingTask, setIsSharingTask] = useState(false);
+  const [shareMessage, setShareMessage] = useState('');
+  const [shareMentionDropdown, setShareMentionDropdown] = useState<{ show: boolean, search: string, position: number } | null>(null);
+  const shareMessageRef = useRef<HTMLTextAreaElement>(null);
 
   const activeClient = clients.find(c => c.id === selectedClientId);
 
   // Open share modal and load channels
   const handleOpenShareModal = async () => {
     setShowShareModal(true);
+    setShareMessage('');
     setIsLoadingChannels(true);
     try {
       const channels = await fetchChannels();
@@ -409,6 +413,49 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
     } finally {
       setIsLoadingChannels(false);
     }
+  };
+
+  // Handle share message input with @mention detection
+  const handleShareMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setShareMessage(value);
+
+    // Detect @mentions
+    const cursorPos = e.target.selectionStart;
+    const textBeforeCursor = value.substring(0, cursorPos);
+    const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+
+    if (lastAtIndex !== -1) {
+      const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
+      // Only show dropdown if there's no space after @ (still typing mention)
+      if (!textAfterAt.includes(' ') && textAfterAt.length <= 20) {
+        setShareMentionDropdown({ show: true, search: textAfterAt.toLowerCase(), position: lastAtIndex });
+        return;
+      }
+    }
+    setShareMentionDropdown(null);
+  };
+
+  // Insert mention into share message
+  const insertShareMention = (profile: Profile) => {
+    if (!shareMentionDropdown || !shareMessageRef.current) return;
+
+    const name = profile.full_name || 'User';
+    const before = shareMessage.substring(0, shareMentionDropdown.position);
+    const after = shareMessage.substring(shareMessageRef.current.selectionStart);
+    const newMessage = `${before}@${name} ${after}`;
+
+    setShareMessage(newMessage);
+    setShareMentionDropdown(null);
+
+    // Focus back on textarea
+    setTimeout(() => {
+      if (shareMessageRef.current) {
+        shareMessageRef.current.focus();
+        const newPos = before.length + name.length + 2;
+        shareMessageRef.current.setSelectionRange(newPos, newPos);
+      }
+    }, 0);
   };
 
   // Share task to selected channel
@@ -436,20 +483,62 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
         assignedTo: Array.isArray(task.assignedTo) ? task.assignedTo : (task.assignedTo ? [task.assignedTo] : [])
       };
 
+      // Build message text
+      const messageText = shareMessage.trim()
+        ? `${shareMessage.trim()}`
+        : `📋 Shared a task: ${task.title}`;
+
       const chatMessage: ChatMessage = {
         id: Date.now().toString(),
         channelId: channelId,
         sender: currentUser.name,
         senderId: currentUser.id,
-        text: `📋 Shared a task: ${task.title}`,
+        text: messageText,
         timestamp: new Date().toISOString(),
         avatar: currentUser.avatarUrl || 'user',
         taskLink: taskLinkData
       };
 
       await sendChatMessage(chatMessage);
+
+      // Detect mentions in the message and send notifications
+      const mentionedIds = detectMentions(shareMessage, teamProfiles);
+
+      // Get assigned user IDs
+      const assignedIds = Array.isArray(task.assignedTo) ? task.assignedTo : (task.assignedTo ? [task.assignedTo] : []);
+
+      // Combine mentioned and assigned users (unique)
+      const notifyIds = new Set<string>([...mentionedIds, ...assignedIds]);
+
+      // Send notifications to all relevant users (except current user)
+      for (const userId of notifyIds) {
+        if (userId !== currentUser.id) {
+          const isMentioned = mentionedIds.includes(userId);
+          const isAssigned = assignedIds.includes(userId);
+
+          let title = `${currentUser.name} shared a task`;
+          if (isMentioned && isAssigned) {
+            title = `${currentUser.name} mentioned you in a shared task (assigned to you)`;
+          } else if (isMentioned) {
+            title = `${currentUser.name} mentioned you in a shared task`;
+          } else if (isAssigned) {
+            title = `${currentUser.name} shared a task assigned to you`;
+          }
+
+          await createNotification(
+            userId,
+            title,
+            `"${task.title}" in #${channelName}`,
+            'message',
+            'TASKS',
+            { taskId: task.id, boardId: taskModal.clientId, groupId: taskModal.groupId, boardName: activeClient.name }
+          );
+        }
+      }
+
       addToast('success', `Task shared to #${channelName}`);
       setShowShareModal(false);
+      setShareMessage('');
     } catch (error) {
       console.error('Error sharing task:', error);
       addToast('error', 'Failed to share task to chat');
@@ -1838,10 +1927,10 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                   <Share2 className="w-5 h-5 text-brand-600" />
                   Share to Chat
                 </h3>
-                <p className="text-sm text-slate-500 mt-0.5">Select a channel to share this task</p>
+                <p className="text-sm text-slate-500 mt-0.5">Add a message and select a channel</p>
               </div>
               <button
-                onClick={() => setShowShareModal(false)}
+                onClick={() => { setShowShareModal(false); setShareMessage(''); setShareMentionDropdown(null); }}
                 className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-lg transition-colors"
               >
                 <X className="w-5 h-5" />
@@ -1870,8 +1959,54 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
               </div>
             </div>
 
+            {/* Message Input with @mention support */}
+            <div className="p-4 border-b border-slate-100 relative">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
+                Message (optional) - Use @ to mention people
+              </label>
+              <textarea
+                ref={shareMessageRef}
+                value={shareMessage}
+                onChange={handleShareMessageChange}
+                placeholder="Add a message... Type @ to mention someone"
+                className="w-full p-3 text-sm border border-slate-200 rounded-lg outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 resize-none"
+                rows={3}
+              />
+
+              {/* Mention Dropdown */}
+              {shareMentionDropdown?.show && (
+                <div className="absolute left-4 right-4 bg-white border border-slate-200 rounded-lg shadow-xl max-h-40 overflow-y-auto z-10" style={{ bottom: '100%', marginBottom: '4px' }}>
+                  {teamProfiles
+                    .filter(p => p.id !== currentUser.id && (p.full_name?.toLowerCase().includes(shareMentionDropdown.search) || shareMentionDropdown.search === ''))
+                    .slice(0, 5)
+                    .map(profile => (
+                      <button
+                        key={profile.id}
+                        onClick={() => insertShareMention(profile)}
+                        className="w-full flex items-center gap-2 p-2 hover:bg-brand-50 text-left transition-colors"
+                      >
+                        {profile.avatar_url ? (
+                          <img src={profile.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-7 h-7 rounded-full bg-brand-100 flex items-center justify-center text-xs font-bold text-brand-700">
+                            {profile.full_name?.charAt(0) || '?'}
+                          </div>
+                        )}
+                        <span className="text-sm font-medium text-slate-700">{profile.full_name || 'Unknown'}</span>
+                      </button>
+                    ))}
+                  {teamProfiles.filter(p => p.id !== currentUser.id && (p.full_name?.toLowerCase().includes(shareMentionDropdown.search) || shareMentionDropdown.search === '')).length === 0 && (
+                    <div className="p-3 text-sm text-slate-400 text-center">No matches found</div>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Channel List */}
-            <div className="p-4 max-h-64 overflow-y-auto">
+            <div className="p-4 max-h-48 overflow-y-auto">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
+                Select Channel
+              </label>
               {isLoadingChannels ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="w-6 h-6 text-brand-600 animate-spin" />
@@ -1913,7 +2048,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
             {/* Footer */}
             <div className="p-4 bg-slate-50 border-t border-slate-100">
               <button
-                onClick={() => setShowShareModal(false)}
+                onClick={() => { setShowShareModal(false); setShareMessage(''); setShareMentionDropdown(null); }}
                 className="w-full py-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
               >
                 Cancel
