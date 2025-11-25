@@ -340,7 +340,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto scrollbar-hide">
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-hidden">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentView === item.id;
@@ -348,52 +348,52 @@ const Sidebar: React.FC<SidebarProps> = ({
             <button
               key={item.id}
               onClick={() => handleViewChange(item.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${
                 isActive
                   ? 'bg-brand-600 text-white shadow-md shadow-brand-900/20'
                   : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
               }`}
             >
-              <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-300'}`} />
+              <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-300'}`} />
               <span className="font-medium text-sm">{item.label}</span>
             </button>
           );
         })}
-        
+
         {/* Invite Button - Moved to main nav as requested */}
         {currentUser.role === 'Owner' && (
-            <div className="pt-4 pb-2">
-                <div className="px-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Team Management</div>
-                <button 
+            <div className="pt-3">
+                <div className="px-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Team Management</div>
+                <button
                     onClick={onInvite}
-                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 bg-blue-600/10 text-blue-400 border border-blue-600/20 hover:bg-blue-600 hover:text-white group"
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 bg-blue-600/10 text-blue-400 border border-blue-600/20 hover:bg-blue-600 hover:text-white group"
                 >
-                    <UserPlus className="w-5 h-5 text-blue-500 group-hover:text-white" />
+                    <UserPlus className="w-5 h-5 flex-shrink-0 text-blue-500 group-hover:text-white" />
                     <span className="font-medium text-sm">Invite Team Member</span>
                 </button>
             </div>
         )}
       </nav>
 
-      <div className="p-4 border-t border-slate-800 space-y-4 flex-shrink-0">
+      <div className="p-3 border-t border-slate-800 space-y-2 flex-shrink-0">
         {/* User Profile */}
         <div className="relative">
-            <button 
+            <button
               onClick={() => setIsProfileOpen(!isProfileOpen)}
-              className="w-full flex items-center gap-3 p-2 hover:bg-slate-800 rounded-lg transition-colors group"
+              className="w-full flex items-center gap-2 p-2 hover:bg-slate-800 rounded-lg transition-colors group"
             >
               {currentUser.avatarUrl ? (
-                  <img src={currentUser.avatarUrl} alt="Avatar" className="w-8 h-8 rounded-full object-cover border border-brand-400" />
+                  <img src={currentUser.avatarUrl} alt="Avatar" className="w-8 h-8 rounded-full object-cover border border-brand-400 flex-shrink-0" />
               ) : (
-                  <div className="w-8 h-8 rounded-full bg-brand-600 flex items-center justify-center text-xs font-bold text-white border border-brand-400 shadow-sm">
+                  <div className="w-8 h-8 rounded-full bg-brand-600 flex items-center justify-center text-xs font-bold text-white border border-brand-400 shadow-sm flex-shrink-0">
                     {currentUser.initials}
                   </div>
               )}
-              <div className="flex-1 text-left overflow-hidden">
+              <div className="flex-1 text-left overflow-hidden min-w-0">
                 <p className="text-sm font-medium text-slate-200 truncate">{currentUser.name}</p>
                 <p className="text-xs text-slate-500 truncate">{currentUser.role}</p>
               </div>
-              <MoreVertical className="w-4 h-4 text-slate-500 group-hover:text-slate-300" />
+              <MoreVertical className="w-4 h-4 text-slate-500 group-hover:text-slate-300 flex-shrink-0" />
             </button>
             
             {/* Profile Menu */}
