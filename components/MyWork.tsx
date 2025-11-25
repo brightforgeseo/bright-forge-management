@@ -1,7 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, Table as TableIcon, CheckCircle2, AlertCircle, Clock, ChevronLeft, ChevronRight, Users, Filter, MessageCircle, X, Send } from 'lucide-react';
 import { User, ToastType, Task, TaskGroup, ClientBoard, Profile, TaskComment } from '../types';
 import { fetchClientBoards, fetchProfiles, saveClientBoard, createNotification } from '../services/databaseService';
+
+// Detect @mentions in text
+const detectMentions = (text: string, profiles: Profile[]): string[] => {
+  const mentionedIds: string[] = [];
+
+  // Check for @everyone
+  if (text.toLowerCase().includes('@everyone')) {
+    return profiles.map(p => p.id);
+  }
+
+  // Check for @name mentions
+  profiles.forEach(profile => {
+    const name = profile.full_name || '';
+    const firstName = name.split(' ')[0].toLowerCase();
+    const fullName = name.toLowerCase();
+
+    if (text.toLowerCase().includes(`@${firstName}`) || text.toLowerCase().includes(`@${fullName}`)) {
+      mentionedIds.push(profile.id);
+    }
+  });
+
+  return mentionedIds;
+};
 
 interface MyWorkProps {
   currentUser: User;
@@ -40,9 +63,61 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
   const [isSaving, setIsSaving] = useState(false);
   const [allBoards, setAllBoards] = useState<ClientBoard[]>([]);
 
+  // Mention dropdown state
+  const [mentionDropdown, setMentionDropdown] = useState<{ show: boolean; search: string; position: number } | null>(null);
+  const commentInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     loadData();
   }, []);
+
+  // Handle deep link from notification click
+  useEffect(() => {
+    const checkForDeepLink = () => {
+      const openTaskData = localStorage.getItem('openMyWorkTask');
+      if (!openTaskData) return;
+
+      // Wait for tasks to load
+      if (allTasks.length === 0) return;
+
+      try {
+        const linkData = JSON.parse(openTaskData);
+        const { taskId, boardId } = linkData;
+
+        // Find the task in allTasks
+        const task = allTasks.find(t => t.id === taskId && t.clientId === boardId);
+
+        if (task) {
+          setSelectedTask(task);
+          setIsTaskModalOpen(true);
+          localStorage.removeItem('openMyWorkTask');
+        } else {
+          // Task not found in My Work (maybe user not assigned)
+          // Clear the localStorage and let them know
+          localStorage.removeItem('openMyWorkTask');
+          console.warn('[MyWork] Task not found in My Work tasks:', linkData);
+        }
+      } catch (e) {
+        console.error('[MyWork] Error processing deep link:', e);
+        localStorage.removeItem('openMyWorkTask');
+      }
+    };
+
+    // Check on mount and when tasks load
+    checkForDeepLink();
+
+    // Listen for custom event (same-tab detection)
+    const handleOpenMyWorkTask = (event: CustomEvent) => {
+      // Small delay to ensure state is ready
+      setTimeout(checkForDeepLink, 100);
+    };
+
+    window.addEventListener('openMyWorkTask', handleOpenMyWorkTask as EventListener);
+
+    return () => {
+      window.removeEventListener('openMyWorkTask', handleOpenMyWorkTask as EventListener);
+    };
+  }, [allTasks]);
 
   const loadData = async () => {
     setLoading(true);
@@ -240,31 +315,41 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
   const handleAddComment = async () => {
     if (!newComment.trim() || !selectedTask) return;
 
+    setMentionDropdown(null);
+    const mentions = detectMentions(newComment.trim(), teamProfiles);
+
     const comment: TaskComment = {
       id: Date.now().toString(),
       author: currentUser.name,
       authorId: currentUser.id,
       text: newComment.trim(),
       timestamp: new Date().toISOString(),
-      avatar: currentUser.avatarUrl
+      avatar: currentUser.avatarUrl,
+      mentions
     };
 
     const updatedComments = [...(selectedTask.comments || []), comment];
     await updateTaskInBoard(selectedTask, 'comments', updatedComments);
+    const commentText = newComment;
     setNewComment('');
 
-    // Send notification to assigned users
+    // Collect all users to notify (assigned + mentioned, no duplicates)
     const assignedIds = Array.isArray(selectedTask.assignedTo)
       ? selectedTask.assignedTo
       : selectedTask.assignedTo ? [selectedTask.assignedTo] : [];
 
-    for (const userId of assignedIds) {
+    const usersToNotify = new Set<string>([...assignedIds, ...mentions]);
+
+    for (const userId of usersToNotify) {
       if (userId !== currentUser.id) {
+        const isMentioned = mentions.includes(userId);
         await createNotification(
           userId,
-          `New comment on "${selectedTask.title}"`,
-          `${currentUser.name}: ${newComment.substring(0, 100)}`,
-          'info',
+          isMentioned
+            ? `${currentUser.name} mentioned you on "${selectedTask.title}"`
+            : `New comment on "${selectedTask.title}"`,
+          `${currentUser.name}: ${commentText.substring(0, 100)}`,
+          isMentioned ? 'message' : 'info',
           'MY_WORK',
           {
             taskId: selectedTask.id,
@@ -274,6 +359,16 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
         );
       }
     }
+  };
+
+  // Handle selecting a mention from dropdown
+  const handleSelectMention = (name: string) => {
+    if (!mentionDropdown) return;
+    const lastAtIndex = newComment.lastIndexOf('@');
+    const newText = newComment.substring(0, lastAtIndex) + '@' + name + ' ' + newComment.substring(mentionDropdown.position);
+    setNewComment(newText);
+    setMentionDropdown(null);
+    commentInputRef.current?.focus();
   };
 
   // Get all unique statuses across all boards
@@ -890,16 +985,97 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
                       </div>
                     )}
                   </div>
-                  <div className="flex-1 flex gap-2">
+                  <div className="flex-1 flex gap-2 relative">
                     <input
+                      ref={commentInputRef}
                       type="text"
                       value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setNewComment(value);
+
+                        // Check for @ mentions
+                        const cursorPos = e.target.selectionStart || value.length;
+                        const textBeforeCursor = value.substring(0, cursorPos);
+                        const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+
+                        if (lastAtIndex !== -1 && cursorPos > lastAtIndex) {
+                          const searchText = textBeforeCursor.substring(lastAtIndex + 1);
+                          const charBeforeAt = lastAtIndex > 0 ? textBeforeCursor[lastAtIndex - 1] : ' ';
+                          // Only show if @ is at start or after space
+                          if (charBeforeAt === ' ' || lastAtIndex === 0) {
+                            setMentionDropdown({ show: true, search: searchText.toLowerCase(), position: cursorPos });
+                          } else {
+                            setMentionDropdown(null);
+                          }
+                        } else {
+                          setMentionDropdown(null);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') {
+                          setMentionDropdown(null);
+                        }
+                      }}
                       onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}
-                      placeholder="Add a comment..."
+                      placeholder="Add a comment... (Use @name to mention)"
                       disabled={isSaving}
                       className="flex-1 p-2.5 border border-slate-300 rounded-lg outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 text-sm disabled:opacity-50"
                     />
+
+                    {/* Mention Dropdown */}
+                    {mentionDropdown?.show && (
+                      <div className="absolute bottom-full left-0 mb-2 w-64 bg-white rounded-lg shadow-xl border border-slate-200 overflow-hidden z-[100]">
+                        <div className="p-2 bg-slate-50 border-b border-slate-200">
+                          <p className="text-xs font-bold text-slate-500 uppercase">Mention Someone</p>
+                        </div>
+                        <div className="max-h-48 overflow-y-auto">
+                          {/* @everyone option */}
+                          {(!mentionDropdown.search || 'everyone'.includes(mentionDropdown.search)) && (
+                            <button
+                              onClick={() => handleSelectMention('everyone')}
+                              className="w-full text-left px-3 py-2 hover:bg-brand-50 transition-colors flex items-center gap-2 text-sm"
+                            >
+                              <div className="w-8 h-8 rounded-full bg-brand-600 flex items-center justify-center text-white font-bold text-xs">
+                                ALL
+                              </div>
+                              <div>
+                                <p className="font-medium text-slate-900">@everyone</p>
+                                <p className="text-xs text-slate-500">Notify all team members</p>
+                              </div>
+                            </button>
+                          )}
+
+                          {/* Team members */}
+                          {teamProfiles
+                            .filter(profile => {
+                              if (!mentionDropdown.search) return true;
+                              const name = (profile.full_name || '').toLowerCase();
+                              return name.includes(mentionDropdown.search);
+                            })
+                            .map(profile => (
+                              <button
+                                key={profile.id}
+                                onClick={() => handleSelectMention(profile.full_name?.split(' ')[0] || 'User')}
+                                className="w-full text-left px-3 py-2 hover:bg-brand-50 transition-colors flex items-center gap-2 text-sm"
+                              >
+                                {profile.avatar_url ? (
+                                  <img src={profile.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover" />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-bold text-xs">
+                                    {profile.full_name?.charAt(0) || '?'}
+                                  </div>
+                                )}
+                                <div>
+                                  <p className="font-medium text-slate-900">{profile.full_name || 'Unknown'}</p>
+                                  <p className="text-xs text-slate-500">@{profile.full_name?.split(' ')[0] || 'user'}</p>
+                                </div>
+                              </button>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+
                     <button
                       onClick={handleAddComment}
                       disabled={!newComment.trim() || isSaving}

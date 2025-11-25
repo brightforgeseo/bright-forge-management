@@ -243,6 +243,13 @@ const Sidebar: React.FC<SidebarProps> = ({
           console.log('[Sidebar] Setting openChatNotification:', linkData);
           localStorage.setItem('openChatNotification', JSON.stringify(linkData));
         }
+
+        // Handle MY_WORK task notifications
+        if (notification.linkView === 'MY_WORK' && linkData.taskId) {
+          console.log('[Sidebar] Setting openMyWorkTask:', linkData);
+          localStorage.setItem('openMyWorkTask', JSON.stringify(linkData));
+          window.dispatchEvent(new CustomEvent('openMyWorkTask', { detail: linkData }));
+        }
       } else {
         console.warn('[Sidebar] No linkData found in notification');
       }
