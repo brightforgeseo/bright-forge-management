@@ -317,16 +317,16 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
       <div className="flex-1 overflow-hidden p-4 lg:p-8 flex flex-col">
         {viewMode === 'table' ? (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden">
-            <div className="overflow-auto flex-1">
-              <table className="w-full min-w-[800px]">
+            <div className="overflow-y-auto flex-1">
+              <table className="w-full table-fixed">
                 <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
                   <tr>
-                    <th className="text-left py-3 px-4 lg:px-6 text-xs font-semibold text-slate-500 uppercase">Task</th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase w-32 lg:w-48">Group</th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase w-32 lg:w-48">Board</th>
-                    <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase w-24 lg:w-32">Date</th>
-                    <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase w-24 lg:w-32">Status</th>
-                    <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase w-24 lg:w-32">Priority</th>
+                    <th className="text-left py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase w-[25%]">Task</th>
+                    <th className="text-left py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase w-[15%]">Group</th>
+                    <th className="text-left py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase w-[20%]">Board</th>
+                    <th className="text-center py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase w-[12%]">Date</th>
+                    <th className="text-center py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase w-[14%]">Status</th>
+                    <th className="text-center py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase w-[14%]">Priority</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -348,19 +348,19 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
                             className="hover:bg-slate-50 transition-colors cursor-pointer"
                             onClick={() => handleTaskClick(task)}
                           >
-                            <td className="py-3 px-4 lg:px-6">
-                              <div className="flex items-center gap-3">
+                            <td className="py-3 px-2 lg:px-4">
+                              <div className="flex items-center gap-2">
                                 <div className="w-1 h-8 rounded-full flex-shrink-0" style={{ backgroundColor: task.groupColor }}></div>
                                 <span className="text-sm font-medium text-slate-700 truncate">{task.title}</span>
                               </div>
                             </td>
-                            <td className="py-3 px-4">
+                            <td className="py-3 px-2 lg:px-4">
                               <span className="text-sm text-slate-600 truncate block">{task.groupTitle}</span>
                             </td>
-                            <td className="py-3 px-4">
+                            <td className="py-3 px-2 lg:px-4">
                               <span className="text-sm text-slate-600 truncate block">{task.clientName}</span>
                             </td>
-                            <td className="py-3 px-4 text-center">
+                            <td className="py-3 px-2 lg:px-4 text-center">
                               <span className={`text-sm font-medium whitespace-nowrap ${
                                 status === 'overdue' ? 'text-red-600' :
                                 status === 'today' ? 'text-blue-600' :
@@ -370,14 +370,14 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
                                 {new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                               </span>
                             </td>
-                            <td className="py-3 px-4 text-center">
+                            <td className="py-3 px-2 lg:px-4 text-center">
                               {(() => {
                                 const statusDef = task.boardData.statusDefs.find(s => s.id === task.status);
                                 const statusLabel = statusDef?.label || task.status;
                                 const statusColor = statusDef?.color || '#94a3b8';
                                 return (
                                   <span
-                                    className="inline-block px-2 py-1 text-xs font-semibold rounded whitespace-nowrap"
+                                    className="inline-block px-2 py-1 text-xs font-semibold rounded truncate max-w-full"
                                     style={{
                                       backgroundColor: statusColor + '20',
                                       color: statusColor
@@ -388,14 +388,14 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
                                 );
                               })()}
                             </td>
-                            <td className="py-3 px-4 text-center">
+                            <td className="py-3 px-2 lg:px-4 text-center">
                               {(() => {
                                 const priorityDef = task.boardData.priorityDefs.find(p => p.id === task.priority);
                                 const priorityLabel = priorityDef?.label || task.priority;
                                 const priorityColor = priorityDef?.color || '#94a3b8';
                                 return (
                                   <span
-                                    className="inline-block px-2 py-1 text-xs font-semibold rounded whitespace-nowrap"
+                                    className="inline-block px-2 py-1 text-xs font-semibold rounded truncate max-w-full"
                                     style={{
                                       backgroundColor: priorityColor + '20',
                                       color: priorityColor
