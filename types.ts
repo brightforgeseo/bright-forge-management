@@ -141,6 +141,9 @@ export interface ChatMessage {
   isEdited?: boolean; // Flag to show message was edited
   editedAt?: string; // Timestamp of last edit
   reactions?: MessageReaction[]; // Emoji reactions on this message
+  // Call room ID for voice/video calls
+  callRoomId?: string;
+  callType?: 'video' | 'voice';
   // Task link fields for shared tasks
   taskLink?: {
     taskId: string;

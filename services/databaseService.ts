@@ -355,7 +355,9 @@ export const fetchChatMessages = async (channelId: string): Promise<ChatMessage[
     attachmentType: row.attachment_type,
     isEdited: row.is_edited,
     editedAt: row.edited_at,
-    taskLink: row.task_link
+    taskLink: row.task_link,
+    callRoomId: row.call_room_id,
+    callType: row.call_type
   }));
 };
 
@@ -375,6 +377,12 @@ export const sendChatMessage = async (msg: ChatMessage) => {
   // Include task link data if present (stored as JSON in text or a separate column)
   if (msg.taskLink) {
     insertData.task_link = msg.taskLink;
+  }
+
+  // Include call room data if present
+  if (msg.callRoomId) {
+    insertData.call_room_id = msg.callRoomId;
+    insertData.call_type = msg.callType;
   }
 
   const { data, error } = await supabase

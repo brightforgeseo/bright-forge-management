@@ -448,7 +448,9 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
           attachmentType: newMsg.attachment_type,
           isEdited: newMsg.is_edited,
           editedAt: newMsg.edited_at,
-          taskLink: newMsg.task_link
+          taskLink: newMsg.task_link,
+          callRoomId: newMsg.call_room_id,
+          callType: newMsg.call_type
         };
 
         // Only update if message is for current channel
@@ -833,11 +835,13 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
   };
 
   // Video/Voice Call Functions
-  const startCall = async (videoEnabled: boolean = true) => {
-    // Generate a unique room ID based on channel
-    const roomId = `${activeChannelId}-${Date.now()}`;
+  const [activeCallRoomId, setActiveCallRoomId] = useState<string | null>(null);
 
-    // Send message to channel about the call
+  const startCall = async (videoEnabled: boolean = true) => {
+    // Use channel ID as room ID so all channel members can join the same call
+    const roomId = `call-${activeChannelId}`;
+
+    // Send message to channel about the call with room ID
     const callMsg: ChatMessage = {
       id: Date.now().toString(),
       channelId: activeChannelId,
@@ -845,17 +849,28 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       senderId: currentUser.id,
       text: `${videoEnabled ? '📹' : '📞'} Started a ${videoEnabled ? 'video' : 'voice'} call`,
       timestamp: new Date().toISOString(),
-      avatar: currentUser.avatarUrl || 'user'
+      avatar: currentUser.avatarUrl || 'user',
+      callRoomId: roomId,
+      callType: videoEnabled ? 'video' : 'voice'
     };
     await sendChatMessage(callMsg);
 
+    setActiveCallRoomId(roomId);
     setCallVideoEnabled(videoEnabled);
     setIsInCall(true);
     addToast('success', `${videoEnabled ? 'Video' : 'Voice'} call started!`);
   };
 
+  const joinCall = (roomId: string, videoEnabled: boolean = true) => {
+    setActiveCallRoomId(roomId);
+    setCallVideoEnabled(videoEnabled);
+    setIsInCall(true);
+    addToast('success', 'Joining call...');
+  };
+
   const handleCloseCall = () => {
     setIsInCall(false);
+    setActiveCallRoomId(null);
   };
 
   // SIMPLIFIED SEND MESSAGE - No optimistic updates, wait for database
@@ -1548,6 +1563,22 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                     </span>
                     {/* Task Link Card */}
                     {msg.taskLink && renderTaskLinkCard(msg.taskLink)}
+                    {/* Join Call Button */}
+                    {msg.callRoomId && !isInCall && (
+                      <button
+                        onClick={() => joinCall(msg.callRoomId!, msg.callType === 'video')}
+                        className="mt-2 flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-medium rounded-lg transition-colors"
+                      >
+                        {msg.callType === 'video' ? <Video className="w-4 h-4" /> : <Phone className="w-4 h-4" />}
+                        Join {msg.callType === 'video' ? 'Video' : 'Voice'} Call
+                      </button>
+                    )}
+                    {msg.callRoomId && isInCall && activeCallRoomId === msg.callRoomId && (
+                      <span className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 bg-green-100 text-green-700 text-sm font-medium rounded-lg">
+                        <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                        You&apos;re in this call
+                      </span>
+                    )}
                   </div>
                 )}
 
@@ -1852,11 +1883,11 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       </div>
 
       {/* Video Call */}
-      {isInCall && (
+      {isInCall && activeCallRoomId && (
         <VideoCall
-          roomId={activeChannelId}
+          roomId={activeCallRoomId}
           currentUser={currentUser}
-          channelName={channels.find(c => c.id === activeChannelId)?.name || 'Call'}
+          channelName={channels.find((c: ChatChannel) => c.id === activeChannelId)?.name || 'Call'}
           videoEnabled={callVideoEnabled}
           onClose={handleCloseCall}
         />
