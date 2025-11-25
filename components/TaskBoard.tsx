@@ -4,6 +4,7 @@ import { Plus, Sparkles, ChevronDown, ChevronUp, ChevronRight, Trash2, Briefcase
 import { Task, TaskGroup, User, ClientBoard, ToastType, LabelDefinition, Profile, TaskComment, ChatChannel, ChatMessage } from '../types';
 import { generateProjectTasks } from '../services/geminiService';
 import { fetchClientBoards, saveClientBoard, deleteClientBoard, uploadFile, fetchProfiles, createNotification, fetchChannels, sendChatMessage } from '../services/databaseService';
+import { supabase } from '../lib/supabaseClient';
 
 interface TaskBoardProps {
   currentUser: User;
@@ -409,6 +410,56 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   const [shareMessage, setShareMessage] = useState('');
   const [shareMentionDropdown, setShareMentionDropdown] = useState<{ show: boolean, search: string, position: number } | null>(null);
   const shareMessageRef = useRef<HTMLTextAreaElement>(null);
+
+  // Realtime subscription for client_boards changes
+  useEffect(() => {
+    const boardsSub = supabase.channel('public:client_boards')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'client_boards' }, async (payload) => {
+        console.log('[TaskBoard] Realtime update received:', payload.eventType);
+
+        // Refetch all boards to get the latest data
+        const boards = await fetchClientBoards();
+
+        if (boards.length > 0) {
+          // Preserve the currently selected board if it still exists
+          const currentSelectedId = selectedClientId;
+          setClients(boards);
+          clientsRef.current = boards;
+
+          // If the currently selected board still exists, keep it selected
+          if (currentSelectedId && boards.find(b => b.id === currentSelectedId)) {
+            // Keep current selection
+          } else if (boards.length > 0) {
+            setSelectedClientId(boards[0].id);
+          }
+
+          // Update task modal if open (the task data might have changed)
+          if (taskModal) {
+            const board = boards.find(b => b.id === taskModal.clientId);
+            if (board) {
+              for (const group of board.groups) {
+                const task = group.tasks.find(t => t.id === taskModal.task.id);
+                if (task) {
+                  setTaskModal({
+                    ...taskModal,
+                    task,
+                    groupId: group.id,
+                    groupTitle: group.title,
+                    groupColor: group.color
+                  });
+                  break;
+                }
+              }
+            }
+          }
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(boardsSub);
+    };
+  }, [selectedClientId, taskModal]);
 
   const activeClient = clients.find(c => c.id === selectedClientId);
 

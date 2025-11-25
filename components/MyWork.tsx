@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, Table as TableIcon, CheckCircle2, AlertCircle, Clock, ChevronLeft, ChevronRight, Users, Filter, MessageCircle, X, Send } from 'lucide-react';
 import { User, ToastType, Task, TaskGroup, ClientBoard, Profile, TaskComment } from '../types';
 import { fetchClientBoards, fetchProfiles, saveClientBoard, createNotification } from '../services/databaseService';
+import { supabase } from '../lib/supabaseClient';
 
 // Detect @mentions in text
 const detectMentions = (text: string, profiles: Profile[]): string[] => {
@@ -162,6 +163,65 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
     setTeamProfiles(profiles);
     setLoading(false);
   };
+
+  // Realtime subscription for client_boards changes
+  useEffect(() => {
+    const boardsSub = supabase.channel('public:client_boards_mywork')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'client_boards' }, async (payload) => {
+        console.log('[MyWork] Realtime update received:', payload.eventType);
+
+        // Refetch all boards and rebuild the task list
+        const [boards, profiles] = await Promise.all([fetchClientBoards(), fetchProfiles()]);
+
+        // Store all boards for updating
+        setAllBoards(boards);
+
+        // Extract all tasks with context
+        const tasks: TaskWithContext[] = [];
+        const taskIds = new Set<string>();
+
+        boards.forEach(board => {
+          board.groups.forEach(group => {
+            group.tasks.forEach(task => {
+              const assignedIds = Array.isArray(task.assignedTo)
+                ? task.assignedTo
+                : task.assignedTo ? [task.assignedTo] : [];
+
+              const taskKey = `${board.id}-${group.id}-${task.id}`;
+
+              if (assignedIds.length > 0 && !taskIds.has(taskKey)) {
+                taskIds.add(taskKey);
+                tasks.push({
+                  ...task,
+                  groupTitle: group.title,
+                  groupColor: group.color,
+                  clientName: board.name,
+                  clientId: board.id,
+                  groupId: group.id,
+                  boardData: board
+                });
+              }
+            });
+          });
+        });
+
+        setAllTasks(tasks);
+        setTeamProfiles(profiles);
+
+        // Update selected task if modal is open
+        if (selectedTask && isTaskModalOpen) {
+          const updatedTask = tasks.find(t => t.id === selectedTask.id && t.clientId === selectedTask.clientId);
+          if (updatedTask) {
+            setSelectedTask(updatedTask);
+          }
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(boardsSub);
+    };
+  }, [selectedTask, isTaskModalOpen]);
 
   // Update task in the source board and save
   const updateTaskInBoard = async (
