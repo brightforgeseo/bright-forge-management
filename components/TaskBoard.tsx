@@ -242,26 +242,37 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
         const board = clients.find(b => b.id === boardId);
         if (board) {
           setSelectedClientId(board.id);
-          const group = board.groups.find(g => g.id === groupId);
-          if (group) {
-            const task = group.tasks.find(t => t.id === taskId);
-            if (task) {
+
+          // First try the specified group
+          let group = board.groups.find(g => g.id === groupId);
+          let task = group?.tasks.find(t => t.id === taskId);
+
+          // If task not found in specified group, search all groups (task may have moved)
+          if (!task) {
+            for (const g of board.groups) {
+              const foundTask = g.tasks.find(t => t.id === taskId);
+              if (foundTask) {
+                task = foundTask;
+                group = g;
+                break;
+              }
+            }
+          }
+
+          if (task && group) {
+            requestAnimationFrame(() => {
               requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                  setTaskModal({
-                    task,
-                    groupId: group.id,
-                    clientId: board.id,
-                    groupTitle: group.title,
-                    groupColor: group.color
-                  });
+                setTaskModal({
+                  task,
+                  groupId: group!.id,
+                  clientId: board.id,
+                  groupTitle: group!.title,
+                  groupColor: group!.color
                 });
               });
-            } else {
-              addToast('Task not found. Showing board instead.', 'error');
-            }
+            });
           } else {
-            addToast('Task group not found. Showing board instead.', 'error');
+            addToast('Task not found. It may have been deleted.', 'error');
           }
         } else {
           addToast('Board not found. The board may have been deleted.', 'error');
@@ -280,22 +291,40 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
     // Also check whenever clients change
   }, [clients]);
 
-  // Also check when component first becomes visible (in case user switches to Tasks view)
+  // Also check when component becomes visible or when localStorage changes
   useEffect(() => {
-    // Set up an interval to check repeatedly until we process it
-    const interval = setInterval(() => {
+    // Check immediately on mount
+    const checkAndOpen = () => {
       const data = localStorage.getItem('openTaskModal');
       if (data && clients.length > 0) {
+        // Trigger the clients effect to process the deep link
         setClients(prev => [...prev]);
-        clearInterval(interval);
       }
-    }, 250);
+    };
+
+    // Initial check
+    checkAndOpen();
+
+    // Set up interval for cases where the data arrives after mount
+    const interval = setInterval(checkAndOpen, 250);
+
+    // Listen for storage changes (in case notification is clicked while on Tasks view)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'openTaskModal' && e.newValue) {
+        checkAndOpen();
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
 
     // Clean up after 5 seconds
-    setTimeout(() => clearInterval(interval), 5000);
+    const timeout = setTimeout(() => clearInterval(interval), 5000);
 
-    return () => clearInterval(interval);
-  }, []);
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [clients.length]);
 
   // Debounced Save Logic
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
