@@ -518,6 +518,48 @@ export const uploadFile = async (file: File, bucket: string = 'uploads'): Promis
 
 // --- Due Date Notifications ---
 
+// Helper function to create notification for a single user if not duplicate
+const createNotificationIfNotDuplicate = async (
+  userId: string,
+  title: string,
+  message: string,
+  taskId: string,
+  boardId: string,
+  groupId: string,
+  boardName: string,
+  today: string
+) => {
+  const { data: existing } = await supabase
+    .from('notifications')
+    .select('id, link_data, message')
+    .eq('user_id', userId)
+    .eq('type', 'alert')
+    .eq('title', title)
+    .gte('created_at', today + 'T00:00:00');
+
+  const isDuplicate = existing?.some(notif => {
+    if (notif.message === message) return true;
+    if (notif.link_data) {
+      const linkData = typeof notif.link_data === 'string'
+        ? JSON.parse(notif.link_data)
+        : notif.link_data;
+      return linkData.taskId === taskId && linkData.boardId === boardId;
+    }
+    return false;
+  });
+
+  if (!isDuplicate) {
+    await createNotification(
+      userId,
+      title,
+      message,
+      'alert',
+      'TASKS',
+      { taskId, boardId, groupId }
+    );
+  }
+};
+
 export const checkDueDateNotifications = async (currentUserId: string) => {
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -542,87 +584,46 @@ export const checkDueDateNotifications = async (currentUserId: string) => {
         if (!task.dueDate || !task.assignedTo) continue;
 
         const assignedIds = Array.isArray(task.assignedTo) ? task.assignedTo : [task.assignedTo];
+
+        // Skip if current user is not assigned (they triggered the check)
         if (!assignedIds.includes(currentUserId)) continue;
 
         const taskDueDate = new Date(task.dueDate);
         const daysOverdue = Math.floor((now.getTime() - taskDueDate.getTime()) / (1000 * 60 * 60 * 24));
 
-        // Notification 1: Task due today
+        // Notification 1: Task due today - notify ALL assigned users
         if (task.dueDate === today) {
-          const taskMessage = `"${task.title}" is due today on ${boardData.name}`;
-          const { data: existing } = await supabase
-            .from('notifications')
-            .select('id, link_data, message')
-            .eq('user_id', currentUserId)
-            .eq('type', 'alert')
-            .eq('title', 'Task Due Today')
-            .gte('created_at', today + 'T00:00:00');
-
-          const isDuplicate = existing?.some(notif => {
-            if (notif.message === taskMessage) return true;
-            if (notif.link_data) {
-              const linkData = typeof notif.link_data === 'string'
-                ? JSON.parse(notif.link_data)
-                : notif.link_data;
-              return linkData.taskId === task.id && linkData.boardId === boardData.id;
-            }
-            return false;
-          });
-
-          if (!isDuplicate) {
-            await createNotification(
-              currentUserId,
+          for (const userId of assignedIds) {
+            const taskMessage = `"${task.title}" is due today on ${boardData.name}`;
+            await createNotificationIfNotDuplicate(
+              userId,
               'Task Due Today',
-              `"${task.title}" is due today on ${boardData.name}`,
-              'alert',
-              'TASKS',
-              {
-                taskId: task.id,
-                boardId: boardData.id,
-                groupId: group.id
-              }
+              taskMessage,
+              task.id,
+              boardData.id,
+              group.id,
+              boardData.name,
+              today
             );
           }
         }
 
-        // Notification 3: Task overdue for 2+ days with no comments
+        // Notification 2: Task overdue for 2+ days with no comments - notify ALL assigned users
         if (daysOverdue >= 2) {
           const hasComments = task.comments && task.comments.length > 0;
 
           if (!hasComments) {
-            const warningMessage = `"${task.title}" is ${daysOverdue} days overdue with no updates on ${boardData.name}`;
-
-            // Check if we already sent this warning today
-            const { data: existing } = await supabase
-              .from('notifications')
-              .select('id, link_data, message')
-              .eq('user_id', currentUserId)
-              .eq('type', 'alert')
-              .eq('title', 'Overdue Task Warning')
-              .gte('created_at', today + 'T00:00:00');
-
-            const isDuplicate = existing?.some(notif => {
-              if (notif.link_data) {
-                const linkData = typeof notif.link_data === 'string'
-                  ? JSON.parse(notif.link_data)
-                  : notif.link_data;
-                return linkData.taskId === task.id && linkData.boardId === boardData.id;
-              }
-              return false;
-            });
-
-            if (!isDuplicate) {
-              await createNotification(
-                currentUserId,
+            for (const userId of assignedIds) {
+              const warningMessage = `"${task.title}" is ${daysOverdue} days overdue with no updates on ${boardData.name}`;
+              await createNotificationIfNotDuplicate(
+                userId,
                 'Overdue Task Warning',
                 warningMessage,
-                'alert',
-                'TASKS',
-                {
-                  taskId: task.id,
-                  boardId: boardData.id,
-                  groupId: group.id
-                }
+                task.id,
+                boardData.id,
+                group.id,
+                boardData.name,
+                today
               );
             }
           }
