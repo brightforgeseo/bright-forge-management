@@ -354,12 +354,13 @@ export const fetchChatMessages = async (channelId: string): Promise<ChatMessage[
     attachmentUrl: row.attachment_url,
     attachmentType: row.attachment_type,
     isEdited: row.is_edited,
-    editedAt: row.edited_at
+    editedAt: row.edited_at,
+    taskLink: row.task_link
   }));
 };
 
 export const sendChatMessage = async (msg: ChatMessage) => {
-  const insertData = {
+  const insertData: Record<string, any> = {
     channel_id: msg.channelId,
     sender: msg.sender,
     sender_id: msg.senderId,
@@ -370,6 +371,11 @@ export const sendChatMessage = async (msg: ChatMessage) => {
     attachment_url: msg.attachmentUrl,
     attachment_type: msg.attachmentType
   };
+
+  // Include task link data if present (stored as JSON in text or a separate column)
+  if (msg.taskLink) {
+    insertData.task_link = msg.taskLink;
+  }
 
   const { data, error } = await supabase
     .from('chat_messages')

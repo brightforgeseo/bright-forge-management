@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Plus, Sparkles, ChevronDown, ChevronUp, ChevronRight, Trash2, Briefcase, CheckCircle2, Settings, Mail, Phone, Globe, X, Image as ImageIcon, Edit3, Palette, Loader2, Upload, UserCircle, Link as LinkIcon, MessageCircle, Send, Search } from 'lucide-react';
-import { Task, TaskGroup, User, ClientBoard, ToastType, LabelDefinition, Profile, TaskComment } from '../types';
+import { Plus, Sparkles, ChevronDown, ChevronUp, ChevronRight, Trash2, Briefcase, CheckCircle2, Settings, Mail, Phone, Globe, X, Image as ImageIcon, Edit3, Palette, Loader2, Upload, UserCircle, Link as LinkIcon, MessageCircle, Send, Search, Share2, Hash, Users } from 'lucide-react';
+import { Task, TaskGroup, User, ClientBoard, ToastType, LabelDefinition, Profile, TaskComment, ChatChannel, ChatMessage } from '../types';
 import { generateProjectTasks } from '../services/geminiService';
-import { fetchClientBoards, saveClientBoard, deleteClientBoard, uploadFile, fetchProfiles, createNotification } from '../services/databaseService';
+import { fetchClientBoards, saveClientBoard, deleteClientBoard, uploadFile, fetchProfiles, createNotification, fetchChannels, sendChatMessage } from '../services/databaseService';
 
 interface TaskBoardProps {
   currentUser: User;
@@ -386,7 +386,77 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   const [newComment, setNewComment] = useState('');
   const [mentionDropdown, setMentionDropdown] = useState<{ show: boolean, search: string, position: number } | null>(null);
 
+  // Share to Chat state
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [chatChannels, setChatChannels] = useState<ChatChannel[]>([]);
+  const [isLoadingChannels, setIsLoadingChannels] = useState(false);
+  const [isSharingTask, setIsSharingTask] = useState(false);
+
   const activeClient = clients.find(c => c.id === selectedClientId);
+
+  // Open share modal and load channels
+  const handleOpenShareModal = async () => {
+    setShowShareModal(true);
+    setIsLoadingChannels(true);
+    try {
+      const channels = await fetchChannels();
+      // Filter to only show regular channels (not DMs)
+      const publicChannels = channels.filter(ch => ch.type === 'channel');
+      setChatChannels(publicChannels);
+    } catch (error) {
+      console.error('Error fetching channels:', error);
+      addToast('error', 'Failed to load chat channels');
+    } finally {
+      setIsLoadingChannels(false);
+    }
+  };
+
+  // Share task to selected channel
+  const handleShareTaskToChannel = async (channelId: string, channelName: string) => {
+    if (!taskModal || !activeClient) return;
+
+    setIsSharingTask(true);
+    try {
+      const task = taskModal.task;
+      const statusDef = activeClient.statusDefs.find(s => s.id === task.status);
+      const priorityDef = activeClient.priorityDefs.find(p => p.id === task.priority);
+
+      const taskLinkData = {
+        taskId: task.id,
+        groupId: taskModal.groupId,
+        boardId: taskModal.clientId,
+        boardName: activeClient.name,
+        groupTitle: taskModal.groupTitle,
+        title: task.title,
+        status: statusDef?.label || task.status,
+        statusColor: statusDef?.color || '#94a3b8',
+        priority: priorityDef?.label || task.priority,
+        priorityColor: priorityDef?.color || '#94a3b8',
+        dueDate: task.dueDate,
+        assignedTo: Array.isArray(task.assignedTo) ? task.assignedTo : (task.assignedTo ? [task.assignedTo] : [])
+      };
+
+      const chatMessage: ChatMessage = {
+        id: Date.now().toString(),
+        channelId: channelId,
+        sender: currentUser.name,
+        senderId: currentUser.id,
+        text: `📋 Shared a task: ${task.title}`,
+        timestamp: new Date().toISOString(),
+        avatar: currentUser.avatarUrl || 'user',
+        taskLink: taskLinkData
+      };
+
+      await sendChatMessage(chatMessage);
+      addToast('success', `Task shared to #${channelName}`);
+      setShowShareModal(false);
+    } catch (error) {
+      console.error('Error sharing task:', error);
+      addToast('error', 'Failed to share task to chat');
+    } finally {
+      setIsSharingTask(false);
+    }
+  };
 
   useEffect(() => {
     if (activeClient && isEditingClient) {
@@ -1302,9 +1372,19 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                 </div>
                 <p className="text-sm text-slate-500">{taskModal.groupTitle} • {activeClient.name}</p>
               </div>
-              <button onClick={() => setTaskModal(null)} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-lg transition-colors">
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleOpenShareModal}
+                  className="text-slate-400 hover:text-brand-600 p-2 hover:bg-brand-50 rounded-lg transition-colors flex items-center gap-1.5"
+                  title="Share to Chat"
+                >
+                  <Share2 className="w-5 h-5" />
+                  <span className="text-xs font-medium hidden sm:inline">Share</span>
+                </button>
+                <button onClick={() => setTaskModal(null)} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Modal Body - Scrollable */}
@@ -1720,13 +1800,13 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                <div className="p-4 space-y-3 max-h-[400px] overflow-y-auto">
                   {(labelEditorType === 'status' ? activeClient.statusDefs : activeClient.priorityDefs).map((def) => (
                      <div key={def.id} className="flex items-center gap-2">
-                        <input 
-                          type="color" 
-                          value={def.color} 
+                        <input
+                          type="color"
+                          value={def.color}
                           onChange={(e) => handleUpdateLabel(activeClient.id, labelEditorType, def.id, 'color', e.target.value)}
-                          className="w-8 h-8 rounded cursor-pointer border-none" 
+                          className="w-8 h-8 rounded cursor-pointer border-none"
                         />
-                        <input 
+                        <input
                           value={def.label}
                           onChange={(e) => handleUpdateLabel(activeClient.id, labelEditorType, def.id, 'label', e.target.value)}
                           className="flex-1 p-2 border border-slate-200 rounded text-sm outline-none focus:border-brand-500"
@@ -1734,7 +1814,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                         <button onClick={() => handleDeleteLabel(activeClient.id, labelEditorType, def.id)} className="p-2 text-slate-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
                      </div>
                   ))}
-                  <button 
+                  <button
                     onClick={() => handleAddLabel(activeClient.id, labelEditorType)}
                     className="w-full py-2 border-2 border-dashed border-slate-200 rounded-lg text-slate-400 hover:text-brand-600 hover:border-brand-200 text-sm font-semibold transition-colors mt-2"
                   >
@@ -1745,6 +1825,101 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                   <button onClick={() => setIsLabelEditorOpen(false)} className="bg-brand-600 text-white px-6 py-2 rounded-lg font-bold text-sm">Done</button>
                </div>
             </div>
+        </div>
+      )}
+
+      {/* Share to Chat Modal */}
+      {showShareModal && taskModal && (
+        <div className="fixed inset-0 bg-slate-900/60 z-[60] flex items-center justify-center p-4 animate-fadeIn backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-100">
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-slate-50 to-white">
+              <div>
+                <h3 className="font-bold text-lg text-slate-900 flex items-center gap-2">
+                  <Share2 className="w-5 h-5 text-brand-600" />
+                  Share to Chat
+                </h3>
+                <p className="text-sm text-slate-500 mt-0.5">Select a channel to share this task</p>
+              </div>
+              <button
+                onClick={() => setShowShareModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Task Preview */}
+            <div className="p-4 bg-slate-50 border-b border-slate-100">
+              <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <div className="w-1 h-12 rounded-full flex-shrink-0" style={{ backgroundColor: taskModal.groupColor }}></div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-slate-900 truncate">{taskModal.task.title}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{taskModal.groupTitle} • {activeClient?.name}</p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <span
+                        className="text-xs font-medium px-2 py-0.5 rounded text-white"
+                        style={{ backgroundColor: activeClient?.statusDefs.find(s => s.id === taskModal.task.status)?.color || '#94a3b8' }}
+                      >
+                        {activeClient?.statusDefs.find(s => s.id === taskModal.task.status)?.label || 'Status'}
+                      </span>
+                      <span className="text-xs text-slate-400">Due: {new Date(taskModal.task.dueDate).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Channel List */}
+            <div className="p-4 max-h-64 overflow-y-auto">
+              {isLoadingChannels ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 text-brand-600 animate-spin" />
+                  <span className="ml-2 text-slate-500">Loading channels...</span>
+                </div>
+              ) : chatChannels.length === 0 ? (
+                <div className="text-center py-8 text-slate-500">
+                  <Hash className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                  <p className="font-medium">No channels available</p>
+                  <p className="text-sm">Create a channel in Team Chat first</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {chatChannels.map((channel) => (
+                    <button
+                      key={channel.id}
+                      onClick={() => handleShareTaskToChannel(channel.id, channel.name)}
+                      disabled={isSharingTask}
+                      className="w-full flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:border-brand-300 hover:bg-brand-50 transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center group-hover:bg-brand-100 transition-colors">
+                        <Hash className="w-5 h-5 text-slate-500 group-hover:text-brand-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-slate-900 truncate">{channel.name}</p>
+                        <p className="text-xs text-slate-500">{channel.type === 'channel' ? 'Public channel' : 'Direct message'}</p>
+                      </div>
+                      {isSharingTask ? (
+                        <Loader2 className="w-5 h-5 text-brand-600 animate-spin" />
+                      ) : (
+                        <Send className="w-5 h-5 text-slate-300 group-hover:text-brand-600 transition-colors" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-100">
+              <button
+                onClick={() => setShowShareModal(false)}
+                className="w-full py-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check, Smile, Film, SmilePlus, Video, Phone, Lock, UserPlus, Menu } from 'lucide-react';
+import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check, Smile, Film, SmilePlus, Video, Phone, Lock, UserPlus, Menu, ClipboardList, Calendar, ArrowRight } from 'lucide-react';
 import { ChatChannel, ChatMessage, User, ToastType, Profile, MessageReaction } from '../types';
 import { getChatResponse } from '../services/geminiService';
 import { storeEchoConversation, buildConversationContext } from '../services/echoMemory';
@@ -10,9 +10,10 @@ import DailyIframe from '@daily-co/daily-js';
 interface TeamChatProps {
   currentUser: User;
   addToast: (type: ToastType, message: string) => void;
+  onNavigateToTask?: (taskId: string, boardId: string, groupId: string) => void;
 }
 
-const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
+const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateToTask }) => {
   // SIMPLE STATE MODEL - No caching, no drafts
   const [channels, setChannels] = useState<ChatChannel[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -118,6 +119,87 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
       }
       return part;
     });
+  };
+
+  // Handle clicking on a shared task link
+  const handleTaskLinkClick = (taskLink: ChatMessage['taskLink']) => {
+    if (!taskLink) return;
+
+    // Store task data in localStorage for TaskBoard to pick up
+    localStorage.setItem('openTaskModal', JSON.stringify({
+      taskId: taskLink.taskId,
+      boardId: taskLink.boardId,
+      groupId: taskLink.groupId
+    }));
+
+    // If onNavigateToTask is provided, use it (e.g., to switch views)
+    if (onNavigateToTask) {
+      onNavigateToTask(taskLink.taskId, taskLink.boardId, taskLink.groupId);
+    } else {
+      // Fallback: trigger storage event for any listening TaskBoard
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'openTaskModal',
+        newValue: JSON.stringify({
+          taskId: taskLink.taskId,
+          boardId: taskLink.boardId,
+          groupId: taskLink.groupId
+        })
+      }));
+    }
+  };
+
+  // Render a task link card
+  const renderTaskLinkCard = (taskLink: ChatMessage['taskLink']) => {
+    if (!taskLink) return null;
+
+    const dueDate = new Date(taskLink.dueDate);
+    const isOverdue = dueDate < new Date() && taskLink.status !== 'Done';
+
+    return (
+      <button
+        onClick={() => handleTaskLinkClick(taskLink)}
+        className="mt-2 w-full max-w-sm bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:border-brand-300 transition-all text-left group"
+      >
+        <div className="p-3">
+          <div className="flex items-start gap-3">
+            <div
+              className="w-1 h-full min-h-[3rem] rounded-full flex-shrink-0"
+              style={{ backgroundColor: taskLink.statusColor }}
+            ></div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <ClipboardList className="w-4 h-4 text-slate-400" />
+                <span className="text-xs text-slate-500 font-medium">{taskLink.boardName}</span>
+                <span className="text-xs text-slate-300">•</span>
+                <span className="text-xs text-slate-500">{taskLink.groupTitle}</span>
+              </div>
+              <p className="font-semibold text-slate-900 truncate group-hover:text-brand-600 transition-colors">
+                {taskLink.title}
+              </p>
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                <span
+                  className="text-xs font-medium px-2 py-0.5 rounded text-white"
+                  style={{ backgroundColor: taskLink.statusColor }}
+                >
+                  {taskLink.status}
+                </span>
+                <span
+                  className="text-xs font-medium px-2 py-0.5 rounded text-white"
+                  style={{ backgroundColor: taskLink.priorityColor }}
+                >
+                  {taskLink.priority}
+                </span>
+                <span className={`text-xs flex items-center gap-1 ${isOverdue ? 'text-red-500' : 'text-slate-500'}`}>
+                  <Calendar className="w-3 h-3" />
+                  {dueDate.toLocaleDateString()}
+                </span>
+              </div>
+            </div>
+            <ArrowRight className="w-5 h-5 text-slate-300 group-hover:text-brand-500 transition-colors flex-shrink-0 mt-2" />
+          </div>
+        </div>
+      </button>
+    );
   };
 
   // Search GIFs using Giphy API
@@ -366,7 +448,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
           attachmentUrl: newMsg.attachment_url,
           attachmentType: newMsg.attachment_type,
           isEdited: newMsg.is_edited,
-          editedAt: newMsg.edited_at
+          editedAt: newMsg.edited_at,
+          taskLink: newMsg.task_link
         };
 
         // Only update if message is for current channel
@@ -883,7 +966,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
         attachmentUrl: result.attachment_url,
         attachmentType: result.attachment_type,
         isEdited: result.is_edited,
-        editedAt: result.edited_at
+        editedAt: result.edited_at,
+        taskLink: result.task_link
       };
 
       setMessages(prev => {
@@ -1519,6 +1603,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast }) => {
                         </button>
                       )}
                     </span>
+                    {/* Task Link Card */}
+                    {msg.taskLink && renderTaskLinkCard(msg.taskLink)}
                   </div>
                 )}
 

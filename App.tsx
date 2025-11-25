@@ -202,7 +202,7 @@ ${currentUser.name}`;
       case ToolView.SITE_AUDIT: return <AuditTool />;
       case ToolView.TASKS: return <TaskBoard currentUser={currentUser} addToast={addToast} />;
       case ToolView.MY_WORK: return <MyWork currentUser={currentUser} addToast={addToast} onNavigateToTasks={() => setCurrentView(ToolView.TASKS)} />;
-      case ToolView.TEAM_CHAT: return <TeamChat currentUser={currentUser} addToast={addToast} />;
+      case ToolView.TEAM_CHAT: return <TeamChat currentUser={currentUser} addToast={addToast} onNavigateToTask={() => setCurrentView(ToolView.TASKS)} />;
       case ToolView.SETTINGS: return <Settings branding={branding} setBranding={setBranding} addToast={addToast} currentUser={currentUser} />;
       default: return <Dashboard currentUser={currentUser} setCurrentView={setCurrentView} />;
     }

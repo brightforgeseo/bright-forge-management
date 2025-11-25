@@ -141,6 +141,21 @@ export interface ChatMessage {
   isEdited?: boolean; // Flag to show message was edited
   editedAt?: string; // Timestamp of last edit
   reactions?: MessageReaction[]; // Emoji reactions on this message
+  // Task link fields for shared tasks
+  taskLink?: {
+    taskId: string;
+    groupId: string;
+    boardId: string;
+    boardName: string;
+    groupTitle: string;
+    title: string;
+    status: string;
+    statusColor: string;
+    priority: string;
+    priorityColor: string;
+    dueDate: string;
+    assignedTo?: string[];
+  };
 }
 
 export interface ChatChannel {
