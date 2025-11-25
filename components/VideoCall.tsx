@@ -53,6 +53,9 @@ const VideoCall: React.FC<VideoCallProps> = ({
         setLocalStream(stream);
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = stream;
+          localVideoRef.current.play().catch(err => {
+            console.log('[VideoCall] Local video autoplay failed:', err);
+          });
         }
       };
 
@@ -275,14 +278,39 @@ const VideoCall: React.FC<VideoCallProps> = ({
 // Remote video component
 const RemoteVideo: React.FC<{ participant: RemoteParticipant }> = ({ participant }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [hasVideo, setHasVideo] = useState(false);
 
   useEffect(() => {
     if (videoRef.current && participant.stream) {
       videoRef.current.srcObject = participant.stream;
+
+      // Try to play the video
+      videoRef.current.play().catch(err => {
+        console.log('[RemoteVideo] Autoplay failed, will retry on user interaction:', err);
+      });
+
+      // Check if video tracks exist and are enabled
+      const checkVideoTracks = () => {
+        const videoTracks = participant.stream.getVideoTracks();
+        const hasActiveVideo = videoTracks.length > 0 && videoTracks.some(track => track.enabled && track.readyState === 'live');
+        setHasVideo(hasActiveVideo);
+      };
+
+      // Initial check
+      checkVideoTracks();
+
+      // Listen for track changes
+      participant.stream.onaddtrack = checkVideoTracks;
+      participant.stream.onremovetrack = checkVideoTracks;
+
+      // Listen for track enabled/disabled changes
+      participant.stream.getVideoTracks().forEach(track => {
+        track.onmute = () => setHasVideo(false);
+        track.onunmute = () => setHasVideo(true);
+        track.onended = () => setHasVideo(false);
+      });
     }
   }, [participant.stream]);
-
-  const hasVideo = participant.stream?.getVideoTracks().some(track => track.enabled);
 
   return (
     <div className="relative bg-slate-800 rounded-xl overflow-hidden">
@@ -290,6 +318,7 @@ const RemoteVideo: React.FC<{ participant: RemoteParticipant }> = ({ participant
         ref={videoRef}
         autoPlay
         playsInline
+        muted={false}
         className={`w-full h-full object-cover ${!hasVideo ? 'hidden' : ''}`}
       />
       {!hasVideo && (
