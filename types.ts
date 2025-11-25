@@ -54,6 +54,7 @@ export interface ClientBoard {
   groups: TaskGroup[];
   statusDefs: LabelDefinition[];
   priorityDefs: LabelDefinition[];
+  archivedTasks?: ArchivedTask[]; // Soft-deleted tasks that can be restored
 }
 
 export enum ToolView {
@@ -111,6 +112,12 @@ export interface Task {
   worksheet?: string; // URL to worksheet
   clientSheet?: string; // URL to client sheet
   comments?: TaskComment[];
+}
+
+export interface ArchivedTask extends Task {
+  archivedAt: string; // ISO timestamp when task was archived
+  originalGroupId: string; // Group the task was in before archiving
+  originalGroupTitle: string; // Title of the original group
 }
 
 export interface TaskGroup {

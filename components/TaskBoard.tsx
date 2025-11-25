@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Plus, Sparkles, ChevronDown, ChevronUp, ChevronRight, Trash2, Briefcase, CheckCircle2, Settings, Mail, Phone, Globe, X, Image as ImageIcon, Edit3, Palette, Loader2, Upload, UserCircle, Link as LinkIcon, MessageCircle, Send, Search, Share2, Hash, Users } from 'lucide-react';
-import { Task, TaskGroup, User, ClientBoard, ToastType, LabelDefinition, Profile, TaskComment, ChatChannel, ChatMessage } from '../types';
+import { Plus, Sparkles, ChevronDown, ChevronUp, ChevronRight, Trash2, Briefcase, CheckCircle2, Settings, Mail, Phone, Globe, X, Image as ImageIcon, Edit3, Palette, Loader2, Upload, UserCircle, Link as LinkIcon, MessageCircle, Send, Search, Share2, Hash, Users, Archive, RotateCcw } from 'lucide-react';
+import { Task, TaskGroup, User, ClientBoard, ToastType, LabelDefinition, Profile, TaskComment, ChatChannel, ChatMessage, ArchivedTask } from '../types';
 import { generateProjectTasks } from '../services/geminiService';
 import { fetchClientBoards, saveClientBoard, deleteClientBoard, uploadFile, fetchProfiles, createNotification, fetchChannels, sendChatMessage } from '../services/databaseService';
 import { supabase } from '../lib/supabaseClient';
@@ -410,6 +410,9 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   const [shareMessage, setShareMessage] = useState('');
   const [shareMentionDropdown, setShareMentionDropdown] = useState<{ show: boolean, search: string, position: number } | null>(null);
   const shareMessageRef = useRef<HTMLTextAreaElement>(null);
+
+  // Archive panel state
+  const [showArchivePanel, setShowArchivePanel] = useState(false);
 
   // Realtime subscription for client_boards changes
   useEffect(() => {
@@ -847,6 +850,75 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
     });
   };
   const deleteTask = (cid: string, gid: string, tid: string) => updateClient(cid, c => ({ ...c, groups: c.groups.map(g => g.id === gid ? { ...g, tasks: g.tasks.filter(t => t.id !== tid) } : g) }));
+
+  // Archive a task (soft delete) - moves to archive instead of deleting
+  const archiveTask = (cid: string, gid: string, tid: string) => {
+    updateClient(cid, c => {
+      const group = c.groups.find((g: TaskGroup) => g.id === gid);
+      if (!group) return c;
+
+      const task = group.tasks.find((t: Task) => t.id === tid);
+      if (!task) return c;
+
+      // Create archived task with metadata
+      const archivedTask: ArchivedTask = {
+        ...task,
+        archivedAt: new Date().toISOString(),
+        originalGroupId: gid,
+        originalGroupTitle: group.title
+      };
+
+      // Remove from group and add to archive
+      return {
+        ...c,
+        groups: c.groups.map((g: TaskGroup) => g.id === gid ? { ...g, tasks: g.tasks.filter((t: Task) => t.id !== tid) } : g),
+        archivedTasks: [...(c.archivedTasks || []), archivedTask]
+      };
+    });
+    addToast('info', 'Task moved to archive');
+  };
+
+  // Restore a task from archive
+  const restoreTask = (cid: string, archivedTaskId: string) => {
+    updateClient(cid, c => {
+      const archivedTask = c.archivedTasks?.find((t: ArchivedTask) => t.id === archivedTaskId);
+      if (!archivedTask) return c;
+
+      // Find the original group or use the first group
+      let targetGroupId = archivedTask.originalGroupId;
+      let targetGroup = c.groups.find((g: TaskGroup) => g.id === targetGroupId);
+
+      // If original group doesn't exist, use first group
+      if (!targetGroup && c.groups.length > 0) {
+        targetGroup = c.groups[0];
+        targetGroupId = targetGroup.id;
+      }
+
+      if (!targetGroup) return c;
+
+      // Create restored task (without archive metadata)
+      const { archivedAt, originalGroupId, originalGroupTitle, ...restoredTask } = archivedTask;
+
+      return {
+        ...c,
+        groups: c.groups.map((g: TaskGroup) => g.id === targetGroupId ? { ...g, tasks: [...g.tasks, restoredTask as Task] } : g),
+        archivedTasks: c.archivedTasks?.filter((t: ArchivedTask) => t.id !== archivedTaskId) || []
+      };
+    });
+    addToast('success', 'Task restored');
+  };
+
+  // Permanently delete a task from archive
+  const permanentlyDeleteTask = (cid: string, archivedTaskId: string) => {
+    if (!window.confirm('Permanently delete this task? This cannot be undone.')) return;
+
+    updateClient(cid, c => ({
+      ...c,
+      archivedTasks: c.archivedTasks?.filter((t: ArchivedTask) => t.id !== archivedTaskId) || []
+    }));
+    addToast('info', 'Task permanently deleted');
+  };
+
   const moveTask = (cid: string, gid: string, tid: string, dir: 'up'|'down') => {
       updateClient(cid, c => {
           const gs = c.groups.map(g => {
@@ -961,9 +1033,19 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
             </button>
             
             {activeClient && (
-                <button onClick={() => setIsEditingClient(true)} className="text-slate-400 hover:text-brand-600 transition-colors">
-                    <Settings className="w-5 h-5" />
-                </button>
+                <>
+                  <button onClick={() => setShowArchivePanel(true)} className="text-slate-400 hover:text-amber-500 transition-colors relative" title="View archived tasks">
+                      <Archive className="w-5 h-5" />
+                      {(activeClient.archivedTasks?.length || 0) > 0 && (
+                        <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                          {activeClient.archivedTasks!.length}
+                        </span>
+                      )}
+                  </button>
+                  <button onClick={() => setIsEditingClient(true)} className="text-slate-400 hover:text-brand-600 transition-colors">
+                      <Settings className="w-5 h-5" />
+                  </button>
+                </>
             )}
 
             {/* Client Search Bar */}
@@ -1366,8 +1448,8 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                            </div>
                                         </td>
                                         <td className="py-2 px-2 text-center">
-                                           <button onClick={() => deleteTask(activeClient.id, group.id, task.id)} className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-colors">
-                                              <X className="w-4 h-4" />
+                                           <button onClick={() => archiveTask(activeClient.id, group.id, task.id)} className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-amber-500 transition-colors" title="Archive task">
+                                              <Archive className="w-4 h-4" />
                                            </button>
                                         </td>
                                       </tr>
@@ -2123,6 +2205,104 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                 className="w-full py-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Archive Panel Modal */}
+      {showArchivePanel && activeClient && (
+        <div className="fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full overflow-hidden max-h-[80vh] flex flex-col">
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-amber-50 to-white">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
+                  <Archive className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg text-slate-900">Archived Tasks</h3>
+                  <p className="text-sm text-slate-500">{activeClient.archivedTasks?.length || 0} archived tasks for {activeClient.name}</p>
+                </div>
+              </div>
+              <button onClick={() => setShowArchivePanel(false)} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4">
+              {(!activeClient.archivedTasks || activeClient.archivedTasks.length === 0) ? (
+                <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+                  <Archive className="w-16 h-16 mb-4 opacity-20" />
+                  <p className="font-medium text-lg">No archived tasks</p>
+                  <p className="text-sm mt-1">Tasks you archive will appear here</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {activeClient.archivedTasks.map((archivedTask) => {
+                    const statusDef = activeClient.statusDefs.find(s => s.id === archivedTask.status);
+                    const priorityDef = activeClient.priorityDefs.find(p => p.id === archivedTask.priority);
+
+                    return (
+                      <div key={archivedTask.id} className="bg-white border border-slate-200 rounded-xl p-4 hover:border-slate-300 transition-colors">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-semibold text-slate-900 truncate">{archivedTask.title}</h4>
+                            <div className="flex items-center gap-2 mt-2 flex-wrap">
+                              <span
+                                className="text-xs font-medium px-2 py-0.5 rounded text-white"
+                                style={{ backgroundColor: statusDef?.color || '#94a3b8' }}
+                              >
+                                {statusDef?.label || 'Unknown'}
+                              </span>
+                              <span
+                                className="text-xs font-medium px-2 py-0.5 rounded text-white"
+                                style={{ backgroundColor: priorityDef?.color || '#94a3b8' }}
+                              >
+                                {priorityDef?.label || 'Unknown'}
+                              </span>
+                              <span className="text-xs text-slate-400">
+                                Due: {new Date(archivedTask.dueDate).toLocaleDateString()}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-400 mt-2">
+                              From: <span className="font-medium">{archivedTask.originalGroupTitle}</span>
+                              {' • '}
+                              Archived: {new Date(archivedTask.archivedAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <button
+                              onClick={() => restoreTask(activeClient.id, archivedTask.id)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
+                              title="Restore task"
+                            >
+                              <RotateCcw className="w-4 h-4" />
+                              Restore
+                            </button>
+                            <button
+                              onClick={() => permanentlyDeleteTask(activeClient.id, archivedTask.id)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                              title="Permanently delete"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
+              <p className="text-xs text-slate-400">
+                Archived tasks can be restored or permanently deleted
+              </p>
+              <button onClick={() => setShowArchivePanel(false)} className="bg-slate-900 text-white px-6 py-2 rounded-lg font-bold text-sm hover:bg-slate-800">
+                Done
               </button>
             </div>
           </div>
