@@ -95,23 +95,23 @@ const KeywordTool: React.FC = () => {
 
           {/* Table & Chart */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
+            <div className="overflow-y-auto">
+              <table className="w-full table-fixed text-left">
                 <thead className="bg-slate-50 border-b border-slate-100">
                   <tr>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Keyword</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Volume</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Diff</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Comp</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-48">6 Month Trend</th>
+                    <th className="px-2 lg:px-4 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-[30%]">Keyword</th>
+                    <th className="px-2 lg:px-4 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-[15%]">Volume</th>
+                    <th className="px-2 lg:px-4 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-[15%]">Diff</th>
+                    <th className="px-2 lg:px-4 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-[15%]">Comp</th>
+                    <th className="px-2 lg:px-4 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-[25%]">6 Month Trend</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {results.map((row, idx) => (
                     <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4 font-medium text-slate-900">{row.keyword}</td>
-                      <td className="px-6 py-4 text-slate-600">{row.searchVolume.toLocaleString()}</td>
-                      <td className="px-6 py-4">
+                      <td className="px-2 lg:px-4 py-4 font-medium text-slate-900 truncate">{row.keyword}</td>
+                      <td className="px-2 lg:px-4 py-4 text-slate-600">{row.searchVolume.toLocaleString()}</td>
+                      <td className="px-2 lg:px-4 py-4">
                         <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
                           row.difficulty === 'High' ? 'bg-red-100 text-red-700' :
                           row.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
@@ -120,24 +120,24 @@ const KeywordTool: React.FC = () => {
                           {row.difficulty}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-slate-600">
-                        <div className="w-full bg-slate-200 rounded-full h-1.5 max-w-[80px]">
-                          <div 
-                            className="bg-brand-600 h-1.5 rounded-full" 
-                            style={{ width: `${row.competition}%` }} 
+                      <td className="px-2 lg:px-4 py-4 text-slate-600">
+                        <div className="w-full bg-slate-200 rounded-full h-1.5">
+                          <div
+                            className="bg-brand-600 h-1.5 rounded-full"
+                            style={{ width: `${row.competition}%` }}
                           />
                         </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="h-10 w-32">
+                      <td className="px-2 lg:px-4 py-4">
+                        <div className="h-10 w-full">
                           <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={row.trend.map((val, i) => ({ i, val }))}>
-                              <Area 
-                                type="monotone" 
-                                dataKey="val" 
-                                stroke="#ea580c" 
-                                fill="#ffedd5" 
-                                strokeWidth={2} 
+                              <Area
+                                type="monotone"
+                                dataKey="val"
+                                stroke="#ea580c"
+                                fill="#ffedd5"
+                                strokeWidth={2}
                               />
                             </AreaChart>
                           </ResponsiveContainer>
