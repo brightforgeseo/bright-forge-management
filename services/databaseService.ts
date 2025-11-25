@@ -131,6 +131,15 @@ export const deleteAllNotifications = async (userId: string) => {
   if (error) console.error('Error deleting notifications:', error);
 };
 
+export const deleteNotification = async (notificationId: string) => {
+  const { error } = await supabase
+    .from('notifications')
+    .delete()
+    .eq('id', notificationId);
+
+  if (error) console.error('Error deleting notification:', error);
+};
+
 
 // --- Profiles ---
 

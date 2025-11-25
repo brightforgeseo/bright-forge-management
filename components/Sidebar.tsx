@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { LayoutDashboard, Search, PenTool, BarChart, Settings, TableProperties, MessageSquare, Hexagon, LogOut, UserPlus, MoreVertical, Bell, X, Check, CheckSquare, Menu } from 'lucide-react';
 import { ToolView, BrandingConfig, User, AppNotification } from '../types';
 import { supabase } from '../lib/supabaseClient';
-import { fetchNotifications, markNotificationRead, markAllNotificationsRead, deleteAllNotifications } from '../services/databaseService';
+import { fetchNotifications, markNotificationRead, markAllNotificationsRead, deleteAllNotifications, deleteNotification } from '../services/databaseService';
 import { version } from '../package.json';
 
 // Flash favicon when receiving notifications
@@ -196,6 +196,12 @@ const Sidebar: React.FC<SidebarProps> = ({
     setNotifications([]);
   };
 
+  const handleDeleteNotification = async (e: React.MouseEvent, notificationId: string) => {
+    e.stopPropagation(); // Prevent triggering the notification click
+    await deleteNotification(notificationId);
+    setNotifications(prev => prev.filter(n => n.id !== notificationId));
+  };
+
   const handleNotificationClick = (notification: AppNotification) => {
     console.log('[Sidebar] Notification clicked:', notification);
     console.log('[Sidebar] linkView:', notification.linkView);
@@ -319,18 +325,27 @@ const Sidebar: React.FC<SidebarProps> = ({
                     notifications.map(n => (
                       <div
                         key={n.id}
-                        className={`p-3 border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer ${!n.isRead ? 'bg-blue-50/30' : ''}`}
+                        className={`p-3 border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer group ${!n.isRead ? 'bg-blue-50/30' : ''}`}
                         onClick={() => handleNotificationClick(n)}
                       >
                         <div className="flex justify-between items-start gap-2">
-                          <div>
+                          <div className="flex-1 min-w-0">
                             <p className={`text-sm ${!n.isRead ? 'font-bold text-slate-900' : 'font-medium text-slate-700'}`}>{n.title}</p>
                             <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">{n.message}</p>
                             <p className="text-[10px] text-slate-400 mt-1">
                               {new Date(n.createdAt).toLocaleTimeString()} · {new Date(n.createdAt).toLocaleDateString()}
                             </p>
                           </div>
-                          {!n.isRead && <div className="w-2 h-2 bg-brand-500 rounded-full mt-1.5"></div>}
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            {!n.isRead && <div className="w-2 h-2 bg-brand-500 rounded-full"></div>}
+                            <button
+                              onClick={(e) => handleDeleteNotification(e, n.id)}
+                              className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-all"
+                              title="Delete notification"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))
