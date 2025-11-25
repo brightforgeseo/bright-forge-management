@@ -340,7 +340,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      <nav className="flex-1 px-4 py-6 space-y-2 overflow-hidden">
+      <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto scrollbar-hide">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentView === item.id;
@@ -375,7 +375,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         )}
       </nav>
 
-      <div className="p-4 border-t border-slate-800 space-y-4">
+      <div className="p-4 border-t border-slate-800 space-y-4 flex-shrink-0">
         {/* User Profile */}
         <div className="relative">
             <button 
