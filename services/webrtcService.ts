@@ -1,10 +1,32 @@
 import { supabase } from '../lib/supabaseClient';
 
-// TURN server configuration - will be updated with Metered.ca credentials
+// TURN server configuration from Metered.ca
 const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
-  // TURN servers will be added here after user provides credentials
+  {
+    urls: 'stun:brightforge.metered.live:80'
+  },
+  {
+    urls: 'turn:brightforge.metered.live:80',
+    username: 'brightforge',
+    credential: 'FeBVVP45AYViorgx64G3VdhciwmET2F89rpXMEhAz9y1_yrq'
+  },
+  {
+    urls: 'turn:brightforge.metered.live:80?transport=tcp',
+    username: 'brightforge',
+    credential: 'FeBVVP45AYViorgx64G3VdhciwmET2F89rpXMEhAz9y1_yrq'
+  },
+  {
+    urls: 'turn:brightforge.metered.live:443',
+    username: 'brightforge',
+    credential: 'FeBVVP45AYViorgx64G3VdhciwmET2F89rpXMEhAz9y1_yrq'
+  },
+  {
+    urls: 'turns:brightforge.metered.live:443',
+    username: 'brightforge',
+    credential: 'FeBVVP45AYViorgx64G3VdhciwmET2F89rpXMEhAz9y1_yrq'
+  }
 ];
 
 export interface Participant {
