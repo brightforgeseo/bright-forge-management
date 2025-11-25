@@ -1,10 +1,15 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { KeywordResult, AuditResult, ContentResult, Task } from '../types';
 import { getChatSystemPrompt, getSEOSystemPrompt } from './skillsLoader';
+import { loadBusinessContext, formatBusinessContextForPrompt, getClientContext } from './businessContextLoader';
 
 // API key parts (split to avoid detection)
 const K1 = 'sk-ant-api03-FM3mh6FtduBlSZR63Sdx8zM2xsKNtuE';
 const K2 = '_IxCsXAgHA-QFdT-0P2Ip3Tpypg7SVQAPr8TA7p0S2dvHyFi9D0mpjQ-z388AAAA';
+
+// Model IDs - Latest Claude 4.5 models
+const CLAUDE_HAIKU = 'claude-haiku-4-5-20251001'; // Claude 4.5 Haiku - fast, efficient for chat
+const CLAUDE_SONNET = 'claude-sonnet-4-5-20250514'; // Claude 4.5 Sonnet - high-quality for content generation
 
 const getClaudeClient = () => {
   const apiKey = K1 + K2;
@@ -16,7 +21,8 @@ const getClaudeClient = () => {
 };
 
 /**
- * Chat response using Claude 4.5 Haiku (fast, cost-effective for chat)
+ * Chat response using Claude 4 Haiku (fast, cost-effective for chat)
+ * Now with live business context from clients, tasks, and comments
  */
 export const getClaudeChatResponse = async (
   history: string,
@@ -25,19 +31,36 @@ export const getClaudeChatResponse = async (
   const client = getClaudeClient();
 
   try {
-    // Truncate history if too long (roughly last 8000 chars)
-    const truncatedHistory = history.length > 8000 ? '...' + history.slice(-8000) : history;
+    // Load live business context (cached for 5 min)
+    const businessContext = await loadBusinessContext();
+    const businessContextPrompt = formatBusinessContextForPrompt(businessContext);
 
-    const systemPrompt = getChatSystemPrompt();
+    // Truncate history smartly - keep more recent context
+    const truncatedHistory = history.length > 6000 ? '...' + history.slice(-6000) : history;
+
+    // Get base system prompt with skills
+    const baseSystemPrompt = getChatSystemPrompt();
+
+    // Combine static knowledge + live business data
+    const fullSystemPrompt = `${baseSystemPrompt}
+
+${businessContextPrompt}
+
+## INSTRUCTIONS FOR USING LIVE DATA
+- Reference actual client names, tasks, and team members from the data above
+- When asked about workload, status, or updates - use the real numbers
+- Proactively mention overdue tasks or urgent items when relevant
+- If asked about a specific client, provide their actual task status
+- Use comment history to understand recent activity and context`;
 
     const response = await client.messages.create({
-      model: 'claude-3-5-haiku-20241022', // Claude 4.5 Haiku
-      max_tokens: 2048, // Increased for better responses
+      model: CLAUDE_HAIKU,
+      max_tokens: 1536, // Optimized - most chat responses are shorter
       system: [
         {
           type: 'text',
-          text: systemPrompt,
-          cache_control: { type: 'ephemeral' } // Cache business context for 5 min
+          text: fullSystemPrompt,
+          cache_control: { type: 'ephemeral' }
         }
       ],
       messages: [
@@ -48,7 +71,7 @@ ${truncatedHistory}
 
 User Message: ${message}
 
-Reply as a helpful SEO colleague. Be concise (under 3 sentences unless asked for detail).`,
+Respond as Echo, the Bright Forge AI assistant. Be helpful, concise (2-3 sentences unless detail requested), and reference actual business data when relevant.`,
         },
       ],
     });
@@ -62,54 +85,87 @@ Reply as a helpful SEO colleague. Be concise (under 3 sentences unless asked for
       type: error?.type,
       error: error?.error
     });
-    throw error; // Re-throw original error so fallback can see it
+    throw error;
   }
 };
 
 /**
  * Content generation using Claude 4.5 Sonnet (high-quality, detailed content)
+ * Enhanced with advanced SEO techniques and business context
  */
 export const generateClaudeContent = async (
   topic: string,
   tone: string,
-  keywords: string
+  keywords: string,
+  clientName?: string
 ): Promise<ContentResult> => {
   const client = getClaudeClient();
 
   try {
     const seoSystemPrompt = getSEOSystemPrompt();
 
+    // Get client-specific context if provided
+    let clientContext = '';
+    if (clientName) {
+      clientContext = await getClientContext(clientName);
+    }
+
+    const advancedSEOPrompt = `${seoSystemPrompt}
+
+## ADVANCED SEO REQUIREMENTS
+1. **Search Intent Optimization**: Match the content structure to user search intent (informational, transactional, navigational)
+2. **E-E-A-T Signals**: Demonstrate Experience, Expertise, Authoritativeness, and Trustworthiness
+3. **Featured Snippet Optimization**: Include a clear, concise answer in the first paragraph (40-60 words)
+4. **Semantic SEO**: Use related terms, synonyms, and LSI keywords naturally
+5. **Content Depth**: Cover the topic comprehensively with supporting subtopics
+6. **Readability**: Use short sentences, bullet points, and clear transitions
+
+${clientContext ? `## CLIENT CONTEXT\n${clientContext}` : ''}`;
+
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514', // Claude 4.5 Sonnet
-      max_tokens: 8192, // Increased for longer content
+      model: CLAUDE_SONNET,
+      max_tokens: 4096, // Optimized - covers 1500-2000 word articles with metadata
       system: [
         {
           type: 'text',
-          text: seoSystemPrompt,
-          cache_control: { type: 'ephemeral' } // Cache SEO guidelines
+          text: advancedSEOPrompt,
+          cache_control: { type: 'ephemeral' }
         }
       ],
       messages: [
         {
           role: 'user',
-          content: `Write a high-quality, SEO-optimized blog post about "${topic}".
+          content: `Create an expert-level, SEO-optimized blog post about "${topic}".
 
-Tone: ${tone}
-Target Keywords: ${keywords}
+**Tone:** ${tone}
+**Primary Keyword:** ${keywords.split(',')[0]?.trim() || keywords}
+**Secondary Keywords:** ${keywords}
 
-Requirements:
-- Follow Bright Forge SEO standards
-- Use primary keyword 3-5x in body
-- Professional, data-driven tone
-- NO generic AI language
-- Markdown structure with ## and ### headings
-- 3-4 sentence paragraphs maximum
+**Content Structure Requirements:**
+1. Title: Include primary keyword, compelling hook, under 60 chars
+2. Meta Description: Action-oriented, include keyword, 150-160 chars
+3. Introduction: Hook + featured snippet answer + outline preview
+4. Body Sections: 3-5 H2 sections with H3 subsections where needed
+5. Conclusion: Summary + clear CTA
 
-Return as JSON:
+**SEO Rules:**
+- Primary keyword: 3-5x in body (not in metadata counts)
+- Secondary keywords: 1-2x each, distributed naturally
+- Internal linking placeholders: [LINK: anchor text]
+- External authority reference placeholders: [CITE: topic]
+- Image alt text suggestions in [IMG: description] format
+
+**Quality Standards:**
+- NO AI clichés ("In today's world", "It's important to note", "Delve")
+- Data-driven claims with specific numbers where possible
+- Actionable advice, not generic statements
+- Industry-specific terminology appropriate for the audience
+
+Return ONLY valid JSON:
 {
-  "title": "SEO-optimized title with primary keyword",
-  "content": "Full blog post in Markdown",
-  "metaDescription": "Compelling description under 160 chars with primary keyword"
+  "title": "SEO title under 60 chars",
+  "content": "Full markdown content",
+  "metaDescription": "Meta description 150-160 chars"
 }`,
         },
       ],
@@ -131,7 +187,8 @@ Return as JSON:
 };
 
 /**
- * SEO Strategy & Task Plan Generator using Claude Sonnet 4.5
+ * SEO Strategy & Task Plan Generator using Claude 4.5 Sonnet
+ * Now with business context awareness for better client-specific strategies
  */
 export const generateSEOStrategy = async (
   clientName: string,
@@ -146,44 +203,68 @@ export const generateSEOStrategy = async (
   const client = getClaudeClient();
 
   try {
+    // Load business context to understand current workload and client history
+    const businessContext = await loadBusinessContext();
+    const existingClient = businessContext.clients.find(c =>
+      c.name.toLowerCase().includes(clientName.toLowerCase())
+    );
+
+    const clientContext = existingClient
+      ? `\n\nExisting Client Data:
+- Current Tasks: ${existingClient.taskCount}
+- Overdue Tasks: ${existingClient.overdueCount}
+- Completed Tasks: ${existingClient.completedCount}`
+      : '\n\nNote: This appears to be a new client.';
+
     const keywordsText = targetKeywords && targetKeywords.length > 0
       ? `\nTarget Keywords: ${targetKeywords.join(', ')}`
       : '';
 
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 4096,
+      model: CLAUDE_SONNET,
+      max_tokens: 3072, // Optimized - strategy responses rarely need 4K
       messages: [
         {
           role: 'user',
-          content: `You are an expert SEO strategist and project manager. Create a comprehensive SEO strategy and task plan for:
+          content: `You are Bright Forge's senior SEO strategist. Create a data-driven SEO strategy and actionable task plan.
 
-Client: ${clientName}
-Industry: ${industry}
-Goal: ${goal}${keywordsText}
+**Client:** ${clientName}
+**Industry:** ${industry}
+**Primary Goal:** ${goal}${keywordsText}${clientContext}
 
-Provide:
-1. A strategic overview (2-3 paragraphs) explaining the approach
-2. 6-10 specific, actionable tasks with:
-   - Clear task titles
-   - Status assignment (mix of 'Not Started', 'Working on it')
-   - Priority (High, Medium, Low)
-   - Due dates within 90 days (YYYY-MM-DD format)
-3. 4-6 key SEO recommendations specific to this industry and goal
+**Deliverables Required:**
 
-Return as JSON:
+1. **Strategic Overview** (2-3 paragraphs)
+   - Industry-specific SEO challenges and opportunities
+   - Competitive positioning approach
+   - Expected outcomes with realistic timelines
+
+2. **Task Plan** (8-12 tasks)
+   - Specific, measurable deliverables
+   - Logical sequence (foundation → optimization → growth)
+   - Mix of quick wins and long-term initiatives
+   - Realistic due dates spread over 90 days
+
+3. **Priority Recommendations** (5-7 items)
+   - Technical SEO priorities
+   - Content gaps to address
+   - Link building opportunities
+   - Local SEO considerations (if applicable)
+   - Conversion optimization suggestions
+
+**Task Format:**
+- Title: Action verb + specific deliverable
+- Status: "Not Started" for future tasks, "Working on it" for immediate priorities
+- Priority: High (week 1-2), Medium (month 1), Low (month 2-3)
+- Due dates: Spread realistically, avoid clustering
+
+Return ONLY valid JSON:
 {
-  "strategy": "The strategic overview as markdown text",
+  "strategy": "Strategic overview in markdown",
   "tasks": [
-    {
-      "id": "unique-id",
-      "title": "Task title",
-      "status": "Not Started" | "Working on it",
-      "priority": "High" | "Medium" | "Low",
-      "dueDate": "YYYY-MM-DD"
-    }
+    {"id": "task-1", "title": "Task title", "status": "Not Started", "priority": "High", "dueDate": "YYYY-MM-DD"}
   ],
-  "recommendations": ["recommendation 1", "recommendation 2", ...]
+  "recommendations": ["Specific recommendation 1", "Specific recommendation 2"]
 }`,
         },
       ],
@@ -191,7 +272,6 @@ Return as JSON:
 
     const text = response.content[0].type === 'text' ? response.content[0].text : '';
 
-    // Extract JSON from the response
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       return JSON.parse(jsonMatch[0]);
@@ -205,33 +285,53 @@ Return as JSON:
 };
 
 /**
- * Keyword research using Claude Sonnet 4.5
+ * Keyword research using Claude 4.5 Sonnet
+ * Enhanced with search intent and content opportunity analysis
  */
-export const generateClaudeKeywords = async (seedKeyword: string): Promise<KeywordResult[]> => {
+export const generateClaudeKeywords = async (
+  seedKeyword: string,
+  industry?: string
+): Promise<KeywordResult[]> => {
   const client = getClaudeClient();
 
   try {
+    const industryContext = industry ? `\nIndustry Context: ${industry}` : '';
+
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2048,
+      model: CLAUDE_SONNET,
+      max_tokens: 1536, // Optimized - keyword lists are compact JSON
       messages: [
         {
           role: 'user',
-          content: `Generate 5-7 related long-tail keywords for "${seedKeyword}".
-For each keyword:
-- Estimate monthly search volume (realistic range 100-50000)
-- Assign difficulty level (Low, Medium, High)
-- Estimate competition score (0-100)
-- Create a 6-month search trend array (6 numbers between 0-100 representing relative interest)
+          content: `Generate 8-10 strategic keyword opportunities for "${seedKeyword}".${industryContext}
 
-Return as JSON array:
+**Keyword Strategy Requirements:**
+1. Include a mix of:
+   - High-volume head terms (competitive but valuable)
+   - Mid-tail keywords (balanced opportunity)
+   - Long-tail phrases (lower competition, high intent)
+   - Question-based keywords (featured snippet opportunities)
+
+2. For each keyword provide:
+   - Realistic monthly search volume estimate (based on industry norms)
+   - Difficulty assessment based on typical SERP competition
+   - Competition score reflecting advertiser interest
+   - 6-month trend showing seasonality or growth patterns
+
+**Analysis Criteria:**
+- Prioritize keywords with clear search intent
+- Include at least 2 question-based keywords
+- Consider local variations if relevant
+- Balance informational and transactional intent
+
+Return ONLY valid JSON array:
 [
   {
-    "keyword": "keyword phrase",
-    "searchVolume": number,
+    "keyword": "exact keyword phrase",
+    "searchVolume": 1500,
     "difficulty": "Low" | "Medium" | "High",
-    "competition": number,
-    "trend": [number, number, number, number, number, number]
+    "competition": 45,
+    "trend": [70, 75, 80, 85, 90, 88]
   }
 ]`,
         },
@@ -240,7 +340,6 @@ Return as JSON array:
 
     const text = response.content[0].type === 'text' ? response.content[0].text : '';
 
-    // Extract JSON from the response
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     if (jsonMatch) {
       return JSON.parse(jsonMatch[0]) as KeywordResult[];
@@ -254,37 +353,79 @@ Return as JSON array:
 };
 
 /**
- * SEO Audit using Claude Sonnet 4.5
+ * SEO Audit using Claude 4.5 Sonnet
+ * Comprehensive content analysis with actionable recommendations
  */
-export const analyzeClaudeText = async (text: string): Promise<AuditResult> => {
+export const analyzeClaudeText = async (
+  text: string,
+  targetKeyword?: string,
+  url?: string
+): Promise<AuditResult> => {
   const client = getClaudeClient();
 
   try {
+    // Smart truncation - keep beginning and end for context
+    const maxLength = 3000;
+    let contentToAnalyze = text;
+    if (text.length > maxLength) {
+      const halfLength = Math.floor(maxLength / 2);
+      contentToAnalyze = text.substring(0, halfLength) + '\n\n[...content truncated...]\n\n' + text.substring(text.length - halfLength);
+    }
+
+    const keywordContext = targetKeyword ? `\nTarget Keyword: "${targetKeyword}"` : '';
+    const urlContext = url ? `\nPage URL: ${url}` : '';
+
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2048,
+      model: CLAUDE_SONNET,
+      max_tokens: 1536, // Optimized - audit results are structured JSON
       messages: [
         {
           role: 'user',
-          content: `Analyze the following text content for SEO optimization opportunities.
+          content: `Perform a comprehensive SEO content audit.${keywordContext}${urlContext}
 
-Text: "${text.substring(0, 2000)}..."
+**Content to Analyze:**
+"${contentToAnalyze}"
 
-Provide:
-- An overall SEO score (0-100)
-- 3-5 specific issues categorized by severity (high, medium, low)
-- Actionable recommendations for each issue
-- A brief summary
+**Audit Criteria:**
 
-Return as JSON:
+1. **On-Page SEO Factors**
+   - Title tag optimization
+   - Heading structure (H1, H2, H3 hierarchy)
+   - Keyword placement and density
+   - Meta description quality
+
+2. **Content Quality Signals**
+   - E-E-A-T indicators (expertise, experience, authority, trust)
+   - Content depth and comprehensiveness
+   - Readability and formatting
+   - Unique value proposition
+
+3. **Technical Content Issues**
+   - Content length assessment
+   - Internal/external linking opportunities
+   - Image optimization suggestions
+   - Schema markup opportunities
+
+4. **User Experience Factors**
+   - Scannability (bullet points, short paragraphs)
+   - Clear CTAs presence
+   - Mobile-friendliness indicators
+
+**Scoring Guide:**
+- 90-100: Excellent, minor tweaks only
+- 70-89: Good, some optimization needed
+- 50-69: Fair, significant improvements required
+- Below 50: Poor, major rewrite recommended
+
+Return ONLY valid JSON:
 {
-  "score": number,
-  "summary": "Brief overview of SEO health",
+  "score": 75,
+  "summary": "2-3 sentence executive summary of SEO health and priority actions",
   "issues": [
     {
-      "severity": "high" | "medium" | "low",
-      "message": "Description of the issue",
-      "recommendation": "How to fix it"
+      "severity": "high",
+      "message": "Specific issue description",
+      "recommendation": "Actionable fix with example if applicable"
     }
   ]
 }`,
@@ -294,7 +435,6 @@ Return as JSON:
 
     const responseText = response.content[0].type === 'text' ? response.content[0].text : '';
 
-    // Extract JSON from the response
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       return JSON.parse(jsonMatch[0]) as AuditResult;
