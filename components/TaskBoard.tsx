@@ -330,7 +330,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
     // Set up interval for cases where the data arrives after mount
     const interval = setInterval(checkAndOpen, 250);
 
-    // Listen for storage changes (in case notification is clicked while on Tasks view)
+    // Listen for storage changes (in case notification is clicked in another tab)
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'openTaskModal' && e.newValue) {
         checkAndOpen();
@@ -338,13 +338,20 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
     };
     window.addEventListener('storage', handleStorageChange);
 
-    // Clean up after 5 seconds
+    // Listen for custom event (in case notification is clicked in same tab)
+    const handleOpenTaskModal = () => {
+      checkAndOpen();
+    };
+    window.addEventListener('openTaskModal', handleOpenTaskModal);
+
+    // Clean up after 5 seconds (for the interval only)
     const timeout = setTimeout(() => clearInterval(interval), 5000);
 
     return () => {
       clearInterval(interval);
       clearTimeout(timeout);
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('openTaskModal', handleOpenTaskModal);
     };
   }, [clients.length]);
 

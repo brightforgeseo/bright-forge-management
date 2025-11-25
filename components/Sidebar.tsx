@@ -228,6 +228,8 @@ const Sidebar: React.FC<SidebarProps> = ({
         if (notification.linkView === 'TASKS' && linkData.taskId) {
           console.log('[Sidebar] Setting openTaskModal:', linkData);
           localStorage.setItem('openTaskModal', JSON.stringify(linkData));
+          // Dispatch custom event for same-tab detection
+          window.dispatchEvent(new CustomEvent('openTaskModal', { detail: linkData }));
         }
 
         // Handle chat notifications (DMs and mentions)
