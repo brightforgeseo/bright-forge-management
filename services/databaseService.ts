@@ -603,9 +603,20 @@ export const checkDueDateNotifications = async (currentUserId: string) => {
     return;
   }
 
+  // Status labels that indicate a task is complete/handled - no notifications needed
+  const completedStatusLabels = ['done', 'ben to check', 'sent to client', 'complete', 'completed', 'finished', 'closed'];
+
   for (const board of boards) {
     const boardData = board.board_data as any;
     if (!boardData.groups) continue;
+
+    // Build a map of status IDs to labels for this board
+    const statusLabelMap = new Map<string, string>();
+    if (boardData.statusDefs) {
+      for (const def of boardData.statusDefs) {
+        statusLabelMap.set(def.id, def.label?.toLowerCase() || '');
+      }
+    }
 
     for (const group of boardData.groups) {
       if (!group.tasks) continue;
@@ -613,15 +624,22 @@ export const checkDueDateNotifications = async (currentUserId: string) => {
       for (const task of group.tasks) {
         if (!task.dueDate || !task.assignedTo) continue;
 
+        // Skip tasks with completed/handled statuses
+        const taskStatusLabel = statusLabelMap.get(task.status) || '';
+        if (completedStatusLabels.includes(taskStatusLabel)) continue;
+
         const assignedIds = Array.isArray(task.assignedTo) ? task.assignedTo : [task.assignedTo];
 
         // Skip if current user is not assigned (they triggered the check)
         if (!assignedIds.includes(currentUserId)) continue;
 
         const taskDueDate = new Date(task.dueDate);
-        const daysOverdue = Math.floor((now.getTime() - taskDueDate.getTime()) / (1000 * 60 * 60 * 24));
+        taskDueDate.setHours(0, 0, 0, 0);
+        const todayDate = new Date(now);
+        todayDate.setHours(0, 0, 0, 0);
+        const daysOverdue = Math.floor((todayDate.getTime() - taskDueDate.getTime()) / (1000 * 60 * 60 * 24));
 
-        // Notification 1: Task due today - notify ALL assigned users
+        // Notification 1: Task due today - notify assigned users
         if (task.dueDate === today) {
           for (const userId of assignedIds) {
             const taskMessage = `"${task.title}" is due today on ${boardData.name}`;
@@ -638,16 +656,22 @@ export const checkDueDateNotifications = async (currentUserId: string) => {
           }
         }
 
-        // Notification 2: Task overdue for 2+ days with no comments - notify ALL assigned users
-        if (daysOverdue >= 2) {
-          const hasComments = task.comments && task.comments.length > 0;
+        // Notification 2: Overdue tasks - only notify at specific intervals to avoid spam
+        // Day 1: First overdue reminder
+        // Day 7: One week overdue reminder
+        // Day 14+: Every 7 days thereafter
+        if (daysOverdue > 0) {
+          const shouldNotify = daysOverdue === 1 || daysOverdue === 7 || (daysOverdue >= 14 && daysOverdue % 7 === 0);
 
-          if (!hasComments) {
+          if (shouldNotify) {
             for (const userId of assignedIds) {
-              const warningMessage = `"${task.title}" is ${daysOverdue} days overdue with no updates on ${boardData.name}`;
+              const overdueText = daysOverdue === 1
+                ? '1 day overdue'
+                : `${daysOverdue} days overdue`;
+              const warningMessage = `"${task.title}" is ${overdueText} on ${boardData.name}`;
               await createNotificationIfNotDuplicate(
                 userId,
-                'Overdue Task Warning',
+                'Overdue Task',
                 warningMessage,
                 task.id,
                 boardData.id,
