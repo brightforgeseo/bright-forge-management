@@ -229,6 +229,7 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
     field: keyof Task,
     value: any
   ) => {
+    console.log('[MyWork] updateTaskInBoard called:', { taskId: task.id, field, value, boardId: task.clientId });
     setIsSaving(true);
     try {
       // Find the board
@@ -361,7 +362,9 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
       }
 
       // Save to database
+      console.log('[MyWork] Saving board to database:', updatedBoard.id);
       await saveClientBoard(updatedBoard);
+      console.log('[MyWork] Board saved successfully');
       addToast('success', 'Task updated');
     } catch (error) {
       console.error('Failed to update task:', error);
@@ -950,8 +953,11 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
                   <label className="text-xs font-semibold text-slate-500 uppercase block mb-2">Due Date</label>
                   <input
                     type="date"
-                    value={selectedTask.dueDate}
-                    onChange={(e) => updateTaskInBoard(selectedTask, 'dueDate', e.target.value)}
+                    value={selectedTask.dueDate || ''}
+                    onChange={(e) => {
+                      console.log('[MyWork] Updating due date:', e.target.value);
+                      updateTaskInBoard(selectedTask, 'dueDate', e.target.value);
+                    }}
                     disabled={isSaving}
                     className="w-full p-2.5 text-sm text-slate-700 font-medium bg-slate-50 border border-slate-200 rounded-lg outline-none hover:border-brand-500 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 cursor-pointer disabled:opacity-50"
                   />

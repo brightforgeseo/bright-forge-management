@@ -137,6 +137,7 @@ CREATE POLICY "Authenticated users can delete boards" ON client_boards FOR DELET
 CREATE POLICY "Users can view their own notifications" ON notifications FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Authenticated users can create notifications" ON notifications FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 CREATE POLICY "Users can update their own notifications" ON notifications FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete their own notifications" ON notifications FOR DELETE USING (auth.uid() = user_id);
 
 -- Step 6: Create storage bucket for uploads
 INSERT INTO storage.buckets (id, name, public) VALUES ('uploads', 'uploads', true) ON CONFLICT (id) DO NOTHING;
@@ -177,3 +178,42 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Step 10: Enable Realtime for all tables (CRITICAL for notifications to work!)
+-- Set REPLICA IDENTITY FULL for proper realtime filtering
+ALTER TABLE notifications REPLICA IDENTITY FULL;
+ALTER TABLE chat_messages REPLICA IDENTITY FULL;
+ALTER TABLE channels REPLICA IDENTITY FULL;
+ALTER TABLE profiles REPLICA IDENTITY FULL;
+ALTER TABLE client_boards REPLICA IDENTITY FULL;
+
+-- Add tables to realtime publication
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE chat_messages;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE channels;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE profiles;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE client_boards;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;

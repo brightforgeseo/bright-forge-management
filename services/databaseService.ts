@@ -86,6 +86,43 @@ export const createNotification = async (
   linkView?: string,
   linkData?: any
 ) => {
+  // Prevent duplicate notifications within 30 seconds for the same task/channel
+  // This prevents spam when multiple components trigger notifications
+  const thirtySecondsAgo = new Date(Date.now() - 30000).toISOString();
+
+  if (linkData?.taskId || linkData?.channelId) {
+    const { data: recent } = await supabase
+      .from('notifications')
+      .select('id')
+      .eq('user_id', userId)
+      .gte('created_at', thirtySecondsAgo)
+      .limit(10);
+
+    if (recent && recent.length > 0) {
+      // Check for duplicate by querying with the same linkData
+      const { data: existing } = await supabase
+        .from('notifications')
+        .select('id, link_data')
+        .eq('user_id', userId)
+        .gte('created_at', thirtySecondsAgo);
+
+      const isDuplicate = existing?.some(n => {
+        if (!n.link_data) return false;
+        const existingData = typeof n.link_data === 'string' ? JSON.parse(n.link_data) : n.link_data;
+        // Same task = duplicate
+        if (linkData.taskId && existingData.taskId === linkData.taskId) return true;
+        // Same DM channel = duplicate (within 30s)
+        if (linkData.channelId && linkData.channelType === 'dm' && existingData.channelId === linkData.channelId) return true;
+        return false;
+      });
+
+      if (isDuplicate) {
+        console.log('[Notification] Skipping duplicate notification for user:', userId);
+        return null;
+      }
+    }
+  }
+
   const { data, error } = await supabase.from('notifications').insert({
     user_id: userId,
     title,
@@ -556,7 +593,7 @@ const createNotificationIfNotDuplicate = async (
   taskId: string,
   boardId: string,
   groupId: string,
-  boardName: string,
+  _boardName: string, // Used in message construction by caller
   today: string
 ) => {
   const { data: existing } = await supabase
@@ -604,17 +641,29 @@ export const checkDueDateNotifications = async (currentUserId: string) => {
   }
 
   // Status labels that indicate a task is complete/handled - no notifications needed
-  const completedStatusLabels = ['done', 'ben to check', 'sent to client', 'complete', 'completed', 'finished', 'closed'];
+  // Using partial matching to catch variations like "Done - Approved", "Completed!", etc.
+  const completedKeywords = ['done', 'complete', 'finished', 'closed', 'approved', 'shipped', 'delivered', 'resolved', 'sent to client', 'ben to check', 'archived'];
+  // Colors that typically indicate completion (green shades)
+  const completedColors = ['#00c875', '#00ca72', '#22c55e', '#16a34a', '#15803d', '#166534', '#4ade80', '#86efac', 'green'];
+
+  const isCompletedStatus = (label: string, color?: string): boolean => {
+    const lowerLabel = label.toLowerCase();
+    // Check if label contains any completion keyword
+    if (completedKeywords.some(keyword => lowerLabel.includes(keyword))) return true;
+    // Check if color indicates completion (green)
+    if (color && completedColors.includes(color.toLowerCase())) return true;
+    return false;
+  };
 
   for (const board of boards) {
     const boardData = board.board_data as any;
     if (!boardData.groups) continue;
 
-    // Build a map of status IDs to labels for this board
-    const statusLabelMap = new Map<string, string>();
+    // Build a map of status IDs to their label and color
+    const statusMap = new Map<string, { label: string; color?: string }>();
     if (boardData.statusDefs) {
       for (const def of boardData.statusDefs) {
-        statusLabelMap.set(def.id, def.label?.toLowerCase() || '');
+        statusMap.set(def.id, { label: def.label?.toLowerCase() || '', color: def.color });
       }
     }
 
@@ -625,8 +674,11 @@ export const checkDueDateNotifications = async (currentUserId: string) => {
         if (!task.dueDate || !task.assignedTo) continue;
 
         // Skip tasks with completed/handled statuses
-        const taskStatusLabel = statusLabelMap.get(task.status) || '';
-        if (completedStatusLabels.includes(taskStatusLabel)) continue;
+        const statusInfo = statusMap.get(task.status);
+        if (statusInfo && isCompletedStatus(statusInfo.label, statusInfo.color)) continue;
+
+        // Also skip archived tasks
+        if (task.archived || task.isArchived) continue;
 
         const assignedIds = Array.isArray(task.assignedTo) ? task.assignedTo : [task.assignedTo];
 

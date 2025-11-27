@@ -124,7 +124,12 @@ const Sidebar: React.FC<SidebarProps> = ({
   // Request notification permission on mount
   useEffect(() => {
     if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
+      // Request permission immediately for better UX
+      Notification.requestPermission().then(permission => {
+        console.log('[Notifications] Browser permission:', permission);
+      });
+    } else if ('Notification' in window) {
+      console.log('[Notifications] Browser permission already:', Notification.permission);
     }
   }, []);
 
@@ -158,12 +163,31 @@ const Sidebar: React.FC<SidebarProps> = ({
           createdAt: newNote.created_at
         }, ...prev]);
 
-        // Show native OS notification (works even when app is in background)
+        // Show native browser/OS notification (works even when tab is not focused)
         if (window.electronAPI?.showNotification) {
+          // Electron app
           window.electronAPI.showNotification(newNote.title, newNote.message);
+        } else if ('Notification' in window && Notification.permission === 'granted') {
+          // Web browser - show native notification like Slack/Monday
+          const notification = new Notification(newNote.title, {
+            body: newNote.message,
+            icon: '/vite.svg',
+            tag: newNote.id, // Prevent duplicate notifications
+            requireInteraction: false,
+            silent: false // Allow system sound
+          });
+
+          // Click notification to focus the app
+          notification.onclick = () => {
+            window.focus();
+            notification.close();
+          };
+
+          // Auto-close after 5 seconds
+          setTimeout(() => notification.close(), 5000);
         }
 
-        // Play notification sound when receiving
+        // Play in-app notification sound
         playNotificationSound();
 
         // Flash favicon if window is not focused
@@ -171,7 +195,9 @@ const Sidebar: React.FC<SidebarProps> = ({
           startFaviconFlash();
         }
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[Notifications] Realtime subscription status:', status);
+      });
 
     return () => {
       supabase.removeChannel(channel);
