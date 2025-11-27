@@ -886,3 +886,145 @@ export const updateUserRole = async (email: string, newRole: string): Promise<vo
     throw error;
   }
 };
+
+// =====================================================
+// ACTIVITY LOG FUNCTIONS
+// =====================================================
+
+export interface ActivityLogEntry {
+  id: string;
+  userId: string | null;
+  userEmail: string;
+  userName: string | null;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  entityName: string | null;
+  fieldName: string | null;
+  oldValue: string | null;
+  newValue: string | null;
+  boardId: string | null;
+  boardName: string | null;
+  groupId: string | null;
+  groupName: string | null;
+  metadata: any;
+  createdAt: string;
+}
+
+export const logActivity = async (params: {
+  userId?: string;
+  userEmail: string;
+  userName?: string;
+  action: string;
+  entityType: string;
+  entityId?: string;
+  entityName?: string;
+  fieldName?: string;
+  oldValue?: string;
+  newValue?: string;
+  boardId?: string;
+  boardName?: string;
+  groupId?: string;
+  groupName?: string;
+  metadata?: any;
+}) => {
+  const { error } = await supabase.from('activity_log').insert({
+    user_id: params.userId || null,
+    user_email: params.userEmail,
+    user_name: params.userName || null,
+    action: params.action,
+    entity_type: params.entityType,
+    entity_id: params.entityId || null,
+    entity_name: params.entityName || null,
+    field_name: params.fieldName || null,
+    old_value: params.oldValue || null,
+    new_value: params.newValue || null,
+    board_id: params.boardId || null,
+    board_name: params.boardName || null,
+    group_id: params.groupId || null,
+    group_name: params.groupName || null,
+    metadata: params.metadata || null
+  });
+
+  if (error) {
+    console.error('Error logging activity:', error);
+    // Don't throw - activity logging shouldn't break the app
+  }
+};
+
+export const fetchActivityLog = async (options?: {
+  limit?: number;
+  offset?: number;
+  entityType?: string;
+  action?: string;
+  userId?: string;
+  boardId?: string;
+  startDate?: string;
+  endDate?: string;
+}): Promise<ActivityLogEntry[]> => {
+  let query = supabase
+    .from('activity_log')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (options?.limit) {
+    query = query.limit(options.limit);
+  } else {
+    query = query.limit(100); // Default limit
+  }
+
+  if (options?.offset) {
+    query = query.range(options.offset, options.offset + (options.limit || 100) - 1);
+  }
+
+  if (options?.entityType) {
+    query = query.eq('entity_type', options.entityType);
+  }
+
+  if (options?.action) {
+    query = query.eq('action', options.action);
+  }
+
+  if (options?.userId) {
+    query = query.eq('user_id', options.userId);
+  }
+
+  if (options?.boardId) {
+    query = query.eq('board_id', options.boardId);
+  }
+
+  if (options?.startDate) {
+    query = query.gte('created_at', options.startDate);
+  }
+
+  if (options?.endDate) {
+    query = query.lte('created_at', options.endDate);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('Error fetching activity log:', error);
+    return [];
+  }
+
+  return data.map((row: any) => ({
+    id: row.id,
+    userId: row.user_id,
+    userEmail: row.user_email,
+    userName: row.user_name,
+    action: row.action,
+    entityType: row.entity_type,
+    entityId: row.entity_id,
+    entityName: row.entity_name,
+    fieldName: row.field_name,
+    oldValue: row.old_value,
+    newValue: row.new_value,
+    boardId: row.board_id,
+    boardName: row.board_name,
+    groupId: row.group_id,
+    groupName: row.group_name,
+    metadata: row.metadata,
+    createdAt: row.created_at
+  }));
+};

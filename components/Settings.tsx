@@ -3,6 +3,7 @@ import { BrandingConfig, ToastType, User } from '../types';
 import { Save, Monitor, User as UserIcon, Upload, Loader2, Users, Key, Trash2, Shield, X } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { uploadFile, fetchAllAuthUsers, resetUserPassword, deleteAuthUser, updateUserRole, AuthUser } from '../services/databaseService';
+import ActivityLog from './ActivityLog';
 
 interface SettingsProps {
   branding: BrandingConfig;
@@ -379,6 +380,11 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
             )}
           </div>
         </div>
+      )}
+
+      {/* Activity Log - Only visible to Owners */}
+      {currentUser.role === 'Owner' && (
+        <ActivityLog onError={(msg) => addToast('error', msg)} />
       )}
 
       {/* Reset Password Modal */}

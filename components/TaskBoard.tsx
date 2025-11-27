@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Plus, Sparkles, ChevronDown, ChevronUp, ChevronRight, Trash2, Briefcase, CheckCircle2, Settings, Mail, Phone, Globe, X, Image as ImageIcon, Edit3, Palette, Loader2, Upload, UserCircle, Link as LinkIcon, MessageCircle, Send, Search, Share2, Hash, Users, Archive, RotateCcw } from 'lucide-react';
 import { Task, TaskGroup, User, ClientBoard, ToastType, LabelDefinition, Profile, TaskComment, ChatChannel, ChatMessage, ArchivedTask } from '../types';
 import { generateProjectTasks } from '../services/geminiService';
-import { fetchClientBoards, saveClientBoard, deleteClientBoard, uploadFile, fetchProfiles, createNotification, fetchChannels, sendChatMessage } from '../services/databaseService';
+import { fetchClientBoards, saveClientBoard, deleteClientBoard, uploadFile, fetchProfiles, createNotification, fetchChannels, sendChatMessage, logActivity } from '../services/databaseService';
 import { supabase } from '../lib/supabaseClient';
 
 interface TaskBoardProps {
@@ -752,6 +752,60 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
       setNewItemText(prev => ({ ...prev, [gid]: '' }));
   };
   const updateTaskField = (cid: string, gid: string, tid: string, f: keyof Task, v: string) => {
+    // Find client and task info for activity logging BEFORE state update
+    const client = clients.find(c => c.id === cid);
+    if (client) {
+      let taskToLog: Task | undefined;
+      let groupToLog: TaskGroup | undefined;
+      for (const group of client.groups) {
+        const task = group.tasks.find(t => t.id === tid);
+        if (task) {
+          taskToLog = task;
+          groupToLog = group;
+          break;
+        }
+      }
+
+      // Log activity for tracked fields
+      if (taskToLog && (f === 'status' || f === 'priority' || f === 'assignedTo' || f === 'dueDate')) {
+        const oldValue = f === 'status'
+          ? client.statusDefs.find(s => s.id === taskToLog![f as 'status'])?.label || taskToLog![f as 'status']
+          : f === 'priority'
+          ? client.priorityDefs.find(p => p.id === taskToLog![f as 'priority'])?.label || taskToLog![f as 'priority']
+          : String(taskToLog[f] || '');
+
+        const newValue = f === 'status'
+          ? client.statusDefs.find(s => s.id === v)?.label || v
+          : f === 'priority'
+          ? client.priorityDefs.find(p => p.id === v)?.label || v
+          : v;
+
+        const actionMap: Record<string, string> = {
+          status: 'status_change',
+          priority: 'priority_change',
+          assignedTo: 'assignment_change',
+          dueDate: 'due_date_change'
+        };
+
+        logActivity({
+          userId: currentUser.id,
+          userEmail: currentUser.email || '',
+          userName: currentUser.name,
+          action: actionMap[f] || 'field_change',
+          entityType: 'task',
+          entityId: tid,
+          entityName: taskToLog.title,
+          fieldName: f,
+          oldValue: oldValue,
+          newValue: newValue,
+          boardId: cid,
+          boardName: client.name,
+          groupId: groupToLog?.id,
+          groupName: groupToLog?.title
+        });
+      }
+    }
+
     updateClient(cid, c => {
       // Find the Done status ID from status definitions
       const doneStatusId = c.statusDefs.find(s => s.label === 'Done')?.id;
@@ -853,6 +907,28 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
 
   // Archive a task (soft delete) - moves to archive instead of deleting
   const archiveTask = (cid: string, gid: string, tid: string) => {
+    // Log activity before archiving
+    const client = clients.find(c => c.id === cid);
+    if (client) {
+      const group = client.groups.find((g: TaskGroup) => g.id === gid);
+      const task = group?.tasks.find((t: Task) => t.id === tid);
+      if (task) {
+        logActivity({
+          userId: currentUser.id,
+          userEmail: currentUser.email || '',
+          userName: currentUser.name,
+          action: 'task_archive',
+          entityType: 'task',
+          entityId: tid,
+          entityName: task.title,
+          boardId: cid,
+          boardName: client.name,
+          groupId: gid,
+          groupName: group?.title
+        });
+      }
+    }
+
     updateClient(cid, c => {
       const group = c.groups.find((g: TaskGroup) => g.id === gid);
       if (!group) return c;
@@ -880,6 +956,27 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
 
   // Restore a task from archive
   const restoreTask = (cid: string, archivedTaskId: string) => {
+    // Log activity before restoring
+    const client = clients.find(c => c.id === cid);
+    if (client) {
+      const archivedTask = client.archivedTasks?.find((t: ArchivedTask) => t.id === archivedTaskId);
+      if (archivedTask) {
+        logActivity({
+          userId: currentUser.id,
+          userEmail: currentUser.email || '',
+          userName: currentUser.name,
+          action: 'task_restore',
+          entityType: 'task',
+          entityId: archivedTaskId,
+          entityName: archivedTask.title,
+          boardId: cid,
+          boardName: client.name,
+          groupId: archivedTask.originalGroupId,
+          groupName: archivedTask.originalGroupTitle
+        });
+      }
+    }
+
     updateClient(cid, c => {
       const archivedTask = c.archivedTasks?.find((t: ArchivedTask) => t.id === archivedTaskId);
       if (!archivedTask) return c;
@@ -911,6 +1008,27 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   // Permanently delete a task from archive
   const permanentlyDeleteTask = (cid: string, archivedTaskId: string) => {
     if (!window.confirm('Permanently delete this task? This cannot be undone.')) return;
+
+    // Log activity before deleting
+    const client = clients.find(c => c.id === cid);
+    if (client) {
+      const archivedTask = client.archivedTasks?.find((t: ArchivedTask) => t.id === archivedTaskId);
+      if (archivedTask) {
+        logActivity({
+          userId: currentUser.id,
+          userEmail: currentUser.email || '',
+          userName: currentUser.name,
+          action: 'task_delete',
+          entityType: 'task',
+          entityId: archivedTaskId,
+          entityName: archivedTask.title,
+          boardId: cid,
+          boardName: client.name,
+          groupId: archivedTask.originalGroupId,
+          groupName: archivedTask.originalGroupTitle
+        });
+      }
+    }
 
     updateClient(cid, c => ({
       ...c,
