@@ -51,6 +51,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const activeChannelRef = useRef<string>('');
+  const channelsRef = useRef<ChatChannel[]>([]);
   const [mentionDropdown, setMentionDropdown] = useState<{ show: boolean; search: string; position: number } | null>(null);
 
   // Echo AI Bot User ID (fixed UUID for the bot)
@@ -252,23 +253,48 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     }
   }, [activeChannelId]);
 
-  // Load reactions for all visible messages
+  // Load reactions for all visible messages when channel switches or messages first load
+  const lastLoadedChannelRef = useRef<string>('');
+  const lastLoadedMessageCountRef = useRef<number>(0);
   useEffect(() => {
+    // Skip if no channel or no messages
+    if (!activeChannelId || messages.length === 0) {
+      return;
+    }
+
+    // Load reactions when:
+    // 1. Switching to a new channel
+    // 2. Initial load of messages (lastLoadedMessageCountRef was 0)
+    const isNewChannel = activeChannelId !== lastLoadedChannelRef.current;
+    const isInitialLoad = lastLoadedMessageCountRef.current === 0 && messages.length > 0;
+
+    if (!isNewChannel && !isInitialLoad) {
+      lastLoadedMessageCountRef.current = messages.length;
+      return;
+    }
+
     const loadReactions = async () => {
+      // Load reactions in parallel for better performance
+      const messageIds = messages.map(m => m.id);
+      const reactionsPromises = messageIds.map(async (id) => {
+        const reactions = await fetchMessageReactions(id);
+        return { id, reactions };
+      });
+
+      const results = await Promise.all(reactionsPromises);
       const reactionData: Record<string, MessageReaction[]> = {};
-      for (const msg of messages) {
-        const reactions = await fetchMessageReactions(msg.id);
+      for (const { id, reactions } of results) {
         if (reactions.length > 0) {
-          reactionData[msg.id] = reactions;
+          reactionData[id] = reactions;
         }
       }
       setMessageReactions(reactionData);
+      lastLoadedChannelRef.current = activeChannelId;
+      lastLoadedMessageCountRef.current = messages.length;
     };
 
-    if (messages.length > 0) {
-      loadReactions();
-    }
-  }, [messages]);
+    loadReactions();
+  }, [messages, activeChannelId]);
 
   // Presence Tracking
   useEffect(() => {
@@ -310,6 +336,11 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       supabase.removeChannel(presenceChannel);
     };
   }, [currentUser.id]);
+
+  // Keep channelsRef in sync with channels state
+  useEffect(() => {
+    channelsRef.current = channels;
+  }, [channels]);
 
   // Load Data
   const refreshData = async () => {
@@ -468,7 +499,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
         } else {
           // Message is for different channel - update unread count
           console.log('[TeamChat] Message for different channel, updating unread count');
-          let targetChannel = channels.find(c => c.id === newMsg.channel_id);
+          // Use ref to access current channels without triggering subscription recreation
+          let targetChannel = channelsRef.current.find(c => c.id === newMsg.channel_id);
 
           if (!targetChannel) {
             const updatedChannels = await fetchChannels();
@@ -543,7 +575,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       supabase.removeChannel(msgSub);
       supabase.removeChannel(reactionsSub);
     };
-  }, [currentUser.id, currentUser.name, channels]);
+  }, [currentUser.id, currentUser.name]); // Removed 'channels' to prevent subscription recreation on every unread update
 
   // SIMPLIFIED CHANNEL SWITCH - Always fetch fresh from database
   useEffect(() => {
@@ -552,12 +584,16 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     // Update ref
     activeChannelRef.current = activeChannelId;
 
+    // Reset reaction loading tracker when changing channels
+    lastLoadedMessageCountRef.current = 0;
+
     const loadMessages = async () => {
       console.log('[TeamChat] Switching to channel:', activeChannelId);
       console.log('[TeamChat] Fetching fresh messages from database');
 
-      // Clear current messages immediately
+      // Clear current messages and reactions immediately
       setMessages([]);
+      setMessageReactions({});
 
       // Fetch fresh from database
       const msgs = await fetchChatMessages(activeChannelId);
@@ -776,6 +812,14 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
   };
 
   const handleReaction = async (messageId: string, emoji: string) => {
+    // Validate messageId is a valid UUID before attempting database operations
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(messageId)) {
+      console.warn('[handleReaction] Invalid message ID (not a UUID), skipping:', messageId);
+      addToast('error', 'Cannot add reaction - message still syncing');
+      return;
+    }
+
     try {
       const reactions = messageReactions[messageId] || [];
       const existingReaction = reactions.find(r => r.emoji === emoji);
