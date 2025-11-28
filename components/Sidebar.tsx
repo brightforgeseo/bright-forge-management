@@ -420,7 +420,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Invite Button - Moved to main nav as requested */}
         {currentUser.role === 'Owner' && (
-            <div className="pt-3">
+            <div className="pt-6 mt-2 border-t border-slate-800">
                 <div className="px-3 text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Team</div>
                 <button
                     onClick={onInvite}
