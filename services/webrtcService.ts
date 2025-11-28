@@ -59,6 +59,7 @@ interface SignalMessage {
 
 class WebRTCService {
   private peerConnections: Map<string, RTCPeerConnection> = new Map();
+  private pendingIceCandidates: Map<string, RTCIceCandidateInit[]> = new Map();
   private localStream: MediaStream | null = null;
   private screenStream: MediaStream | null = null;
   private roomId: string | null = null;
@@ -219,6 +220,9 @@ class WebRTCService {
 
     await pc.setRemoteDescription(new RTCSessionDescription(offer));
 
+    // Process any queued ICE candidates now that remote description is set
+    await this.processPendingIceCandidates(peerId);
+
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
 
@@ -238,18 +242,50 @@ class WebRTCService {
     const pc = this.peerConnections.get(peerId);
     if (pc) {
       await pc.setRemoteDescription(new RTCSessionDescription(answer));
+
+      // Process any queued ICE candidates now that remote description is set
+      await this.processPendingIceCandidates(peerId);
     }
   }
 
   private async handleIceCandidate(peerId: string, candidate: RTCIceCandidateInit): Promise<void> {
     const pc = this.peerConnections.get(peerId);
-    if (pc && candidate) {
+    if (!pc || !candidate) return;
+
+    // If remote description is not set yet, queue the candidate
+    if (!pc.remoteDescription) {
+      console.log('[WebRTC] Queuing ICE candidate - remote description not set yet');
+      const pending = this.pendingIceCandidates.get(peerId) || [];
+      pending.push(candidate);
+      this.pendingIceCandidates.set(peerId, pending);
+      return;
+    }
+
+    try {
+      await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      console.log('[WebRTC] Added ICE candidate successfully');
+    } catch (error) {
+      console.error('Error adding ICE candidate:', error);
+    }
+  }
+
+  private async processPendingIceCandidates(peerId: string): Promise<void> {
+    const pc = this.peerConnections.get(peerId);
+    const pending = this.pendingIceCandidates.get(peerId);
+
+    if (!pc || !pending || pending.length === 0) return;
+
+    console.log(`[WebRTC] Processing ${pending.length} pending ICE candidates for peer ${peerId}`);
+
+    for (const candidate of pending) {
       try {
         await pc.addIceCandidate(new RTCIceCandidate(candidate));
       } catch (error) {
-        console.error('Error adding ICE candidate:', error);
+        console.error('Error adding pending ICE candidate:', error);
       }
     }
+
+    this.pendingIceCandidates.delete(peerId);
   }
 
   private handlePeerLeave(peerId: string): void {
@@ -270,6 +306,7 @@ class WebRTCService {
     // Close existing connection if any
     if (this.peerConnections.has(peerId)) {
       this.peerConnections.get(peerId)?.close();
+      this.pendingIceCandidates.delete(peerId);
     }
 
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
@@ -278,6 +315,7 @@ class WebRTCService {
     // Handle ICE candidates
     pc.onicecandidate = (event) => {
       if (event.candidate) {
+        console.log('[WebRTC] Sending ICE candidate to:', peerName);
         this.broadcast({
           type: 'ice-candidate',
           from: this.userId,
@@ -289,9 +327,24 @@ class WebRTCService {
       }
     };
 
+    // Handle ICE gathering state changes
+    pc.onicegatheringstatechange = () => {
+      console.log('[WebRTC] ICE gathering state:', pc.iceGatheringState);
+    };
+
+    // Handle ICE connection state changes
+    pc.oniceconnectionstatechange = () => {
+      console.log('[WebRTC] ICE connection state:', pc.iceConnectionState, 'for peer:', peerName);
+
+      if (pc.iceConnectionState === 'failed') {
+        console.log('[WebRTC] ICE connection failed, attempting restart...');
+        pc.restartIce();
+      }
+    };
+
     // Handle incoming tracks
     pc.ontrack = (event) => {
-      console.log('[WebRTC] Received track from:', peerName);
+      console.log('[WebRTC] Received track from:', peerName, 'kind:', event.track.kind);
       if (this.onParticipantJoined && event.streams[0]) {
         this.onParticipantJoined(peerId, peerName, event.streams[0]);
       }
@@ -299,10 +352,17 @@ class WebRTCService {
 
     // Handle connection state changes
     pc.onconnectionstatechange = () => {
-      console.log('[WebRTC] Connection state:', pc.connectionState);
-      if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+      console.log('[WebRTC] Connection state:', pc.connectionState, 'for peer:', peerName);
+      if (pc.connectionState === 'connected') {
+        console.log('[WebRTC] Successfully connected to:', peerName);
+      } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
         this.handlePeerLeave(peerId);
       }
+    };
+
+    // Handle negotiation needed (for renegotiation)
+    pc.onnegotiationneeded = async () => {
+      console.log('[WebRTC] Negotiation needed for peer:', peerName);
     };
 
     return pc;
@@ -410,6 +470,7 @@ class WebRTCService {
     // Close all peer connections
     this.peerConnections.forEach((pc) => pc.close());
     this.peerConnections.clear();
+    this.pendingIceCandidates.clear();
 
     // Stop local streams
     if (this.localStream) {
