@@ -370,10 +370,39 @@ class WebRTCService {
 
   async startScreenShare(): Promise<MediaStream | null> {
     try {
-      this.screenStream = await navigator.mediaDevices.getDisplayMedia({
-        video: { cursor: 'always' } as any,
-        audio: false
-      });
+      // Check if we're in Electron and have the API available
+      const electronAPI = (window as any).electronAPI;
+
+      if (electronAPI && electronAPI.getScreenSources) {
+        // Use Electron's desktopCapturer
+        console.log('[WebRTC] Using Electron screen capture');
+        const sources = await electronAPI.getScreenSources();
+
+        if (!sources || sources.length === 0) {
+          throw new Error('No screen sources available');
+        }
+
+        // For now, just use the first screen source (entire screen)
+        // In a more advanced implementation, you could show a picker UI
+        const screenSource = sources.find((s: any) => s.id.startsWith('screen:')) || sources[0];
+
+        this.screenStream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            mandatory: {
+              chromeMediaSource: 'desktop',
+              chromeMediaSourceId: screenSource.id
+            }
+          } as any
+        });
+      } else {
+        // Fallback to standard getDisplayMedia for browser
+        console.log('[WebRTC] Using standard getDisplayMedia');
+        this.screenStream = await navigator.mediaDevices.getDisplayMedia({
+          video: { cursor: 'always' } as any,
+          audio: false
+        });
+      }
 
       // Replace or add video track in all peer connections
       const videoTrack = this.screenStream.getVideoTracks()[0];
