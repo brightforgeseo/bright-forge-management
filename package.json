@@ -1,6 +1,6 @@
 {
   "name": "bright-forge-portal",
-  "version": "1.0.92",
+  "version": "1.0.93",
   "description": "Bright Forge Team Portal",
   "main": "electron.js",
   "targets": {
