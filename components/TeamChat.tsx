@@ -878,32 +878,21 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
   // Google Meet Call Functions
   const startGoogleMeet = async () => {
-    // Generate a unique meeting ID based on channel and timestamp
-    const meetingCode = `bf-${activeChannelId.slice(0, 8)}-${Date.now().toString(36)}`;
-    const meetUrl = `https://meet.google.com/new`;
-
-    // Send message to channel about the call with the Meet link
+    // Send message to channel prompting user to share the Meet link
     const callMsg: ChatMessage = {
       id: Date.now().toString(),
       channelId: activeChannelId,
       sender: currentUser.name,
       senderId: currentUser.id,
-      text: `📹 Started a video call`,
+      text: `📹 Starting a video call...\n\n👉 Copy the Google Meet link and paste it here so others can join!`,
       timestamp: new Date().toISOString(),
-      avatar: currentUser.avatarUrl || 'user',
-      callRoomId: meetUrl,
-      callType: 'video'
+      avatar: currentUser.avatarUrl || 'user'
     };
     await sendChatMessage(callMsg);
 
-    // Open Google Meet in new tab
-    window.open(meetUrl, '_blank');
-    addToast('success', 'Google Meet opened in new tab!');
-  };
-
-  const joinGoogleMeet = (meetUrl: string) => {
-    window.open(meetUrl, '_blank');
-    addToast('success', 'Joining Google Meet...');
+    // Open Google Meet in new tab - user will share the link manually
+    window.open('https://meet.google.com/new', '_blank');
+    addToast('success', 'Google Meet opened! Share the link in chat so others can join.');
   };
 
   // SIMPLIFIED SEND MESSAGE - No optimistic updates, wait for database
@@ -1619,16 +1608,6 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                     </span>
                     {/* Task Link Card */}
                     {msg.taskLink && renderTaskLinkCard(msg.taskLink)}
-                    {/* Join Google Meet Button */}
-                    {msg.callRoomId && (
-                      <button
-                        onClick={() => joinGoogleMeet(msg.callRoomId!)}
-                        className="mt-2 flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-medium rounded-lg transition-colors"
-                      >
-                        <Video className="w-4 h-4" />
-                        Join Video Call
-                      </button>
-                    )}
                   </div>
                 )}
 
