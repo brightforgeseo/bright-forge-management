@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check, Smile, Film, SmilePlus, Video, Phone, Lock, UserPlus, Menu, ClipboardList, Calendar, ArrowRight } from 'lucide-react';
+import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check, Smile, Film, SmilePlus, Video, Lock, UserPlus, Menu, ClipboardList, Calendar, ArrowRight } from 'lucide-react';
 import { ChatChannel, ChatMessage, User, ToastType, Profile, MessageReaction } from '../types';
 import { getChatResponse } from '../services/geminiService';
 import { storeEchoConversation, buildConversationContext } from '../services/echoMemory';
 import { fetchChatMessages, sendChatMessage, clearChatHistory, uploadFile, fetchChannels, createChannel, deleteChannel, fetchProfiles, getOrCreateDMChannel, createNotification, editChatMessage, fetchMessageReactions, addMessageReaction, removeMessageReaction, fetchChannelMembers, addChannelMember, removeChannelMember, deleteChatMessage } from '../services/databaseService';
 import { supabase } from '../lib/supabaseClient';
-import VideoCall from './VideoCall';
+// Removed custom VideoCall - now using Google Meet
 
 interface TeamChatProps {
   currentUser: User;
@@ -44,9 +44,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
   const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
   const [messageReactions, setMessageReactions] = useState<Record<string, MessageReaction[]>>({});
 
-  // Video call state
-  const [isInCall, setIsInCall] = useState(false);
-  const [callVideoEnabled, setCallVideoEnabled] = useState(true);
+  // Video call state (kept for backwards compatibility with existing messages)
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -878,43 +876,34 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     }
   };
 
-  // Video/Voice Call Functions
-  const [activeCallRoomId, setActiveCallRoomId] = useState<string | null>(null);
+  // Google Meet Call Functions
+  const startGoogleMeet = async () => {
+    // Generate a unique meeting ID based on channel and timestamp
+    const meetingCode = `bf-${activeChannelId.slice(0, 8)}-${Date.now().toString(36)}`;
+    const meetUrl = `https://meet.google.com/new`;
 
-  const startCall = async (videoEnabled: boolean = true) => {
-    // Use channel ID as room ID so all channel members can join the same call
-    const roomId = `call-${activeChannelId}`;
-
-    // Send message to channel about the call with room ID
+    // Send message to channel about the call with the Meet link
     const callMsg: ChatMessage = {
       id: Date.now().toString(),
       channelId: activeChannelId,
       sender: currentUser.name,
       senderId: currentUser.id,
-      text: `${videoEnabled ? '📹' : '📞'} Started a ${videoEnabled ? 'video' : 'voice'} call`,
+      text: `📹 Started a video call`,
       timestamp: new Date().toISOString(),
       avatar: currentUser.avatarUrl || 'user',
-      callRoomId: roomId,
-      callType: videoEnabled ? 'video' : 'voice'
+      callRoomId: meetUrl,
+      callType: 'video'
     };
     await sendChatMessage(callMsg);
 
-    setActiveCallRoomId(roomId);
-    setCallVideoEnabled(videoEnabled);
-    setIsInCall(true);
-    addToast('success', `${videoEnabled ? 'Video' : 'Voice'} call started!`);
+    // Open Google Meet in new tab
+    window.open(meetUrl, '_blank');
+    addToast('success', 'Google Meet opened in new tab!');
   };
 
-  const joinCall = (roomId: string, videoEnabled: boolean = true) => {
-    setActiveCallRoomId(roomId);
-    setCallVideoEnabled(videoEnabled);
-    setIsInCall(true);
-    addToast('success', 'Joining call...');
-  };
-
-  const handleCloseCall = () => {
-    setIsInCall(false);
-    setActiveCallRoomId(null);
+  const joinGoogleMeet = (meetUrl: string) => {
+    window.open(meetUrl, '_blank');
+    addToast('success', 'Joining Google Meet...');
   };
 
   // SIMPLIFIED SEND MESSAGE - No optimistic updates, wait for database
@@ -1502,22 +1491,13 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
           </div>
           <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
             {activeChannelId && (
-              <>
-                <button
-                  onClick={() => startCall(true)}
-                  className="p-1.5 md:p-2 hover:bg-green-50 rounded-lg transition-colors group"
-                  title="Start Video Call"
-                >
-                  <Video className="w-4 h-4 md:w-5 md:h-5 text-slate-400 group-hover:text-green-600" />
-                </button>
-                <button
-                  onClick={() => startCall(false)}
-                  className="hidden sm:block p-1.5 md:p-2 hover:bg-blue-50 rounded-lg transition-colors group"
-                  title="Start Voice Call"
-                >
-                  <Phone className="w-4 h-4 md:w-5 md:h-5 text-slate-400 group-hover:text-blue-600" />
-                </button>
-              </>
+              <button
+                onClick={startGoogleMeet}
+                className="p-1.5 md:p-2 hover:bg-green-50 rounded-lg transition-colors group"
+                title="Start Google Meet"
+              >
+                <Video className="w-4 h-4 md:w-5 md:h-5 text-slate-400 group-hover:text-green-600" />
+              </button>
             )}
             {activeChannelId && (
               <button
@@ -1639,21 +1619,15 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                     </span>
                     {/* Task Link Card */}
                     {msg.taskLink && renderTaskLinkCard(msg.taskLink)}
-                    {/* Join Call Button */}
-                    {msg.callRoomId && !isInCall && (
+                    {/* Join Google Meet Button */}
+                    {msg.callRoomId && (
                       <button
-                        onClick={() => joinCall(msg.callRoomId!, msg.callType === 'video')}
+                        onClick={() => joinGoogleMeet(msg.callRoomId!)}
                         className="mt-2 flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-medium rounded-lg transition-colors"
                       >
-                        {msg.callType === 'video' ? <Video className="w-4 h-4" /> : <Phone className="w-4 h-4" />}
-                        Join {msg.callType === 'video' ? 'Video' : 'Voice'} Call
+                        <Video className="w-4 h-4" />
+                        Join Video Call
                       </button>
-                    )}
-                    {msg.callRoomId && isInCall && activeCallRoomId === msg.callRoomId && (
-                      <span className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 bg-green-100 text-green-700 text-sm font-medium rounded-lg">
-                        <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                        You&apos;re in this call
-                      </span>
                     )}
                   </div>
                 )}
@@ -1957,17 +1931,6 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
           </div>
         </div>
       </div>
-
-      {/* Video Call */}
-      {isInCall && activeCallRoomId && (
-        <VideoCall
-          roomId={activeCallRoomId}
-          currentUser={currentUser}
-          channelName={channels.find((c: ChatChannel) => c.id === activeChannelId)?.name || 'Call'}
-          videoEnabled={callVideoEnabled}
-          onClose={handleCloseCall}
-        />
-      )}
 
       {/* Members Management Modal */}
       {showMembersModal && (
