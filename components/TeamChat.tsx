@@ -876,23 +876,27 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     }
   };
 
-  // Google Meet Call Functions
-  const startGoogleMeet = async () => {
-    // Send message to channel prompting user to share the Meet link
+  // Video Call - Using Jitsi Meet (free, no account needed, instant rooms)
+  const startVideoCall = async () => {
+    // Generate unique room name from channel ID + timestamp
+    const roomName = `BrightForge-${activeChannelId.slice(0, 8)}-${Date.now().toString(36)}`;
+    const meetUrl = `https://meet.jit.si/${roomName}`;
+
+    // Send clickable link to channel
     const callMsg: ChatMessage = {
       id: Date.now().toString(),
       channelId: activeChannelId,
       sender: currentUser.name,
       senderId: currentUser.id,
-      text: `📹 Starting a video call...\n\n👉 Copy the Google Meet link and paste it here so others can join!`,
+      text: `📹 Started a video call!\n\n👉 Join here: ${meetUrl}`,
       timestamp: new Date().toISOString(),
       avatar: currentUser.avatarUrl || 'user'
     };
     await sendChatMessage(callMsg);
 
-    // Open Google Meet in new tab - user will share the link manually
-    window.open('https://meet.google.com/new', '_blank');
-    addToast('success', 'Google Meet opened! Share the link in chat so others can join.');
+    // Open in new tab
+    window.open(meetUrl, '_blank');
+    addToast('success', 'Video call started!');
   };
 
   // SIMPLIFIED SEND MESSAGE - No optimistic updates, wait for database
@@ -1481,9 +1485,9 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
           <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
             {activeChannelId && (
               <button
-                onClick={startGoogleMeet}
+                onClick={startVideoCall}
                 className="p-1.5 md:p-2 hover:bg-green-50 rounded-lg transition-colors group"
-                title="Start Google Meet"
+                title="Start Video Call"
               >
                 <Video className="w-4 h-4 md:w-5 md:h-5 text-slate-400 group-hover:text-green-600" />
               </button>
