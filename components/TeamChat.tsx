@@ -1226,25 +1226,25 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
       {/* Channels Sidebar */}
       <div className={`
-        w-64 bg-[#3F0E40] flex flex-col flex-shrink-0
+        w-72 md:w-64 bg-[#3F0E40] flex flex-col flex-shrink-0
         fixed md:relative inset-y-0 left-0 z-50
-        transform transition-transform duration-300 ease-in-out
+        transform transition-transform duration-300 ease-out
         ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
       `}>
-        <div className="h-11 px-3 flex items-center justify-between border-b border-[#5d2c5d] flex-shrink-0">
-          <h2 className="font-bold text-white truncate text-sm">Bright Forge</h2>
-          <div className="flex items-center gap-1">
+        <div className="h-14 md:h-11 px-3 flex items-center justify-between border-b border-[#5d2c5d] flex-shrink-0 safe-area-inset-top">
+          <h2 className="font-bold text-white truncate text-base md:text-sm">Bright Forge</h2>
+          <div className="flex items-center gap-2 md:gap-1">
             {currentUser.role === 'Owner' && (
-              <button onClick={() => setShowCreateChannel(true)} className="p-1 text-slate-300 hover:text-white hover:bg-[#5d2c5d] rounded transition-colors" title="New Channel">
-                <Plus className="w-4 h-4" />
+              <button onClick={() => setShowCreateChannel(true)} className="p-2 md:p-1 text-slate-300 hover:text-white hover:bg-[#5d2c5d] rounded-lg md:rounded transition-colors active:bg-[#4d1c4d]" title="New Channel">
+                <Plus className="w-5 h-5 md:w-4 md:h-4" />
               </button>
             )}
             <button
               onClick={() => setIsMobileSidebarOpen(false)}
-              className="md:hidden p-1 text-slate-300 hover:text-white hover:bg-[#5d2c5d] rounded transition-colors"
+              className="md:hidden p-2 text-slate-300 hover:text-white hover:bg-[#5d2c5d] rounded-lg transition-colors active:bg-[#4d1c4d]"
               title="Close"
             >
-              <X className="w-4 h-4" />
+              <X className="w-5 h-5" />
             </button>
           </div>
         </div>
@@ -1286,11 +1286,11 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                 <li
                   key={echoAIChannel.id}
                   onClick={() => setActiveChannelId(echoAIChannel.id)}
-                  className={`px-3 py-1 flex items-center justify-between cursor-pointer mx-1.5 rounded group ${activeChannelId === echoAIChannel.id ? 'bg-[#1164A3] text-white' : 'text-[#bcabbc] hover:bg-[#350d36]'}`}
+                  className={`px-3 py-2.5 md:py-1.5 flex items-center justify-between cursor-pointer mx-1.5 rounded-lg md:rounded group active:opacity-80 ${activeChannelId === echoAIChannel.id ? 'bg-[#1164A3] text-white' : 'text-[#bcabbc] hover:bg-[#350d36]'}`}
                 >
-                  <div className="flex items-center gap-1.5 truncate">
-                    <Bot className="w-3.5 h-3.5 text-brand-400" />
-                    <span className={`truncate text-sm ${echoAIChannel.unread ? 'font-bold text-white' : ''}`}>
+                  <div className="flex items-center gap-2 md:gap-1.5 truncate">
+                    <Bot className="w-4 h-4 md:w-3.5 md:h-3.5 text-brand-400" />
+                    <span className={`truncate text-base md:text-sm ${echoAIChannel.unread ? 'font-bold text-white' : ''}`}>
                       Echo AI {echoAIChannel.unread ? `(${echoAIChannel.unread})` : ''}
                     </span>
                   </div>
@@ -1298,10 +1298,10 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
               ) : (
                 <li
                   onClick={handleStartEchoAI}
-                  className="px-3 py-1 flex items-center gap-1.5 mx-1.5 rounded text-[#bcabbc] hover:bg-[#350d36] cursor-pointer"
+                  className="px-3 py-2.5 md:py-1.5 flex items-center gap-2 md:gap-1.5 mx-1.5 rounded-lg md:rounded text-[#bcabbc] hover:bg-[#350d36] cursor-pointer active:opacity-80"
                 >
-                  <Bot className="w-3.5 h-3.5 text-brand-400" />
-                  <span className="truncate text-sm">Start Echo AI Chat</span>
+                  <Bot className="w-4 h-4 md:w-3.5 md:h-3.5 text-brand-400" />
+                  <span className="truncate text-base md:text-sm">Start Echo AI Chat</span>
                 </li>
               )}
             </ul>
@@ -1317,15 +1317,15 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                 <li
                   key={channel.id}
                   onClick={() => setActiveChannelId(channel.id)}
-                  className={`px-3 py-1 flex items-center justify-between cursor-pointer mx-1.5 rounded group ${activeChannelId === channel.id ? 'bg-[#1164A3] text-white' : 'text-[#bcabbc] hover:bg-[#350d36]'}`}
+                  className={`px-3 py-2.5 md:py-1.5 flex items-center justify-between cursor-pointer mx-1.5 rounded-lg md:rounded group active:opacity-80 ${activeChannelId === channel.id ? 'bg-[#1164A3] text-white' : 'text-[#bcabbc] hover:bg-[#350d36]'}`}
                 >
                   <div className="flex items-center truncate">
                     {channel.is_private ? (
-                      <Lock className="w-3.5 h-3.5 mr-1.5 opacity-70" />
+                      <Lock className="w-4 h-4 md:w-3.5 md:h-3.5 mr-2 md:mr-1.5 opacity-70" />
                     ) : (
-                      <Hash className="w-3.5 h-3.5 mr-1.5 opacity-70" />
+                      <Hash className="w-4 h-4 md:w-3.5 md:h-3.5 mr-2 md:mr-1.5 opacity-70" />
                     )}
-                    <span className={`truncate text-sm ${channel.unread ? 'font-bold text-white' : ''}`}>
+                    <span className={`truncate text-base md:text-sm ${channel.unread ? 'font-bold text-white' : ''}`}>
                       {channel.name} {channel.unread ? `(${channel.unread})` : ''}
                     </span>
                   </div>
@@ -1377,29 +1377,24 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                 return (
                   <li
                     key={channel.id}
-                    className={`px-3 py-1 flex items-center gap-1.5 mx-1.5 rounded group ${activeChannelId === channel.id ? 'bg-[#1164A3] text-white' : 'text-[#bcabbc] hover:bg-[#350d36]'}`}
+                    onClick={() => setActiveChannelId(channel.id)}
+                    className={`px-3 py-2.5 md:py-1.5 flex items-center gap-2 md:gap-1.5 mx-1.5 rounded-lg md:rounded group cursor-pointer active:opacity-80 ${activeChannelId === channel.id ? 'bg-[#1164A3] text-white' : 'text-[#bcabbc] hover:bg-[#350d36]'}`}
                   >
-                    <div
-                      className="relative w-4 h-4 flex-shrink-0 cursor-pointer"
-                      onClick={() => setActiveChannelId(channel.id)}
-                    >
+                    <div className="relative w-5 h-5 md:w-4 md:h-4 flex-shrink-0">
                       {avatar ? (
-                        <img src={avatar} alt="" className="w-4 h-4 rounded-full object-cover" />
+                        <img src={avatar} alt="" className="w-5 h-5 md:w-4 md:h-4 rounded-full object-cover" />
                       ) : (
-                        <div className="w-4 h-4 rounded-full bg-green-600 flex items-center justify-center text-[8px] text-white font-bold">
+                        <div className="w-5 h-5 md:w-4 md:h-4 rounded-full bg-green-600 flex items-center justify-center text-[9px] md:text-[8px] text-white font-bold">
                           {name.charAt(0)}
                         </div>
                       )}
                       {channel.unread ? (
-                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border border-[#3F0E40]" title="Unread messages"></div>
+                        <div className="absolute -top-1 -right-1 w-2.5 h-2.5 md:w-2 md:h-2 bg-red-500 rounded-full border border-[#3F0E40]" title="Unread messages"></div>
                       ) : isOnline ? (
-                        <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full border border-[#3F0E40]" title="Online"></div>
+                        <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 md:w-2 md:h-2 bg-green-500 rounded-full border border-[#3F0E40]" title="Online"></div>
                       ) : null}
                     </div>
-                    <span
-                      className={`truncate text-sm flex-1 cursor-pointer ${channel.unread ? 'font-bold text-white' : ''}`}
-                      onClick={() => setActiveChannelId(channel.id)}
-                    >
+                    <span className={`truncate text-base md:text-sm flex-1 ${channel.unread ? 'font-bold text-white' : ''}`}>
                       {name} {channel.unread ? `(${channel.unread})` : ''}
                       {isOnline && !channel.unread && <span className="ml-1 text-[10px] text-green-400">●</span>}
                     </span>
@@ -1410,10 +1405,10 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                           handleDeleteChannel(channel.id);
                         }
                       }}
-                      className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-400 flex-shrink-0"
+                      className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-400 flex-shrink-0 p-1"
                       title="Delete conversation"
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Trash2 className="w-4 h-4 md:w-3 md:h-3" />
                     </button>
                   </li>
                 );
@@ -1433,29 +1428,29 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                 <li
                   key={p.id}
                   onClick={() => handleStartDM(p.id)}
-                  className="px-3 py-1 flex items-center gap-1.5 mx-1.5 text-[#bcabbc] hover:bg-[#350d36] rounded cursor-pointer transition-colors"
+                  className="px-3 py-2.5 md:py-1.5 flex items-center gap-2 md:gap-1.5 mx-1.5 text-[#bcabbc] hover:bg-[#350d36] rounded-lg md:rounded cursor-pointer transition-colors active:opacity-80"
                 >
                   <div className="relative">
                     {p.avatar_url ? (
-                      <img src={p.avatar_url} alt="" className="w-3.5 h-3.5 rounded-full object-cover" />
+                      <img src={p.avatar_url} alt="" className="w-5 h-5 md:w-3.5 md:h-3.5 rounded-full object-cover" />
                     ) : (
-                      <div className="w-3.5 h-3.5 rounded-full bg-slate-500 flex items-center justify-center text-[7px] text-white font-bold">
+                      <div className="w-5 h-5 md:w-3.5 md:h-3.5 rounded-full bg-slate-500 flex items-center justify-center text-[9px] md:text-[7px] text-white font-bold">
                         {p.full_name?.charAt(0) || '?'}
                       </div>
                     )}
                     <div
-                      className={`absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full border border-[#3F0E40] ${
+                      className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 md:w-1.5 md:h-1.5 rounded-full border border-[#3F0E40] ${
                         p.isOnline ? 'bg-green-500' : 'bg-slate-400'
                       }`}
                       title={p.isOnline ? 'Online' : 'Offline'}
                     />
                   </div>
-                  <span className="truncate text-sm flex-1">
+                  <span className="truncate text-base md:text-sm flex-1">
                     {p.full_name || p.email?.split('@')[0] || 'Team Member'}
                     {p.id === currentUser.id && ' (You)'}
                   </span>
                   {p.isOnline && p.id !== currentUser.id && (
-                    <span className="text-[9px] text-green-400 font-medium">●</span>
+                    <span className="text-[10px] md:text-[9px] text-green-400 font-medium">●</span>
                   )}
                 </li>
               ))}
@@ -1466,14 +1461,15 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
       {/* Main Chat */}
       <div className="flex-1 flex flex-col min-w-0 bg-white h-full">
-        <div className="h-14 md:h-16 border-b border-slate-200 flex items-center justify-between px-3 md:px-6 flex-shrink-0 bg-white">
+        <div className="h-14 md:h-16 border-b border-slate-200 flex items-center justify-between px-2 md:px-6 flex-shrink-0 bg-white safe-area-inset-top">
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <button
               onClick={() => setIsMobileSidebarOpen(true)}
-              className="md:hidden p-2 hover:bg-slate-100 rounded-lg flex-shrink-0"
+              className="md:hidden p-2.5 hover:bg-slate-100 rounded-xl flex-shrink-0 active:bg-slate-200 transition-colors"
               title="Open menu"
+              aria-label="Open channel list"
             >
-              <Menu className="w-5 h-5 text-slate-600" />
+              <Menu className="w-6 h-6 text-slate-600" />
             </button>
             {activeChannel?.type === 'dm' ? (
               <div className="flex items-center gap-2">

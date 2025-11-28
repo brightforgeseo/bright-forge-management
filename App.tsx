@@ -234,27 +234,30 @@ ${currentUser.name}`;
 
       {/* Mobile Header - Hidden on TeamChat which has its own header */}
       {currentView !== ToolView.TEAM_CHAT && (
-      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-slate-200 z-30 flex items-center px-4 gap-3">
-        <button
-          onClick={() => setIsMobileMenuOpen(true)}
-          className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-        >
-          <svg className="w-6 h-6 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-gradient-to-br from-brand-500 to-brand-600 rounded-lg flex items-center justify-center">
-            <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-white border-b border-slate-200 z-30 flex items-center justify-between px-3 safe-area-inset-top">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <button
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="p-2.5 hover:bg-slate-100 rounded-xl transition-colors active:bg-slate-200 flex-shrink-0"
+            aria-label="Open menu"
+          >
+            <svg className="w-6 h-6 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
+          </button>
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-8 h-8 bg-gradient-to-br from-brand-500 to-brand-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
+              <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+              </svg>
+            </div>
+            <span className="font-bold text-slate-900 truncate text-sm">{branding.companyName}</span>
           </div>
-          <span className="font-bold text-slate-900 truncate">{branding.companyName}</span>
         </div>
       </div>
       )}
 
-      <main className={`flex-1 lg:ml-64 h-full overflow-hidden relative ${isFullHeight ? '' : 'bg-slate-50'} ${currentView === ToolView.TEAM_CHAT ? '' : 'pt-16'} lg:pt-0`}>
+      <main className={`flex-1 lg:ml-64 h-full overflow-hidden relative ${isFullHeight ? '' : 'bg-slate-50'} ${currentView === ToolView.TEAM_CHAT ? '' : 'pt-14'} lg:pt-0`}>
         {isFullHeight ? renderContent() : <ScrollablePageWrapper>{renderContent()}</ScrollablePageWrapper>}
       </main>
       <ToastContainer toasts={toasts} removeToast={removeToast} />

@@ -64,3 +64,52 @@ input[type="date"]::-webkit-clear-button {
 .scrollbar-hide::-webkit-scrollbar {
   display: none;  /* Chrome, Safari and Opera */
 }
+
+/* Safe area insets for iOS */
+.safe-area-inset-top {
+  padding-top: env(safe-area-inset-top);
+}
+.safe-area-inset-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Improve touch interactions */
+@media (hover: none) and (pointer: coarse) {
+  /* Mobile devices - increase tap target sizes */
+  button, a, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Prevent text selection on buttons during tap */
+  button {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Disable hover effects on mobile (prevents sticky hover) */
+  .group:hover .group-hover\:opacity-100 {
+    opacity: 0;
+  }
+  .group:active .group-hover\:opacity-100 {
+    opacity: 1;
+  }
+}
+
+/* Smooth scrolling for iOS momentum */
+.overflow-y-auto, .overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Fix input zoom on iOS */
+@media screen and (max-width: 768px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="search"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}

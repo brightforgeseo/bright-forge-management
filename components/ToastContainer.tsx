@@ -9,7 +9,7 @@ interface ToastContainerProps {
 
 const ToastContainer: React.FC<ToastContainerProps> = ({ toasts, removeToast }) => {
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none">
+    <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:bottom-6 z-50 flex flex-col gap-2 sm:gap-3 pointer-events-none">
       {toasts.map((toast) => (
         <ToastItem key={toast.id} toast={toast} onRemove={() => removeToast(toast.id)} />
       ))}
@@ -46,10 +46,10 @@ const ToastItem: React.FC<{ toast: ToastNotification; onRemove: () => void }> = 
   };
 
   return (
-    <div className={`pointer-events-auto min-w-[300px] max-w-md p-4 rounded-lg flex items-start gap-3 transform transition-all duration-300 animate-slideIn ${getStyles()}`}>
+    <div className={`pointer-events-auto w-full sm:min-w-[300px] sm:w-auto max-w-md p-3 sm:p-4 rounded-lg flex items-start gap-2 sm:gap-3 transform transition-all duration-300 animate-slideIn ${getStyles()}`}>
       <div className="mt-0.5 flex-shrink-0">{getIcon()}</div>
-      <p className="text-sm font-medium flex-1">{toast.message}</p>
-      <button onClick={onRemove} className="opacity-50 hover:opacity-100 transition-opacity">
+      <p className="text-sm font-medium flex-1 break-words">{toast.message}</p>
+      <button onClick={onRemove} className="opacity-50 hover:opacity-100 transition-opacity flex-shrink-0">
         <X className="w-4 h-4" />
       </button>
     </div>

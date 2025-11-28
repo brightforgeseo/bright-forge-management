@@ -560,22 +560,22 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
   return (
     <div className="flex flex-col h-full bg-slate-50">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-4 lg:px-8 py-4 lg:py-6">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div className="bg-white border-b border-slate-200 px-3 lg:px-8 py-3 lg:py-6">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 lg:gap-4">
           <div>
-            <h1 className="text-2xl lg:text-3xl font-bold text-slate-900">My Work</h1>
-            <p className="text-sm text-slate-500 mt-1">
+            <h1 className="text-xl lg:text-3xl font-bold text-slate-900">My Work</h1>
+            <p className="text-xs lg:text-sm text-slate-500 mt-0.5 lg:mt-1">
               {filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''} assigned to {getSelectedUserName()}
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5 lg:gap-2">
             {/* User Filter Dropdown */}
-            <div className="relative">
+            <div className="relative flex-1 sm:flex-none">
               <select
                 value={selectedUserId}
                 onChange={(e) => setSelectedUserId(e.target.value)}
-                className="appearance-none bg-white border border-slate-300 rounded-lg pl-10 pr-8 py-2.5 text-sm font-medium text-slate-700 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent cursor-pointer"
+                className="appearance-none w-full sm:w-auto bg-white border border-slate-300 rounded-xl lg:rounded-lg pl-9 lg:pl-10 pr-7 lg:pr-8 py-2.5 text-xs lg:text-sm font-medium text-slate-700 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent cursor-pointer"
               >
                 <option value={currentUser.id}>My Tasks</option>
                 <option value="all">All Team Tasks</option>
@@ -586,16 +586,16 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
                   </option>
                 ))}
               </select>
-              <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <Users className="absolute left-2.5 lg:left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
               <ChevronRight className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none rotate-90" />
             </div>
 
             {/* Status Filter Dropdown */}
-            <div className="relative">
+            <div className="relative flex-1 sm:flex-none">
               <select
                 value={selectedStatusId}
                 onChange={(e) => setSelectedStatusId(e.target.value)}
-                className="appearance-none bg-white border border-slate-300 rounded-lg pl-10 pr-8 py-2.5 text-sm font-medium text-slate-700 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent cursor-pointer"
+                className="appearance-none w-full sm:w-auto bg-white border border-slate-300 rounded-xl lg:rounded-lg pl-9 lg:pl-10 pr-7 lg:pr-8 py-2.5 text-xs lg:text-sm font-medium text-slate-700 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent cursor-pointer"
               >
                 <option value="all">All Statuses</option>
                 {allStatuses.map(status => (
@@ -604,14 +604,14 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
                   </option>
                 ))}
               </select>
-              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <Filter className="absolute left-2.5 lg:left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
               <ChevronRight className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none rotate-90" />
             </div>
 
             {/* Hide Done Toggle */}
             <button
               onClick={() => setHideDone(!hideDone)}
-              className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 border ${
+              className={`px-2.5 lg:px-3 py-2.5 rounded-xl lg:rounded-lg text-xs lg:text-sm font-medium transition-all flex items-center gap-1.5 lg:gap-2 border active:scale-95 ${
                 hideDone
                   ? 'bg-brand-50 text-brand-700 border-brand-300'
                   : 'bg-white text-slate-600 border-slate-300 hover:border-slate-400'
@@ -622,10 +622,10 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
             </button>
 
             {/* View Toggle */}
-            <div className="flex gap-2 bg-slate-100 p-1 rounded-lg">
+            <div className="flex gap-1 bg-slate-100 p-1 rounded-xl lg:rounded-lg">
               <button
                 onClick={() => setViewMode('table')}
-                className={`px-3 lg:px-4 py-2 rounded-md font-medium text-sm transition-all flex items-center gap-2 ${
+                className={`px-2.5 lg:px-4 py-2 rounded-lg lg:rounded-md font-medium text-xs lg:text-sm transition-all flex items-center gap-1.5 lg:gap-2 active:scale-95 ${
                   viewMode === 'table' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -634,7 +634,7 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
               </button>
               <button
                 onClick={() => setViewMode('calendar')}
-                className={`px-3 lg:px-4 py-2 rounded-md font-medium text-sm transition-all flex items-center gap-2 ${
+                className={`px-2.5 lg:px-4 py-2 rounded-lg lg:rounded-md font-medium text-xs lg:text-sm transition-all flex items-center gap-1.5 lg:gap-2 active:scale-95 ${
                   viewMode === 'calendar' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >

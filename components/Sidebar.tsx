@@ -305,17 +305,25 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Sidebar */}
       <div className={`
-        w-64 bg-slate-900 text-white flex flex-col h-full fixed left-0 top-0 shadow-xl transition-transform duration-300
+        w-72 lg:w-64 bg-slate-900 text-white flex flex-col h-full fixed left-0 top-0 shadow-xl transition-transform duration-300 ease-out
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `} style={{ zIndex: 100 }}>
       {/* Brand Header */}
-      <div className="p-3 border-b border-slate-800 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-2 overflow-hidden min-w-0">
-            <div className="w-7 h-7 flex-shrink-0 bg-gradient-to-br from-brand-500 to-brand-600 rounded-lg flex items-center justify-center shadow-lg shadow-brand-900/50">
-               <Hexagon className="w-4 h-4 text-white" fill="currentColor" />
+      <div className="p-3 border-b border-slate-800 flex items-center justify-between flex-shrink-0 safe-area-inset-top">
+        <div className="flex items-center gap-2 overflow-hidden min-w-0 flex-1">
+            <div className="w-8 h-8 lg:w-7 lg:h-7 flex-shrink-0 bg-gradient-to-br from-brand-500 to-brand-600 rounded-lg flex items-center justify-center shadow-lg shadow-brand-900/50">
+               <Hexagon className="w-5 h-5 lg:w-4 lg:h-4 text-white" fill="currentColor" />
             </div>
             <h1 className="font-bold text-base tracking-tight text-slate-100 truncate">{branding.companyName}</h1>
         </div>
+        {/* Mobile close button */}
+        <button
+          onClick={() => setIsMobileMenuOpen(false)}
+          className="lg:hidden p-2 hover:bg-slate-800 rounded-lg transition-colors"
+          aria-label="Close menu"
+        >
+          <X className="w-5 h-5 text-slate-400" />
+        </button>
 
         {/* Notification Bell */}
         <div className="relative flex-shrink-0">
@@ -331,11 +339,11 @@ const Sidebar: React.FC<SidebarProps> = ({
             )}
           </button>
 
-          {/* Notification Panel - Dropdown */}
+          {/* Notification Panel - Dropdown (responsive for mobile) */}
           {isNotificationsOpen && (
             <>
               <div className="fixed inset-0" style={{ zIndex: 10000 }} onClick={() => setIsNotificationsOpen(false)}></div>
-              <div className="fixed top-14 left-[270px] w-80 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden text-slate-900 max-h-[calc(100vh-4rem)]" style={{ zIndex: 10001 }}>
+              <div className="fixed top-14 left-2 right-2 sm:left-auto sm:right-auto sm:left-[270px] w-auto sm:w-80 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden text-slate-900 max-h-[calc(100vh-4rem)]" style={{ zIndex: 10001 }}>
                 <div className="p-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
                   <h3 className="font-bold text-sm text-slate-700">Notifications</h3>
                   <div className="flex gap-2">
@@ -390,7 +398,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      <nav className="flex-1 px-2 py-2 space-y-0.5 overflow-y-auto min-h-0">
+      <nav className="flex-1 px-2 py-3 space-y-1 overflow-y-auto min-h-0">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentView === item.id;
@@ -398,28 +406,28 @@ const Sidebar: React.FC<SidebarProps> = ({
             <button
               key={item.id}
               onClick={() => handleViewChange(item.id)}
-              className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg transition-all duration-200 group ${
+              className={`w-full flex items-center gap-3 px-3 py-3 lg:py-2 rounded-xl lg:rounded-lg transition-all duration-200 group active:scale-[0.98] ${
                 isActive
                   ? 'bg-brand-600 text-white shadow-md shadow-brand-900/20'
-                  : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100 active:bg-slate-700'
               }`}
             >
-              <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-300'}`} />
-              <span className="font-medium text-sm truncate">{item.label}</span>
+              <Icon className={`w-5 h-5 lg:w-4 lg:h-4 flex-shrink-0 ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-300'}`} />
+              <span className="font-medium text-base lg:text-sm truncate">{item.label}</span>
             </button>
           );
         })}
 
         {/* Invite Button - Moved to main nav as requested */}
         {currentUser.role === 'Owner' && (
-            <div className="pt-2">
-                <div className="px-2 text-[9px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Team</div>
+            <div className="pt-3">
+                <div className="px-3 text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Team</div>
                 <button
                     onClick={onInvite}
-                    className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg transition-all duration-200 bg-blue-600/10 text-blue-400 border border-blue-600/20 hover:bg-blue-600 hover:text-white group"
+                    className="w-full flex items-center gap-3 px-3 py-3 lg:py-2 rounded-xl lg:rounded-lg transition-all duration-200 bg-blue-600/10 text-blue-400 border border-blue-600/20 hover:bg-blue-600 hover:text-white active:scale-[0.98] group"
                 >
-                    <UserPlus className="w-4 h-4 flex-shrink-0 text-blue-500 group-hover:text-white" />
-                    <span className="font-medium text-sm truncate">Invite Member</span>
+                    <UserPlus className="w-5 h-5 lg:w-4 lg:h-4 flex-shrink-0 text-blue-500 group-hover:text-white" />
+                    <span className="font-medium text-base lg:text-sm truncate">Invite Member</span>
                 </button>
             </div>
         )}

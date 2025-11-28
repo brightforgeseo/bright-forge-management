@@ -1139,31 +1139,31 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   return (
     <div className="flex flex-col h-full overflow-hidden bg-white relative">
       {/* Header - Fixed */}
-      <div className="flex-none px-4 lg:px-8 py-4 lg:py-6 border-b border-slate-100 bg-white flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4 z-20">
-         <div className="space-y-3">
-          <div className="relative flex items-center gap-4">
-            <button 
+      <div className="flex-none px-3 lg:px-8 py-3 lg:py-6 border-b border-slate-100 bg-white flex flex-col lg:flex-row lg:justify-between lg:items-start gap-3 lg:gap-4 z-20">
+         <div className="space-y-2 lg:space-y-3">
+          <div className="relative flex items-center gap-2 lg:gap-4">
+            <button
               onClick={() => setIsClientDropdownOpen(!isClientDropdownOpen)}
-              className="text-2xl font-bold text-slate-900 flex items-center gap-2 hover:bg-slate-50 px-2 py-1 -ml-2 rounded-lg transition-colors"
+              className="text-xl lg:text-2xl font-bold text-slate-900 flex items-center gap-2 hover:bg-slate-50 active:bg-slate-100 px-2 py-1.5 -ml-2 rounded-xl lg:rounded-lg transition-colors"
             >
-              {activeClient ? activeClient.name : 'Select Client'} 
-              <ChevronDown className="w-5 h-5 text-slate-400" />
+              <span className="truncate max-w-[200px] lg:max-w-none">{activeClient ? activeClient.name : 'Select Client'}</span>
+              <ChevronDown className="w-5 h-5 text-slate-400 flex-shrink-0" />
             </button>
-            
+
             {activeClient && (
-                <>
-                  <button onClick={() => setShowArchivePanel(true)} className="text-slate-400 hover:text-amber-500 transition-colors relative" title="View archived tasks">
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setShowArchivePanel(true)} className="p-2 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-colors relative" title="View archived tasks">
                       <Archive className="w-5 h-5" />
                       {(activeClient.archivedTasks?.length || 0) > 0 && (
-                        <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                        <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-amber-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
                           {activeClient.archivedTasks!.length}
                         </span>
                       )}
                   </button>
-                  <button onClick={() => setIsEditingClient(true)} className="text-slate-400 hover:text-brand-600 transition-colors">
+                  <button onClick={() => setIsEditingClient(true)} className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors">
                       <Settings className="w-5 h-5" />
                   </button>
-                </>
+                </div>
             )}
 
             {/* Client Search Bar */}
