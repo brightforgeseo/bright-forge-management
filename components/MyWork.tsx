@@ -68,6 +68,9 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
   const [mentionDropdown, setMentionDropdown] = useState<{ show: boolean; search: string; position: number } | null>(null);
   const commentInputRef = useRef<HTMLInputElement>(null);
 
+  // Track in-flight saves to prevent realtime from overwriting them
+  const pendingSaveRef = useRef<{ taskId: string; boardId: string } | null>(null);
+
   useEffect(() => {
     loadData();
   }, []);
@@ -170,6 +173,12 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
       .on('postgres_changes', { event: '*', schema: 'public', table: 'client_boards' }, async (payload) => {
         console.log('[MyWork] Realtime update received:', payload.eventType);
 
+        // Skip realtime update if we have a pending save to prevent race condition
+        if (pendingSaveRef.current) {
+          console.log('[MyWork] Skipping realtime update - save in progress for task:', pendingSaveRef.current.taskId);
+          return;
+        }
+
         // Refetch all boards and rebuild the task list
         const [boards, profiles] = await Promise.all([fetchClientBoards(), fetchProfiles()]);
 
@@ -208,20 +217,23 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
         setAllTasks(tasks);
         setTeamProfiles(profiles);
 
-        // Update selected task if modal is open
-        if (selectedTask && isTaskModalOpen) {
-          const updatedTask = tasks.find(t => t.id === selectedTask.id && t.clientId === selectedTask.clientId);
-          if (updatedTask) {
-            setSelectedTask(updatedTask);
+        // Update selected task if modal is open - use functional update to get current state
+        setSelectedTask(currentSelectedTask => {
+          if (currentSelectedTask && isTaskModalOpen) {
+            const updatedTask = tasks.find(t => t.id === currentSelectedTask.id && t.clientId === currentSelectedTask.clientId);
+            if (updatedTask) {
+              return updatedTask;
+            }
           }
-        }
+          return currentSelectedTask;
+        });
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(boardsSub);
     };
-  }, [selectedTask, isTaskModalOpen]);
+  }, [isTaskModalOpen]);
 
   // Update task in the source board and save
   const updateTaskInBoard = async (
@@ -231,6 +243,10 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
   ) => {
     console.log('[MyWork] updateTaskInBoard called:', { taskId: task.id, field, value, boardId: task.clientId });
     setIsSaving(true);
+
+    // Mark this task as having a pending save to prevent realtime from overwriting
+    pendingSaveRef.current = { taskId: task.id, boardId: task.clientId };
+
     try {
       // Find the board
       const boardIndex = allBoards.findIndex(b => b.id === task.clientId);
@@ -370,6 +386,10 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
       console.error('Failed to update task:', error);
       addToast('error', 'Failed to update task');
     } finally {
+      // Clear the pending save ref after a small delay to ensure realtime doesn't race
+      setTimeout(() => {
+        pendingSaveRef.current = null;
+      }, 500);
       setIsSaving(false);
     }
   };

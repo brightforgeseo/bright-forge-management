@@ -414,11 +414,20 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   // Archive panel state
   const [showArchivePanel, setShowArchivePanel] = useState(false);
 
+  // Track in-flight saves to prevent realtime from overwriting them
+  const pendingSaveRef = useRef<{ taskId: string; boardId: string } | null>(null);
+
   // Realtime subscription for client_boards changes
   useEffect(() => {
     const boardsSub = supabase.channel('public:client_boards')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'client_boards' }, async (payload) => {
         console.log('[TaskBoard] Realtime update received:', payload.eventType);
+
+        // Skip realtime update if we have a pending save to prevent race condition
+        if (pendingSaveRef.current) {
+          console.log('[TaskBoard] Skipping realtime update - save in progress for task:', pendingSaveRef.current.taskId);
+          return;
+        }
 
         // Refetch all boards to get the latest data
         const boards = await fetchClientBoards();
@@ -436,25 +445,27 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
             setSelectedClientId(boards[0].id);
           }
 
-          // Update task modal if open (the task data might have changed)
-          if (taskModal) {
-            const board = boards.find(b => b.id === taskModal.clientId);
-            if (board) {
-              for (const group of board.groups) {
-                const task = group.tasks.find(t => t.id === taskModal.task.id);
-                if (task) {
-                  setTaskModal({
-                    ...taskModal,
-                    task,
-                    groupId: group.id,
-                    groupTitle: group.title,
-                    groupColor: group.color
-                  });
-                  break;
+          // Update task modal if open - use functional update to get current state
+          setTaskModal(currentTaskModal => {
+            if (currentTaskModal) {
+              const board = boards.find(b => b.id === currentTaskModal.clientId);
+              if (board) {
+                for (const group of board.groups) {
+                  const task = group.tasks.find(t => t.id === currentTaskModal.task.id);
+                  if (task) {
+                    return {
+                      ...currentTaskModal,
+                      task,
+                      groupId: group.id,
+                      groupTitle: group.title,
+                      groupColor: group.color
+                    };
+                  }
                 }
               }
             }
-          }
+            return currentTaskModal;
+          });
         }
       })
       .subscribe();
@@ -462,7 +473,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
     return () => {
       supabase.removeChannel(boardsSub);
     };
-  }, [selectedClientId, taskModal]);
+  }, [selectedClientId]);
 
   const activeClient = clients.find(c => c.id === selectedClientId);
 
@@ -752,6 +763,14 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
       setNewItemText(prev => ({ ...prev, [gid]: '' }));
   };
   const updateTaskField = (cid: string, gid: string, tid: string, f: keyof Task, v: string) => {
+    // Mark this task as having a pending save to prevent realtime from overwriting
+    pendingSaveRef.current = { taskId: tid, boardId: cid };
+
+    // Clear the pending save ref after the debounce period plus buffer
+    setTimeout(() => {
+      pendingSaveRef.current = null;
+    }, 2500); // 1500ms debounce + 500ms buffer + 500ms for save
+
     // Find client and task info for activity logging BEFORE state update
     const client = clients.find(c => c.id === cid);
     if (client) {

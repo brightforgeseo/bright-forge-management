@@ -33,8 +33,10 @@
     "recharts": "^3.4.1"
   },
   "devDependencies": {
+    "@parcel/packager-raw-url": "^2.16.1",
     "@parcel/transformer-inline-string": "^2.16.1",
     "@parcel/transformer-raw": "^2.16.1",
+    "@parcel/transformer-webmanifest": "^2.16.1",
     "autoprefixer": "^10.4.17",
     "concurrently": "^8.0.0",
     "cross-env": "^7.0.0",
