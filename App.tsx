@@ -60,7 +60,7 @@ const App: React.FC = () => {
     return () => {
       subscription.unsubscribe();
     };
-  }, [isAuthenticated]);
+  }, []); // Empty dependency - subscription should only be set up once on mount
 
   const handleUserSession = async (uid: string, email: string | undefined, fullName?: string) => {
     if (!email) return;

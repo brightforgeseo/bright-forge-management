@@ -79,6 +79,13 @@ try {
   const content = document.getElementById('error-content');
   if (overlay && content) {
     overlay.style.display = 'block';
-    content.innerHTML += `<div style="color:red"><strong>Mount Failure:</strong> ${e.message}</div>`;
+    // Use textContent instead of innerHTML to prevent XSS
+    const errorDiv = document.createElement('div');
+    errorDiv.style.color = 'red';
+    const strong = document.createElement('strong');
+    strong.textContent = 'Mount Failure: ';
+    errorDiv.appendChild(strong);
+    errorDiv.appendChild(document.createTextNode(e.message || 'Unknown error'));
+    content.appendChild(errorDiv);
   }
 }

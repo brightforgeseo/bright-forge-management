@@ -288,6 +288,9 @@ const RemoteVideo: React.FC<{ participant: RemoteParticipant }> = ({ participant
   const [isPlaying, setIsPlaying] = useState(false);
 
   useEffect(() => {
+    // Store click handler reference for cleanup
+    let clickHandler: (() => void) | null = null;
+
     if (videoRef.current && participant.stream) {
       videoRef.current.srcObject = participant.stream;
 
@@ -299,16 +302,19 @@ const RemoteVideo: React.FC<{ participant: RemoteParticipant }> = ({ participant
         } catch (err) {
           console.log('[RemoteVideo] Autoplay failed, will retry on user interaction:', err);
           // Add click handler to retry play
-          const handleClick = async () => {
+          clickHandler = async () => {
             try {
               await videoRef.current?.play();
               setIsPlaying(true);
-              document.removeEventListener('click', handleClick);
+              if (clickHandler) {
+                document.removeEventListener('click', clickHandler);
+                clickHandler = null;
+              }
             } catch (e) {
               console.log('[RemoteVideo] Retry play failed:', e);
             }
           };
-          document.addEventListener('click', handleClick);
+          document.addEventListener('click', clickHandler);
         }
       };
       playVideo();
@@ -344,6 +350,13 @@ const RemoteVideo: React.FC<{ participant: RemoteParticipant }> = ({ participant
         }
       });
     }
+
+    // Cleanup: remove click handler if component unmounts before user clicks
+    return () => {
+      if (clickHandler) {
+        document.removeEventListener('click', clickHandler);
+      }
+    };
   }, [participant.stream]);
 
   return (

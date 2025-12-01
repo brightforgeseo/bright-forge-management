@@ -63,6 +63,10 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
   // Mobile sidebar state
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
+  // Pagination state for messages
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [loadingMoreMessages, setLoadingMoreMessages] = useState(false);
+
   // Helper function to detect @mentions in text
   const detectMentions = (text: string): string[] => {
     const mentionedIds: string[] = [];
@@ -209,7 +213,14 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     console.log('[searchGifs] Searching for:', query);
     setGifLoading(true);
     try {
-      const apiKey = 'sXpGFDGZs0Dv1mmNFvYaGUvYwKX0PWIh';
+      // Use environment variable for API key (set GIPHY_API_KEY in .env file)
+      const apiKey = process.env.GIPHY_API_KEY || '';
+      if (!apiKey) {
+        console.warn('[searchGifs] GIPHY_API_KEY not configured');
+        setGifs([]);
+        setGifLoading(false);
+        return;
+      }
       const limit = 20;
       const endpoint = query === 'trending'
         ? `https://api.giphy.com/v1/gifs/trending?api_key=${apiKey}&limit=${limit}`
@@ -579,6 +590,9 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
   useEffect(() => {
     if (!activeChannelId) return;
 
+    // Capture the channel ID for this effect run to prevent race conditions
+    const currentChannelId = activeChannelId;
+
     // Update ref
     activeChannelRef.current = activeChannelId;
 
@@ -586,23 +600,34 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     lastLoadedMessageCountRef.current = 0;
 
     const loadMessages = async () => {
-      console.log('[TeamChat] Switching to channel:', activeChannelId);
+      console.log('[TeamChat] Switching to channel:', currentChannelId);
       console.log('[TeamChat] Fetching fresh messages from database');
 
       // Clear current messages and reactions immediately
       setMessages([]);
       setMessageReactions({});
+      setHasMoreMessages(false);
 
-      // Fetch fresh from database
-      const msgs = await fetchChatMessages(activeChannelId);
+      // Fetch fresh from database (last 100 messages)
+      const msgs = await fetchChatMessages(currentChannelId);
+
+      // CRITICAL: Check if user switched channels while we were fetching
+      // If they did, don't update state with stale data
+      if (activeChannelRef.current !== currentChannelId) {
+        console.log('[TeamChat] Channel changed during fetch, discarding stale messages');
+        return;
+      }
+
       console.log(`[TeamChat] Loaded ${msgs.length} messages from database`);
 
       setMessages(msgs);
+      // If we got exactly 100 messages, there might be more
+      setHasMoreMessages(msgs.length === 100);
       scrollToBottom();
 
       // Reset unread count
       setChannels(prev => prev.map(c =>
-        c.id === activeChannelId ? { ...c, unread: 0 } : c
+        c.id === currentChannelId ? { ...c, unread: 0 } : c
       ));
     };
 
@@ -611,6 +636,31 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
   const scrollToBottom = () => {
     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+  };
+
+  // Load older messages (pagination)
+  const loadMoreMessages = async () => {
+    if (!activeChannelId || loadingMoreMessages || !hasMoreMessages) return;
+
+    const oldestMessage = messages[0];
+    if (!oldestMessage) return;
+
+    setLoadingMoreMessages(true);
+    try {
+      const olderMsgs = await fetchChatMessages(activeChannelId, 100, oldestMessage.timestamp);
+
+      if (olderMsgs.length > 0) {
+        setMessages(prev => [...olderMsgs, ...prev]);
+        // If we got less than 100 messages, we've reached the beginning
+        setHasMoreMessages(olderMsgs.length === 100);
+      } else {
+        setHasMoreMessages(false);
+      }
+    } catch (error) {
+      console.error('[TeamChat] Error loading more messages:', error);
+    } finally {
+      setLoadingMoreMessages(false);
+    }
   };
 
   const handleCreateChannel = async () => {
@@ -1515,6 +1565,18 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 md:p-6 space-y-4 md:space-y-6">
+          {/* Load More Messages Button */}
+          {hasMoreMessages && (
+            <div className="flex justify-center">
+              <button
+                onClick={loadMoreMessages}
+                disabled={loadingMoreMessages}
+                className="px-4 py-2 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {loadingMoreMessages ? 'Loading...' : 'Load older messages'}
+              </button>
+            </div>
+          )}
           {messages.map((msg) => (
             <div key={msg.id} className={`flex gap-2 md:gap-4 group ${msg.isAi ? 'bg-brand-50/30 -mx-3 md:-mx-6 px-3 md:px-6 py-2' : ''}`}>
               <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${msg.isAi ? 'bg-brand-500' : 'bg-slate-200'}`}>

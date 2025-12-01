@@ -8,8 +8,31 @@ import { version } from '../package.json';
 
 // Flash favicon when receiving notifications
 let faviconFlashInterval: ReturnType<typeof setInterval> | null = null;
+let faviconFlashTimeout: ReturnType<typeof setTimeout> | null = null;
+let faviconFocusHandler: (() => void) | null = null;
 let originalFaviconHref: string | null = null;
 const notificationFavicon = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%23f97316"/><text x="50" y="70" font-size="60" text-anchor="middle" fill="white">!</text></svg>';
+
+// Cleanup function to stop favicon flashing - can be called on component unmount
+const stopFaviconFlash = () => {
+  if (faviconFlashInterval) {
+    clearInterval(faviconFlashInterval);
+    faviconFlashInterval = null;
+  }
+  if (faviconFlashTimeout) {
+    clearTimeout(faviconFlashTimeout);
+    faviconFlashTimeout = null;
+  }
+  if (faviconFocusHandler) {
+    window.removeEventListener('focus', faviconFocusHandler);
+    faviconFocusHandler = null;
+  }
+  // Restore original favicon
+  if (originalFaviconHref) {
+    const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+    if (favicon) favicon.href = originalFaviconHref;
+  }
+};
 
 const startFaviconFlash = () => {
   // Don't start if already flashing
@@ -30,22 +53,15 @@ const startFaviconFlash = () => {
   }, 500);
 
   // Stop flashing when window gains focus
-  const stopFlashing = () => {
-    if (faviconFlashInterval) {
-      clearInterval(faviconFlashInterval);
-      faviconFlashInterval = null;
-      if (originalFaviconHref) favicon.href = originalFaviconHref;
-    }
-    window.removeEventListener('focus', stopFlashing);
+  faviconFocusHandler = () => {
+    stopFaviconFlash();
   };
 
-  window.addEventListener('focus', stopFlashing);
+  window.addEventListener('focus', faviconFocusHandler);
 
   // Also stop after 30 seconds max
-  setTimeout(() => {
-    if (faviconFlashInterval) {
-      stopFlashing();
-    }
+  faviconFlashTimeout = setTimeout(() => {
+    stopFaviconFlash();
   }, 30000);
 };
 
@@ -201,6 +217,8 @@ const Sidebar: React.FC<SidebarProps> = ({
 
     return () => {
       supabase.removeChannel(channel);
+      // Clean up favicon flash resources on unmount
+      stopFaviconFlash();
     };
   }, [currentUser.id]);
 

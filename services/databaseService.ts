@@ -388,20 +388,35 @@ export const deleteClientBoard = async (boardId: string) => {
 
 // --- Chat ---
 
-export const fetchChatMessages = async (channelId: string): Promise<ChatMessage[]> => {
-  const { data, error } = await supabase
+// Default limit for message pagination - load last 100 messages initially
+const MESSAGE_PAGE_SIZE = 100;
+
+export const fetchChatMessages = async (
+  channelId: string,
+  limit: number = MESSAGE_PAGE_SIZE,
+  beforeTimestamp?: string
+): Promise<ChatMessage[]> => {
+  let query = supabase
     .from('chat_messages')
     .select('*')
     .eq('channel_id', channelId)
-    .order('created_at', { ascending: true });
-    // No limit - load ALL messages
+    .order('created_at', { ascending: false }) // Get newest first for pagination
+    .limit(limit);
+
+  // If loading older messages, get messages before the given timestamp
+  if (beforeTimestamp) {
+    query = query.lt('created_at', beforeTimestamp);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     console.error('Error fetching messages:', error);
     return [];
   }
 
-  return data.map((row: any) => ({
+  // Reverse to show oldest first in the UI
+  return data.reverse().map((row: any) => ({
     id: row.id,
     channelId: row.channel_id,
     sender: row.sender,
