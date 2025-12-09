@@ -2,6 +2,33 @@
 import { supabase, supabaseAdmin } from '../lib/supabaseClient';
 import { ClientBoard, ChatMessage, ChatChannel, Profile, AppNotification } from '../types';
 
+// --- Profile Management ---
+
+export const ensureProfileExists = async (userId: string, email?: string, fullName?: string) => {
+  const { data: existing } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', userId)
+    .single();
+
+  if (existing) return true;
+
+  const { error } = await supabase
+    .from('profiles')
+    .upsert({
+      id: userId,
+      email: email || '',
+      full_name: fullName || email?.split('@')[0] || 'User'
+    }, { onConflict: 'id' });
+
+  if (error) {
+    console.error('[ensureProfileExists] Error creating profile:', error.message);
+    return false;
+  }
+
+  return true;
+};
+
 // --- Allowlist (Invites) ---
 
 export const addToAllowlist = async (email: string, fullName: string, password?: string) => {
@@ -436,6 +463,11 @@ export const fetchChatMessages = async (
 };
 
 export const sendChatMessage = async (msg: ChatMessage) => {
+  // Ensure sender profile exists before inserting message (fixes FK constraint error)
+  if (msg.senderId) {
+    await ensureProfileExists(msg.senderId, undefined, msg.sender);
+  }
+
   const insertData: Record<string, any> = {
     channel_id: msg.channelId,
     sender: msg.sender,
