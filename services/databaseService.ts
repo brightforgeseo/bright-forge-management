@@ -822,33 +822,10 @@ export const removeChannelMember = async (channelId: string, userId: string) => 
 };
 
 export const fetchChannelMembers = async (channelId: string) => {
-  // First, check if channel_members table is accessible
-  const { error: testError } = await supabase
+  // Fetch members
+  const { data: members, error } = await supabase
     .from('channel_members')
-    .select('id')
-    .eq('channel_id', channelId)
-    .limit(1);
-
-  if (testError) {
-    throw new Error(`Cannot access channel_members table: ${testError.message}`);
-  }
-
-  // Fetch members with profile data
-  const { data, error } = await supabase
-    .from('channel_members')
-    .select(`
-      id,
-      channel_id,
-      user_id,
-      role,
-      invited_by,
-      joined_at,
-      profiles!channel_members_user_id_fkey (
-        id,
-        full_name,
-        avatar_url
-      )
-    `)
+    .select('id, channel_id, user_id, role, invited_by, joined_at')
     .eq('channel_id', channelId)
     .order('joined_at', { ascending: true });
 
@@ -856,7 +833,20 @@ export const fetchChannelMembers = async (channelId: string) => {
     throw new Error(`${error.message} (Code: ${error.code})`);
   }
 
-  return data;
+  if (!members || members.length === 0) return [];
+
+  // Fetch profiles separately for each member
+  const userIds = members.map(m => m.user_id);
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, full_name, avatar_url')
+    .in('id', userIds);
+
+  // Combine members with their profiles
+  return members.map(member => ({
+    ...member,
+    profiles: profiles?.find(p => p.id === member.user_id) || null
+  }));
 };
 
 export const isChannelMember = async (channelId: string, userId: string): Promise<boolean> => {
