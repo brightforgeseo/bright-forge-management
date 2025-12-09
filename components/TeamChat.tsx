@@ -701,8 +701,12 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
   };
 
   const handleInviteUser = async (channelId: string, userId: string) => {
+    console.log('[handleInviteUser] channelId:', channelId, 'userId:', userId);
+
     // Optimistically update UI first
     const invitedProfile = profiles.find(p => p.id === userId);
+    console.log('[handleInviteUser] invitedProfile:', invitedProfile);
+
     if (invitedProfile) {
       setChannelMembers(prev => [...prev, {
         id: `temp-${userId}`,
@@ -723,7 +727,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     } catch (e: any) {
       console.error('Invite user error:', e);
       const errorMsg = e?.message || e?.details || 'Unknown error';
-      alert(`Failed to add member: ${errorMsg}\n\nCode: ${e?.code || 'none'}\nHint: ${e?.hint || 'none'}`);
+      alert(`Failed to add member: ${errorMsg}\n\nCode: ${e?.code || 'none'}\nHint: ${e?.hint || 'none'}\nUserId: ${userId}\nChannelId: ${channelId}`);
       addToast('error', `Failed to invite user: ${errorMsg}`);
       // Revert optimistic update on error
       setChannelMembers(prev => prev.filter(m => m.user_id !== userId));
