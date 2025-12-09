@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Hexagon, Mail, Lock, ArrowRight, Loader2, AlertTriangle, User } from 'lucide-react';
 import { BrandingConfig } from '../types';
 import { supabase } from '../lib/supabaseClient';
-import { checkAllowlist, verifyPreProvisionedUser, consumePreProvisionedUser } from '../services/databaseService';
+import { checkAllowlist, verifyPreProvisionedUser, consumePreProvisionedUser, ensureProfileExists } from '../services/databaseService';
 
 interface LoginProps {
   onLogin: (email: string) => void;
@@ -70,6 +70,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, branding }) => {
           const { data, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
 
           if (!loginError && data.user) {
+              // Ensure profile exists for this user
+              await ensureProfileExists(data.user.id, data.user.email, data.user.user_metadata?.full_name);
               onLogin(data.user.email || email);
               return;
           }
@@ -101,13 +103,15 @@ const Login: React.FC<LoginProps> = ({ onLogin, branding }) => {
                   }
 
                   // If successful, clear temp password and log them in
-                  if (signUpData.session) {
+                  if (signUpData.session && signUpData.user) {
+                      await ensureProfileExists(signUpData.user.id, email, preUser.name);
                       await consumePreProvisionedUser(email);
                       onLogin(email);
                       return;
                   } else if (signUpData.user && !signUpData.session) {
                       // User created but needs email confirmation - try to sign in anyway
                       // (This happens when email confirmation is enabled)
+                      await ensureProfileExists(signUpData.user.id, email, preUser.name);
                       const { data: loginData, error: loginErr } = await supabase.auth.signInWithPassword({ email, password });
                       if (!loginErr && loginData.session) {
                           await consumePreProvisionedUser(email);
@@ -142,7 +146,10 @@ const Login: React.FC<LoginProps> = ({ onLogin, branding }) => {
           if (error) throw error;
 
           setSuccessMsg('Account created! Logging you in...');
-          if (data.user || data.session) {
+          if (data.user) {
+              await ensureProfileExists(data.user.id, email, fullName);
+              setTimeout(() => onLogin(email), 1500);
+          } else if (data.session) {
               setTimeout(() => onLogin(email), 1500);
           } else {
               setSuccessMsg('Account created! Please check your email to verify.');

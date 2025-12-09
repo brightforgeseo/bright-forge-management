@@ -13,12 +13,25 @@ export const ensureProfileExists = async (userId: string, email?: string, fullNa
 
   if (existing) return true;
 
+  // Try to get name from allowed_users if not provided
+  let name = fullName;
+  if (!name && email) {
+    const { data: allowedUser } = await supabase
+      .from('allowed_users')
+      .select('full_name')
+      .eq('email', email.toLowerCase())
+      .single();
+    if (allowedUser?.full_name) {
+      name = allowedUser.full_name;
+    }
+  }
+
   const { error } = await supabase
     .from('profiles')
     .upsert({
       id: userId,
       email: email || '',
-      full_name: fullName || email?.split('@')[0] || 'User'
+      full_name: name || email?.split('@')[0] || 'User'
     }, { onConflict: 'id' });
 
   if (error) {
