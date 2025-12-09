@@ -72,32 +72,96 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
   const [chatBackground, setChatBackground] = useState<string>(() => {
     return localStorage.getItem('bf_chat_background') || 'default';
   });
+  const [customBgUrl, setCustomBgUrl] = useState<string | null>(() => {
+    return localStorage.getItem('bf_chat_custom_bg') || null;
+  });
+  const bgInputRef = useRef<HTMLInputElement>(null);
 
   const chatBackgrounds = [
-    { id: 'default', name: 'Default', style: 'bg-white' },
-    { id: 'dark', name: 'Dark', style: 'bg-slate-900' },
-    { id: 'gradient-blue', name: 'Ocean', style: 'bg-gradient-to-br from-blue-100 via-blue-50 to-cyan-100' },
-    { id: 'gradient-purple', name: 'Purple', style: 'bg-gradient-to-br from-purple-100 via-pink-50 to-indigo-100' },
-    { id: 'gradient-green', name: 'Forest', style: 'bg-gradient-to-br from-green-100 via-emerald-50 to-teal-100' },
-    { id: 'gradient-sunset', name: 'Sunset', style: 'bg-gradient-to-br from-orange-100 via-red-50 to-pink-100' },
-    { id: 'gradient-night', name: 'Night', style: 'bg-gradient-to-br from-slate-800 via-slate-900 to-indigo-900' },
-    { id: 'pattern-dots', name: 'Dots', style: 'bg-white bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px]' },
-    { id: 'pattern-grid', name: 'Grid', style: 'bg-white bg-[linear-gradient(to_right,#f0f0f0_1px,transparent_1px),linear-gradient(to_bottom,#f0f0f0_1px,transparent_1px)] [background-size:24px_24px]' },
+    { id: 'default', name: 'Default', style: 'bg-white', dark: false },
+    { id: 'dark', name: 'Dark', style: 'bg-slate-900', dark: true },
+    { id: 'gradient-blue', name: 'Ocean', style: 'bg-gradient-to-br from-blue-100 via-blue-50 to-cyan-100', dark: false },
+    { id: 'gradient-purple', name: 'Purple', style: 'bg-gradient-to-br from-purple-100 via-pink-50 to-indigo-100', dark: false },
+    { id: 'gradient-green', name: 'Forest', style: 'bg-gradient-to-br from-green-100 via-emerald-50 to-teal-100', dark: false },
+    { id: 'gradient-sunset', name: 'Sunset', style: 'bg-gradient-to-br from-orange-100 via-red-50 to-pink-100', dark: false },
+    { id: 'gradient-night', name: 'Night', style: 'bg-gradient-to-br from-slate-800 via-slate-900 to-indigo-900', dark: true },
+    { id: 'pattern-dots', name: 'Dots', style: 'bg-white bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px]', dark: false },
+    { id: 'pattern-grid', name: 'Grid', style: 'bg-white bg-[linear-gradient(to_right,#f0f0f0_1px,transparent_1px),linear-gradient(to_bottom,#f0f0f0_1px,transparent_1px)] [background-size:24px_24px]', dark: false },
+  ];
+
+  // Preset image backgrounds (free stock photos)
+  const imageBackgrounds = [
+    { id: 'img-mountains', name: 'Mountains', url: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200&q=80', dark: true },
+    { id: 'img-beach', name: 'Beach', url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&q=80', dark: false },
+    { id: 'img-forest', name: 'Forest', url: 'https://images.unsplash.com/photo-1448375240586-882707db888b?w=1200&q=80', dark: true },
+    { id: 'img-city', name: 'City', url: 'https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?w=1200&q=80', dark: true },
+    { id: 'img-space', name: 'Space', url: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=1200&q=80', dark: true },
+    { id: 'img-clouds', name: 'Clouds', url: 'https://images.unsplash.com/photo-1517483000871-1dbf64a6e1c6?w=1200&q=80', dark: false },
   ];
 
   const handleBackgroundChange = (bgId: string) => {
     setChatBackground(bgId);
     localStorage.setItem('bf_chat_background', bgId);
+    if (!bgId.startsWith('custom')) {
+      setCustomBgUrl(null);
+      localStorage.removeItem('bf_chat_custom_bg');
+    }
     setShowBackgroundPicker(false);
   };
 
+  const handleCustomBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      // Upload to Supabase storage
+      const fileName = `chat-bg-${currentUser.id}-${Date.now()}.${file.name.split('.').pop()}`;
+      const { data, error } = await supabase.storage
+        .from('uploads')
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(fileName);
+      const url = urlData.publicUrl;
+
+      setCustomBgUrl(url);
+      setChatBackground('custom');
+      localStorage.setItem('bf_chat_background', 'custom');
+      localStorage.setItem('bf_chat_custom_bg', url);
+      setShowBackgroundPicker(false);
+      addToast('success', 'Background uploaded!');
+    } catch (err) {
+      console.error('Upload error:', err);
+      addToast('error', 'Failed to upload background');
+    }
+  };
+
   const getCurrentBackgroundStyle = () => {
+    if (chatBackground === 'custom' && customBgUrl) {
+      return ''; // Will use inline style instead
+    }
+    if (chatBackground.startsWith('img-')) {
+      return ''; // Will use inline style instead
+    }
     const bg = chatBackgrounds.find(b => b.id === chatBackground);
     return bg?.style || 'bg-white';
   };
 
+  const getCurrentBackgroundImage = () => {
+    if (chatBackground === 'custom' && customBgUrl) {
+      return customBgUrl;
+    }
+    const imgBg = imageBackgrounds.find(b => b.id === chatBackground);
+    return imgBg?.url || null;
+  };
+
   const isDarkBackground = () => {
-    return chatBackground === 'dark' || chatBackground === 'gradient-night';
+    if (chatBackground === 'custom') return true; // Assume dark for custom images
+    const imgBg = imageBackgrounds.find(b => b.id === chatBackground);
+    if (imgBg) return imgBg.dark;
+    const bg = chatBackgrounds.find(b => b.id === chatBackground);
+    return bg?.dark || false;
   };
 
   // Helper function to detect @mentions in text
@@ -1593,21 +1657,54 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                 <Palette className="w-4 h-4 md:w-5 md:h-5 text-slate-400 group-hover:text-purple-600" />
               </button>
               {showBackgroundPicker && (
-                <div className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-xl border border-slate-200 p-3 z-50 w-64">
-                  <h4 className="text-sm font-semibold text-slate-700 mb-2">Chat Background</h4>
-                  <div className="grid grid-cols-3 gap-2">
+                <div className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-xl border border-slate-200 p-4 z-50 w-80 max-h-[70vh] overflow-y-auto">
+                  <h4 className="text-sm font-semibold text-slate-700 mb-2">Colors & Patterns</h4>
+                  <div className="grid grid-cols-3 gap-2 mb-4">
                     {chatBackgrounds.map(bg => (
                       <button
                         key={bg.id}
                         onClick={() => handleBackgroundChange(bg.id)}
-                        className={`h-16 rounded-lg border-2 transition-all ${bg.style} ${chatBackground === bg.id ? 'border-brand-500 ring-2 ring-brand-200' : 'border-slate-200 hover:border-slate-300'}`}
+                        className={`h-12 rounded-lg border-2 transition-all ${bg.style} ${chatBackground === bg.id ? 'border-brand-500 ring-2 ring-brand-200' : 'border-slate-200 hover:border-slate-300'}`}
                         title={bg.name}
                       >
                         <span className="sr-only">{bg.name}</span>
                       </button>
                     ))}
                   </div>
-                  <p className="text-xs text-slate-500 mt-2 text-center">Click to select</p>
+
+                  <h4 className="text-sm font-semibold text-slate-700 mb-2">Photo Backgrounds</h4>
+                  <div className="grid grid-cols-3 gap-2 mb-4">
+                    {imageBackgrounds.map(bg => (
+                      <button
+                        key={bg.id}
+                        onClick={() => handleBackgroundChange(bg.id)}
+                        className={`h-16 rounded-lg border-2 transition-all bg-cover bg-center ${chatBackground === bg.id ? 'border-brand-500 ring-2 ring-brand-200' : 'border-slate-200 hover:border-slate-300'}`}
+                        style={{ backgroundImage: `url(${bg.url})` }}
+                        title={bg.name}
+                      >
+                        <span className="sr-only">{bg.name}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <h4 className="text-sm font-semibold text-slate-700 mb-2">Custom Image</h4>
+                  <input
+                    type="file"
+                    ref={bgInputRef}
+                    onChange={handleCustomBgUpload}
+                    accept="image/*"
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() => bgInputRef.current?.click()}
+                    className="w-full py-2 px-3 border-2 border-dashed border-slate-300 rounded-lg text-sm text-slate-600 hover:border-brand-400 hover:text-brand-600 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <ImageIcon className="w-4 h-4" />
+                    Upload your own image
+                  </button>
+                  {customBgUrl && chatBackground === 'custom' && (
+                    <div className="mt-2 text-xs text-green-600 text-center">Custom background active</div>
+                  )}
                 </div>
               )}
             </div>
@@ -1633,7 +1730,10 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
           </div>
         </div>
 
-        <div className={`flex-1 overflow-y-auto p-3 md:p-6 space-y-4 md:space-y-6 ${getCurrentBackgroundStyle()}`}>
+        <div
+          className={`flex-1 overflow-y-auto p-3 md:p-6 space-y-4 md:space-y-6 ${getCurrentBackgroundStyle()} bg-cover bg-center bg-fixed`}
+          style={getCurrentBackgroundImage() ? { backgroundImage: `url(${getCurrentBackgroundImage()})` } : undefined}
+        >
           {/* Load More Messages Button */}
           {hasMoreMessages && (
             <div className="flex justify-center">
