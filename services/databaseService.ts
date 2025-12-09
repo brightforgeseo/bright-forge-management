@@ -30,7 +30,6 @@ export const ensureProfileExists = async (userId: string, email?: string, fullNa
     .from('profiles')
     .upsert({
       id: userId,
-      email: email || '',
       full_name: name || email?.split('@')[0] || 'User'
     }, { onConflict: 'id' });
 
@@ -221,38 +220,13 @@ export const deleteNotification = async (notificationId: string) => {
 // --- Profiles ---
 
 export const fetchProfiles = async (): Promise<Profile[]> => {
-    // Get profiles from profiles table
+    // Get profiles from profiles table (only users who have logged in have profiles)
     const { data: profiles } = await supabase
         .from('profiles')
         .select('*')
         .order('full_name', { ascending: true });
 
-    // Also get users from allowed_users who might not have profiles yet
-    const { data: allowedUsers } = await supabase
-        .from('allowed_users')
-        .select('id, email, full_name, role');
-
-    const profileList = (profiles as Profile[]) || [];
-
-    // Add allowed users who don't have profiles yet (they'll show by email/name)
-    if (allowedUsers) {
-        for (const au of allowedUsers) {
-            // Check if this allowed user already has a profile (by email match)
-            const hasProfile = profileList.some(p =>
-                p.email?.toLowerCase() === au.email?.toLowerCase()
-            );
-            if (!hasProfile && au.email) {
-                profileList.push({
-                    id: au.id, // Use allowed_users id as fallback
-                    email: au.email,
-                    full_name: au.full_name || au.email.split('@')[0],
-                    avatar_url: null
-                });
-            }
-        }
-    }
-
-    return profileList;
+    return (profiles as Profile[]) || [];
 };
 
 export const updateUserProfile = async (fullName: string) => {
