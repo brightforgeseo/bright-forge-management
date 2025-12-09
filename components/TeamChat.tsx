@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check, Smile, Film, SmilePlus, Video, Lock, UserPlus, Menu, ClipboardList, Calendar, ArrowRight } from 'lucide-react';
+import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check, Smile, Film, SmilePlus, Video, Lock, UserPlus, Menu, ClipboardList, Calendar, ArrowRight, Palette } from 'lucide-react';
 import { ChatChannel, ChatMessage, User, ToastType, Profile, MessageReaction } from '../types';
 import { getChatResponse } from '../services/geminiService';
 import { storeEchoConversation, buildConversationContext } from '../services/echoMemory';
@@ -66,6 +66,39 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
   // Pagination state for messages
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [loadingMoreMessages, setLoadingMoreMessages] = useState(false);
+
+  // Chat background state
+  const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
+  const [chatBackground, setChatBackground] = useState<string>(() => {
+    return localStorage.getItem('bf_chat_background') || 'default';
+  });
+
+  const chatBackgrounds = [
+    { id: 'default', name: 'Default', style: 'bg-white' },
+    { id: 'dark', name: 'Dark', style: 'bg-slate-900' },
+    { id: 'gradient-blue', name: 'Ocean', style: 'bg-gradient-to-br from-blue-100 via-blue-50 to-cyan-100' },
+    { id: 'gradient-purple', name: 'Purple', style: 'bg-gradient-to-br from-purple-100 via-pink-50 to-indigo-100' },
+    { id: 'gradient-green', name: 'Forest', style: 'bg-gradient-to-br from-green-100 via-emerald-50 to-teal-100' },
+    { id: 'gradient-sunset', name: 'Sunset', style: 'bg-gradient-to-br from-orange-100 via-red-50 to-pink-100' },
+    { id: 'gradient-night', name: 'Night', style: 'bg-gradient-to-br from-slate-800 via-slate-900 to-indigo-900' },
+    { id: 'pattern-dots', name: 'Dots', style: 'bg-white bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px]' },
+    { id: 'pattern-grid', name: 'Grid', style: 'bg-white bg-[linear-gradient(to_right,#f0f0f0_1px,transparent_1px),linear-gradient(to_bottom,#f0f0f0_1px,transparent_1px)] [background-size:24px_24px]' },
+  ];
+
+  const handleBackgroundChange = (bgId: string) => {
+    setChatBackground(bgId);
+    localStorage.setItem('bf_chat_background', bgId);
+    setShowBackgroundPicker(false);
+  };
+
+  const getCurrentBackgroundStyle = () => {
+    const bg = chatBackgrounds.find(b => b.id === chatBackground);
+    return bg?.style || 'bg-white';
+  };
+
+  const isDarkBackground = () => {
+    return chatBackground === 'dark' || chatBackground === 'gradient-night';
+  };
 
   // Helper function to detect @mentions in text
   const detectMentions = (text: string): string[] => {
@@ -1550,6 +1583,34 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                 <Video className="w-4 h-4 md:w-5 md:h-5 text-slate-400 group-hover:text-green-600" />
               </button>
             )}
+            {/* Background Picker */}
+            <div className="relative">
+              <button
+                onClick={() => setShowBackgroundPicker(!showBackgroundPicker)}
+                className="p-1.5 md:p-2 hover:bg-purple-50 rounded-lg transition-colors group"
+                title="Change Background"
+              >
+                <Palette className="w-4 h-4 md:w-5 md:h-5 text-slate-400 group-hover:text-purple-600" />
+              </button>
+              {showBackgroundPicker && (
+                <div className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-xl border border-slate-200 p-3 z-50 w-64">
+                  <h4 className="text-sm font-semibold text-slate-700 mb-2">Chat Background</h4>
+                  <div className="grid grid-cols-3 gap-2">
+                    {chatBackgrounds.map(bg => (
+                      <button
+                        key={bg.id}
+                        onClick={() => handleBackgroundChange(bg.id)}
+                        className={`h-16 rounded-lg border-2 transition-all ${bg.style} ${chatBackground === bg.id ? 'border-brand-500 ring-2 ring-brand-200' : 'border-slate-200 hover:border-slate-300'}`}
+                        title={bg.name}
+                      >
+                        <span className="sr-only">{bg.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-2 text-center">Click to select</p>
+                </div>
+              )}
+            </div>
             {activeChannelId && (
               <button
                 onClick={async () => {
@@ -1572,7 +1633,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-3 md:p-6 space-y-4 md:space-y-6">
+        <div className={`flex-1 overflow-y-auto p-3 md:p-6 space-y-4 md:space-y-6 ${getCurrentBackgroundStyle()}`}>
           {/* Load More Messages Button */}
           {hasMoreMessages && (
             <div className="flex justify-center">
@@ -1598,8 +1659,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-baseline gap-1 md:gap-2">
-                  <span className="font-bold text-slate-900 text-sm md:text-base">{msg.sender}</span>
-                  <span className="text-[10px] md:text-xs text-slate-400">
+                  <span className={`font-bold text-sm md:text-base ${isDarkBackground() ? 'text-white' : 'text-slate-900'}`}>{msg.sender}</span>
+                  <span className={`text-[10px] md:text-xs ${isDarkBackground() ? 'text-slate-400' : 'text-slate-400'}`}>
                     {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     {msg.isEdited && <span className="ml-1 italic">(edited)</span>}
                   </span>
@@ -1656,7 +1717,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                   </div>
                 ) : (
                   <div className="mt-1">
-                    <span className="text-slate-700 whitespace-pre-wrap text-sm md:text-base">{renderTextWithMentions(msg.text)}</span>
+                    <span className={`whitespace-pre-wrap text-sm md:text-base ${isDarkBackground() ? 'text-slate-200' : 'text-slate-700'}`}>{renderTextWithMentions(msg.text)}</span>
                     <span className="inline-flex items-center gap-1 ml-2">
                       {!msg.isAi && msg.senderId === currentUser.id && editingMessageId !== msg.id && (
                         <button
