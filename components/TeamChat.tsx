@@ -1017,7 +1017,9 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     } catch (error: any) {
       console.error('[handleSendMessage] Failed to send message:', error);
       console.error('[handleSendMessage] Error details:', error.message, error.details, error.hint);
-      addToast('error', `Failed to send message: ${error.message || 'Unknown error'}`);
+      const errorMsg = error.message || error.details || 'Unknown error';
+      alert(`Message failed: ${errorMsg}\n\nCode: ${error.code || 'none'}\nHint: ${error.hint || 'none'}`);
+      addToast('error', `Failed to send message: ${errorMsg}`);
       setMessage(messageText); // Restore message on error
       return;
     }
