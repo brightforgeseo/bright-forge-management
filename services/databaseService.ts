@@ -467,6 +467,7 @@ export const fetchChatMessages = async (
     avatar: row.avatar,
     attachmentUrl: row.attachment_url,
     attachmentType: row.attachment_type,
+    attachmentName: row.attachment_name,
     isEdited: row.is_edited,
     editedAt: row.edited_at,
     taskLink: row.task_link,
@@ -490,7 +491,8 @@ export const sendChatMessage = async (msg: ChatMessage) => {
     avatar: msg.avatar,
     created_at: msg.timestamp,
     attachment_url: msg.attachmentUrl,
-    attachment_type: msg.attachmentType
+    attachment_type: msg.attachmentType,
+    attachment_name: msg.attachmentName
   };
 
   // Include task link data if present (stored as JSON in text or a separate column)

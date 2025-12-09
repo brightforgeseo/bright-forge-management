@@ -144,7 +144,8 @@ export interface ChatMessage {
   isAi?: boolean;
   avatar?: string;
   attachmentUrl?: string;
-  attachmentType?: 'image' | 'file';
+  attachmentType?: 'image' | 'video' | 'file';
+  attachmentName?: string;
   isEdited?: boolean; // Flag to show message was edited
   editedAt?: string; // Timestamp of last edit
   reactions?: MessageReaction[]; // Emoji reactions on this message

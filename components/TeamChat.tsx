@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check, Smile, Film, SmilePlus, Video, Lock, UserPlus, Menu, ClipboardList, Calendar, ArrowRight, Palette } from 'lucide-react';
+import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check, Smile, Film, SmilePlus, Video, Lock, UserPlus, Menu, ClipboardList, Calendar, ArrowRight, Palette, Paperclip, Download, File } from 'lucide-react';
 import { ChatChannel, ChatMessage, User, ToastType, Profile, MessageReaction } from '../types';
 import { getChatResponse } from '../services/geminiService';
 import { storeEchoConversation, buildConversationContext } from '../services/echoMemory';
@@ -606,6 +606,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
           avatar: newMsg.avatar,
           attachmentUrl: newMsg.attachment_url,
           attachmentType: newMsg.attachment_type,
+          attachmentName: newMsg.attachment_name,
           isEdited: newMsg.is_edited,
           editedAt: newMsg.edited_at,
           taskLink: newMsg.task_link,
@@ -1125,6 +1126,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
         avatar: result.avatar,
         attachmentUrl: result.attachment_url,
         attachmentType: result.attachment_type,
+        attachmentName: result.attachment_name,
         isEdited: result.is_edited,
         editedAt: result.edited_at,
         taskLink: result.task_link
@@ -1333,17 +1335,28 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     const url = await uploadFile(e.target.files[0]);
     setIsUploading(false);
     if (url) {
-      const type = e.target.files[0].type.startsWith('image/') ? 'image' : 'file';
+      const file = e.target.files[0];
+      const mimeType = file.type;
+      let type: 'image' | 'video' | 'file' = 'file';
+      if (mimeType.startsWith('image/')) type = 'image';
+      else if (mimeType.startsWith('video/')) type = 'video';
+
+      const fileName = file.name;
+      let displayText = `Sent file: ${fileName}`;
+      if (type === 'image') displayText = 'Sent an image';
+      else if (type === 'video') displayText = 'Sent a video';
+
       await sendChatMessage({
         id: Date.now().toString(),
         channelId: activeChannelId,
         sender: currentUser.name,
         senderId: currentUser.id,
-        text: type === 'image' ? 'Sent an image' : `Sent file: ${e.target.files[0].name}`,
+        text: displayText,
         timestamp: new Date().toISOString(),
         avatar: currentUser.avatarUrl || 'user',
         attachmentUrl: url,
-        attachmentType: type
+        attachmentType: type,
+        attachmentName: fileName
       });
 
       const currentCh = channels.find(c => c.id === activeChannelId);
@@ -1806,9 +1819,30 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                       <a href={msg.attachmentUrl} target="_blank" rel="noopener noreferrer">
                         <img src={msg.attachmentUrl} alt="Attachment" className="max-h-48 md:max-h-60 rounded-lg border border-slate-200" />
                       </a>
+                    ) : msg.attachmentType === 'video' ? (
+                      <video
+                        src={msg.attachmentUrl}
+                        controls
+                        className="max-h-64 md:max-h-80 rounded-lg border border-slate-200"
+                        preload="metadata"
+                      />
                     ) : (
-                      <a href={msg.attachmentUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-brand-600 underline text-sm">
-                        <FileText className="w-4 h-4" /> Attachment
+                      <a
+                        href={msg.attachmentUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-3 px-4 py-3 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-200 transition-colors group"
+                      >
+                        <div className="p-2 bg-white rounded-lg shadow-sm">
+                          <File className="w-5 h-5 text-brand-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-800 truncate max-w-[200px]">
+                            {msg.attachmentName || 'File attachment'}
+                          </p>
+                          <p className="text-xs text-slate-500">Click to download</p>
+                        </div>
+                        <Download className="w-4 h-4 text-slate-400 group-hover:text-brand-600 transition-colors" />
                       </a>
                     )}
                   </div>
@@ -2029,9 +2063,9 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
             />
             <div className="flex justify-between items-center p-1.5 md:p-2 border-t rounded-b-lg md:rounded-b-xl bg-slate-50 border-slate-100">
               <div className="flex gap-0.5 md:gap-1 relative">
-                <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
-                <button onClick={() => fileInputRef.current?.click()} className="p-1.5 md:p-2 hover:bg-slate-200 rounded-full text-slate-500">
-                  <ImageIcon className="w-4 h-4 md:w-5 md:h-5" />
+                <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar" />
+                <button onClick={() => fileInputRef.current?.click()} className="p-1.5 md:p-2 hover:bg-slate-200 rounded-full text-slate-500" title="Attach file">
+                  <Paperclip className="w-4 h-4 md:w-5 md:h-5" />
                 </button>
 
                 <button
