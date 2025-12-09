@@ -67,13 +67,12 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [loadingMoreMessages, setLoadingMoreMessages] = useState(false);
 
-  // Chat background state
+  // Chat background state - per channel
   const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
-  const [chatBackground, setChatBackground] = useState<string>(() => {
-    return localStorage.getItem('bf_chat_background') || 'default';
-  });
-  const [customBgUrl, setCustomBgUrl] = useState<string | null>(() => {
-    return localStorage.getItem('bf_chat_custom_bg') || null;
+  const [channelBackgrounds, setChannelBackgrounds] = useState<Record<string, { bg: string; customUrl?: string }>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('bf_channel_backgrounds') || '{}');
+    } catch { return {}; }
   });
   const bgInputRef = useRef<HTMLInputElement>(null);
 
@@ -99,13 +98,32 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     { id: 'img-clouds', name: 'Clouds', url: 'https://images.unsplash.com/photo-1517483000871-1dbf64a6e1c6?w=1200&q=80', dark: false },
   ];
 
-  const handleBackgroundChange = (bgId: string) => {
-    setChatBackground(bgId);
-    localStorage.setItem('bf_chat_background', bgId);
-    if (!bgId.startsWith('custom')) {
-      setCustomBgUrl(null);
-      localStorage.removeItem('bf_chat_custom_bg');
-    }
+  // Christmas/Holiday backgrounds
+  const christmasBackgrounds = [
+    { id: 'xmas-snow', name: 'Snowy', url: 'https://images.unsplash.com/photo-1517299321609-52687d1bc55a?w=1200&q=80', dark: false },
+    { id: 'xmas-tree', name: 'Tree', url: 'https://images.unsplash.com/photo-1512389142860-9c449e58a543?w=1200&q=80', dark: true },
+    { id: 'xmas-lights', name: 'Lights', url: 'https://images.unsplash.com/photo-1513297887119-d46091b24bfa?w=1200&q=80', dark: true },
+    { id: 'xmas-cozy', name: 'Cozy', url: 'https://images.unsplash.com/photo-1482517967863-00e15c9b44be?w=1200&q=80', dark: true },
+    { id: 'xmas-winter', name: 'Winter', url: 'https://images.unsplash.com/photo-1418985991508-e47386d96a71?w=1200&q=80', dark: false },
+    { id: 'xmas-bokeh', name: 'Bokeh', url: 'https://images.unsplash.com/photo-1543589077-47d81606c1bf?w=1200&q=80', dark: true },
+  ];
+
+  // Get current channel's background
+  const getChannelBackground = () => {
+    return channelBackgrounds[activeChannelId]?.bg || 'default';
+  };
+
+  const getChannelCustomUrl = () => {
+    return channelBackgrounds[activeChannelId]?.customUrl || null;
+  };
+
+  const handleBackgroundChange = (bgId: string, customUrl?: string) => {
+    const updated = {
+      ...channelBackgrounds,
+      [activeChannelId]: { bg: bgId, customUrl }
+    };
+    setChannelBackgrounds(updated);
+    localStorage.setItem('bf_channel_backgrounds', JSON.stringify(updated));
     setShowBackgroundPicker(false);
   };
 
@@ -116,7 +134,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     try {
       // Upload to Supabase storage
       const fileName = `chat-bg-${currentUser.id}-${Date.now()}.${file.name.split('.').pop()}`;
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from('uploads')
         .upload(fileName, file);
 
@@ -125,11 +143,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(fileName);
       const url = urlData.publicUrl;
 
-      setCustomBgUrl(url);
-      setChatBackground('custom');
-      localStorage.setItem('bf_chat_background', 'custom');
-      localStorage.setItem('bf_chat_custom_bg', url);
-      setShowBackgroundPicker(false);
+      handleBackgroundChange('custom', url);
       addToast('success', 'Background uploaded!');
     } catch (err) {
       console.error('Upload error:', err);
@@ -138,29 +152,38 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
   };
 
   const getCurrentBackgroundStyle = () => {
-    if (chatBackground === 'custom' && customBgUrl) {
+    const bgId = getChannelBackground();
+    const customUrl = getChannelCustomUrl();
+    if (bgId === 'custom' && customUrl) {
       return ''; // Will use inline style instead
     }
-    if (chatBackground.startsWith('img-')) {
+    if (bgId.startsWith('img-')) {
       return ''; // Will use inline style instead
     }
-    const bg = chatBackgrounds.find(b => b.id === chatBackground);
+    const bg = chatBackgrounds.find(b => b.id === bgId);
     return bg?.style || 'bg-white';
   };
 
   const getCurrentBackgroundImage = () => {
-    if (chatBackground === 'custom' && customBgUrl) {
-      return customBgUrl;
+    const bgId = getChannelBackground();
+    const customUrl = getChannelCustomUrl();
+    if (bgId === 'custom' && customUrl) {
+      return customUrl;
     }
-    const imgBg = imageBackgrounds.find(b => b.id === chatBackground);
-    return imgBg?.url || null;
+    const imgBg = imageBackgrounds.find(b => b.id === bgId);
+    if (imgBg) return imgBg.url;
+    const xmasBg = christmasBackgrounds.find(b => b.id === bgId);
+    return xmasBg?.url || null;
   };
 
   const isDarkBackground = () => {
-    if (chatBackground === 'custom') return true; // Assume dark for custom images
-    const imgBg = imageBackgrounds.find(b => b.id === chatBackground);
+    const bgId = getChannelBackground();
+    if (bgId === 'custom') return true; // Assume dark for custom images
+    const imgBg = imageBackgrounds.find(b => b.id === bgId);
     if (imgBg) return imgBg.dark;
-    const bg = chatBackgrounds.find(b => b.id === chatBackground);
+    const xmasBg = christmasBackgrounds.find(b => b.id === bgId);
+    if (xmasBg) return xmasBg.dark;
+    const bg = chatBackgrounds.find(b => b.id === bgId);
     return bg?.dark || false;
   };
 
@@ -1664,7 +1687,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                       <button
                         key={bg.id}
                         onClick={() => handleBackgroundChange(bg.id)}
-                        className={`h-12 rounded-lg border-2 transition-all ${bg.style} ${chatBackground === bg.id ? 'border-brand-500 ring-2 ring-brand-200' : 'border-slate-200 hover:border-slate-300'}`}
+                        className={`h-12 rounded-lg border-2 transition-all ${bg.style} ${getChannelBackground() === bg.id ? 'border-brand-500 ring-2 ring-brand-200' : 'border-slate-200 hover:border-slate-300'}`}
                         title={bg.name}
                       >
                         <span className="sr-only">{bg.name}</span>
@@ -1678,7 +1701,22 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                       <button
                         key={bg.id}
                         onClick={() => handleBackgroundChange(bg.id)}
-                        className={`h-16 rounded-lg border-2 transition-all bg-cover bg-center ${chatBackground === bg.id ? 'border-brand-500 ring-2 ring-brand-200' : 'border-slate-200 hover:border-slate-300'}`}
+                        className={`h-16 rounded-lg border-2 transition-all bg-cover bg-center ${getChannelBackground() === bg.id ? 'border-brand-500 ring-2 ring-brand-200' : 'border-slate-200 hover:border-slate-300'}`}
+                        style={{ backgroundImage: `url(${bg.url})` }}
+                        title={bg.name}
+                      >
+                        <span className="sr-only">{bg.name}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <h4 className="text-sm font-semibold text-slate-700 mb-2">Christmas</h4>
+                  <div className="grid grid-cols-3 gap-2 mb-4">
+                    {christmasBackgrounds.map(bg => (
+                      <button
+                        key={bg.id}
+                        onClick={() => handleBackgroundChange(bg.id)}
+                        className={`h-16 rounded-lg border-2 transition-all bg-cover bg-center ${getChannelBackground() === bg.id ? 'border-brand-500 ring-2 ring-brand-200' : 'border-slate-200 hover:border-slate-300'}`}
                         style={{ backgroundImage: `url(${bg.url})` }}
                         title={bg.name}
                       >
@@ -1697,14 +1735,11 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                   />
                   <button
                     onClick={() => bgInputRef.current?.click()}
-                    className="w-full py-2 px-3 border-2 border-dashed border-slate-300 rounded-lg text-sm text-slate-600 hover:border-brand-400 hover:text-brand-600 transition-colors flex items-center justify-center gap-2"
+                    className={`w-full py-2 px-3 border-2 border-dashed rounded-lg text-sm transition-colors flex items-center justify-center gap-2 ${getChannelBackground() === 'custom' ? 'border-brand-500 text-brand-600 bg-brand-50' : 'border-slate-300 text-slate-600 hover:border-brand-400 hover:text-brand-600'}`}
                   >
                     <ImageIcon className="w-4 h-4" />
-                    Upload your own image
+                    {getChannelBackground() === 'custom' ? 'Custom image active' : 'Upload your own image'}
                   </button>
-                  {customBgUrl && chatBackground === 'custom' && (
-                    <div className="mt-2 text-xs text-green-600 text-center">Custom background active</div>
-                  )}
                 </div>
               )}
             </div>
