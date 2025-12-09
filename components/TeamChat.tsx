@@ -720,9 +720,11 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       addToast('success', 'User invited to channel');
       // Reload to get correct data with real IDs
       loadChannelMembers(channelId);
-    } catch (e) {
+    } catch (e: any) {
       console.error('Invite user error:', e);
-      addToast('error', `Failed to invite user: ${e instanceof Error ? e.message : 'Unknown error'}`);
+      const errorMsg = e?.message || e?.details || 'Unknown error';
+      alert(`Failed to add member: ${errorMsg}\n\nCode: ${e?.code || 'none'}\nHint: ${e?.hint || 'none'}`);
+      addToast('error', `Failed to invite user: ${errorMsg}`);
       // Revert optimistic update on error
       setChannelMembers(prev => prev.filter(m => m.user_id !== userId));
     }
