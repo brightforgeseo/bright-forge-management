@@ -3,7 +3,7 @@ import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Lo
 import { ChatChannel, ChatMessage, User, ToastType, Profile, MessageReaction } from '../types';
 import { getChatResponse } from '../services/geminiService';
 import { storeEchoConversation, buildConversationContext } from '../services/echoMemory';
-import { fetchChatMessages, sendChatMessage, clearChatHistory, uploadFile, fetchChannels, createChannel, deleteChannel, fetchProfiles, getOrCreateDMChannel, createNotification, editChatMessage, fetchMessageReactions, addMessageReaction, removeMessageReaction, fetchChannelMembers, addChannelMember, removeChannelMember, deleteChatMessage } from '../services/databaseService';
+import { fetchChatMessages, sendChatMessage, clearChatHistory, uploadFile, fetchChannels, createChannel, deleteChannel, fetchProfiles, getOrCreateDMChannel, createNotification, editChatMessage, fetchMessageReactions, addMessageReaction, removeMessageReaction, fetchChannelMembers, addChannelMember, removeChannelMember, deleteChatMessage, isChannelMember } from '../services/databaseService';
 import { supabase } from '../lib/supabaseClient';
 // Removed custom VideoCall - now using Google Meet
 
@@ -644,13 +644,16 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
             ));
           }
 
-          // Show notification
+          // Show notification only for channels the user is part of
+          // Note: targetChannel will only exist if user has access (fetchChannels filters by membership)
           if (targetChannel && !newMsg.is_ai && newMsg.sender !== currentUser.name) {
             if (targetChannel.type === 'dm') {
               if (isUserInDM(targetChannel, currentUser.id)) {
                 addToast('info', `${newMsg.sender}: ${newMsg.text.substring(0, 50)}${newMsg.text.length > 50 ? '...' : ''}`);
               }
             } else {
+              // Only show toast if user has this channel in their list
+              // (private channels not in user's list won't reach here due to fetchChannels filtering)
               addToast('info', `New message in #${targetChannel.name}`);
             }
           }
@@ -750,6 +753,19 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       setChannels(prev => prev.map(c =>
         c.id === currentChannelId ? { ...c, unread: 0 } : c
       ));
+
+      // For private channels, load members so we can filter the mention dropdown
+      const currentChannel = channelsRef.current.find(c => c.id === currentChannelId);
+      if (currentChannel?.is_private) {
+        try {
+          const members = await fetchChannelMembers(currentChannelId);
+          if (activeChannelRef.current === currentChannelId) {
+            setChannelMembers(members || []);
+          }
+        } catch (e) {
+          console.error('[TeamChat] Failed to load channel members:', e);
+        }
+      }
     };
 
     loadMessages();
@@ -1172,10 +1188,18 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       }
     }
 
-    // Create notifications for @mentions
+    // Create notifications for @mentions (only for members of private channels)
     if (currentCh?.type === 'channel' && mentions.length > 0) {
       for (const mentionedId of mentions) {
         if (mentionedId !== currentUser.id) {
+          // For private channels, verify the mentioned user is actually a member
+          if (currentCh.is_private) {
+            const isMember = await isChannelMember(currentCh.id, mentionedId);
+            if (!isMember) {
+              console.log(`[Notification] Skipping notification for non-member ${mentionedId} in private channel ${currentCh.name}`);
+              continue; // Skip notification if not a member
+            }
+          }
           await createNotification(
             mentionedId,
             `${currentUser.name} mentioned you in #${currentCh.name}`,
@@ -1969,13 +1993,23 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
         <div className="p-2 md:p-6 md:pt-2 flex-shrink-0 bg-white border-t border-slate-100">
           <div className="border rounded-lg md:rounded-xl shadow-sm bg-white flex flex-col relative border-slate-300">
             {/* Mention Dropdown */}
-            {mentionDropdown?.show && (
+            {mentionDropdown?.show && (() => {
+              // For private channels, only show members in the dropdown
+              const currentCh = channels.find(c => c.id === activeChannelId);
+              const isPrivate = currentCh?.is_private;
+              const memberIds = isPrivate ? channelMembers.map(m => m.user_id) : null;
+              const filteredProfilesForMention = isPrivate
+                ? profiles.filter(p => memberIds?.includes(p.id))
+                : profiles;
+
+              return (
               <div className="absolute bottom-full left-0 mb-2 w-64 bg-white rounded-lg shadow-xl border border-slate-200 overflow-hidden z-[100] animate-fadeIn">
                 <div className="p-2 bg-slate-50 border-b border-slate-200">
                   <p className="text-xs font-bold text-slate-500 uppercase">Mention Someone</p>
                 </div>
                 <div className="max-h-48 overflow-y-auto">
-                  {(!mentionDropdown.search || 'everyone'.includes(mentionDropdown.search)) && (
+                  {/* Hide @everyone for private channels - it would leak notifications to non-members */}
+                  {!isPrivate && (!mentionDropdown.search || 'everyone'.includes(mentionDropdown.search)) && (
                     <button
                       onClick={() => {
                         const lastAtIndex = message.lastIndexOf('@');
@@ -1995,7 +2029,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                     </button>
                   )}
 
-                  {profiles
+                  {filteredProfilesForMention
                     .filter(profile => {
                       if (!mentionDropdown.search) return true;
                       const name = (profile.full_name || '').toLowerCase();
@@ -2028,7 +2062,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                     ))}
                 </div>
               </div>
-            )}
+              );
+            })()}
 
             <textarea
               value={message}
