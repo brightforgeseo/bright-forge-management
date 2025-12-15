@@ -623,6 +623,84 @@ export const removeMessageReaction = async (messageId: string, userId: string, e
   }
 };
 
+// --- Message Search ---
+
+export interface SearchResult {
+  message: ChatMessage;
+  channelId: string;
+  channelName: string;
+  channelType: 'channel' | 'dm';
+}
+
+export const searchChatMessages = async (
+  query: string,
+  options?: {
+    channelId?: string;
+    limit?: number;
+  }
+): Promise<SearchResult[]> => {
+  if (!query.trim()) return [];
+
+  const limit = options?.limit || 50;
+  const searchTerm = `%${query.trim()}%`;
+
+  let messagesQuery = supabase
+    .from('chat_messages')
+    .select('*')
+    .ilike('text', searchTerm)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (options?.channelId) {
+    messagesQuery = messagesQuery.eq('channel_id', options.channelId);
+  }
+
+  const { data: messages, error: messagesError } = await messagesQuery;
+
+  if (messagesError) {
+    console.error('Error searching messages:', messagesError);
+    return [];
+  }
+
+  if (!messages || messages.length === 0) return [];
+
+  // Fetch channel info for all unique channel IDs
+  const channelIds = [...new Set(messages.map(m => m.channel_id))];
+  const { data: channels } = await supabase
+    .from('channels')
+    .select('id, name, type')
+    .in('id', channelIds);
+
+  const channelMap = new Map(channels?.map(c => [c.id, c]) || []);
+
+  return messages.map((row: any) => {
+    const channel = channelMap.get(row.channel_id);
+    return {
+      message: {
+        id: row.id,
+        channelId: row.channel_id,
+        sender: row.sender,
+        senderId: row.sender_id,
+        text: row.text,
+        timestamp: row.created_at,
+        isAi: row.is_ai,
+        avatar: row.avatar,
+        attachmentUrl: row.attachment_url,
+        attachmentType: row.attachment_type,
+        attachmentName: row.attachment_name,
+        isEdited: row.is_edited,
+        editedAt: row.edited_at,
+        taskLink: row.task_link,
+        callRoomId: row.call_room_id,
+        callType: row.call_type
+      },
+      channelId: row.channel_id,
+      channelName: channel?.name || 'Unknown',
+      channelType: channel?.type || 'channel'
+    };
+  });
+};
+
 // --- Storage ---
 
 export const uploadFile = async (file: File, bucket: string = 'uploads'): Promise<string | null> => {

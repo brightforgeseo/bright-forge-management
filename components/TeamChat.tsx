@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check, Smile, Film, SmilePlus, Video, Lock, UserPlus, Menu, ClipboardList, Calendar, ArrowRight, Palette, Paperclip, Download, File } from 'lucide-react';
+import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check, Smile, Film, SmilePlus, Video, Lock, UserPlus, Menu, ClipboardList, Calendar, ArrowRight, Palette, Paperclip, Download, File, Search } from 'lucide-react';
 import { ChatChannel, ChatMessage, User, ToastType, Profile, MessageReaction } from '../types';
 import { getChatResponse } from '../services/geminiService';
 import { storeEchoConversation, buildConversationContext } from '../services/echoMemory';
-import { fetchChatMessages, sendChatMessage, clearChatHistory, uploadFile, fetchChannels, createChannel, deleteChannel, fetchProfiles, getOrCreateDMChannel, createNotification, editChatMessage, fetchMessageReactions, addMessageReaction, removeMessageReaction, fetchChannelMembers, addChannelMember, removeChannelMember, deleteChatMessage, isChannelMember } from '../services/databaseService';
+import { fetchChatMessages, sendChatMessage, clearChatHistory, uploadFile, fetchChannels, createChannel, deleteChannel, fetchProfiles, getOrCreateDMChannel, createNotification, editChatMessage, fetchMessageReactions, addMessageReaction, removeMessageReaction, fetchChannelMembers, addChannelMember, removeChannelMember, deleteChatMessage, isChannelMember, searchChatMessages, SearchResult } from '../services/databaseService';
 import { supabase } from '../lib/supabaseClient';
 // Removed custom VideoCall - now using Google Meet
 
@@ -66,6 +66,15 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
   // Pagination state for messages
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [loadingMoreMessages, setLoadingMoreMessages] = useState(false);
+
+  // Search state
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchInCurrentChannel, setSearchInCurrentChannel] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Chat background state - per channel
   const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
@@ -185,6 +194,74 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     if (xmasBg) return xmasBg.dark;
     const bg = chatBackgrounds.find(b => b.id === bgId);
     return bg?.dark || false;
+  };
+
+  // Search messages handler with debouncing
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+
+    // Clear any pending search
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    if (!query.trim()) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+
+    // Debounce the actual search by 300ms
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const results = await searchChatMessages(query, {
+          channelId: searchInCurrentChannel ? activeChannelId : undefined,
+          limit: 50
+        });
+        setSearchResults(results);
+      } catch (error) {
+        console.error('Search error:', error);
+        addToast('error', 'Failed to search messages');
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+  };
+
+  // Navigate to a search result
+  const navigateToSearchResult = async (result: SearchResult) => {
+    // Switch to the channel containing the message
+    if (result.channelId !== activeChannelId) {
+      setActiveChannelId(result.channelId);
+    }
+    // Close search panel
+    setShowSearch(false);
+    setSearchQuery('');
+    setSearchResults([]);
+
+    // Wait for messages to load, then scroll to the message
+    setTimeout(() => {
+      const messageEl = document.getElementById(`msg-${result.message.id}`);
+      if (messageEl) {
+        messageEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        messageEl.classList.add('bg-yellow-100');
+        setTimeout(() => messageEl.classList.remove('bg-yellow-100'), 2000);
+      }
+    }, 500);
+  };
+
+  // Format channel name for display in search results
+  const formatChannelName = (result: SearchResult) => {
+    if (result.channelType === 'dm') {
+      // Extract user name from DM channel
+      const parts = result.channelName.replace('dm_', '').split('_');
+      const otherUserId = parts.find(id => id !== currentUser.id);
+      const otherUser = profiles.find(p => p.id === otherUserId);
+      return otherUser?.full_name || 'Direct Message';
+    }
+    return `#${result.channelName}`;
   };
 
   // Helper function to detect @mentions in text
@@ -1698,6 +1775,19 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
             )}
           </div>
           <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
+            {/* Search Button */}
+            <button
+              onClick={() => {
+                setShowSearch(!showSearch);
+                if (!showSearch) {
+                  setTimeout(() => searchInputRef.current?.focus(), 100);
+                }
+              }}
+              className={`p-1.5 md:p-2 hover:bg-blue-50 rounded-lg transition-colors group ${showSearch ? 'bg-blue-50' : ''}`}
+              title="Search Messages"
+            >
+              <Search className={`w-4 h-4 md:w-5 md:h-5 ${showSearch ? 'text-blue-600' : 'text-slate-400 group-hover:text-blue-600'}`} />
+            </button>
             {activeChannelId && (
               <button
                 onClick={startVideoCall}
@@ -1802,6 +1892,85 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
           </div>
         </div>
 
+        {/* Search Panel */}
+        {showSearch && (
+          <div className="border-b border-slate-200 bg-slate-50 p-3">
+            <div className="flex items-center gap-3">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  placeholder="Search messages..."
+                  className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                />
+                {isSearching && (
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 animate-spin" />
+                )}
+              </div>
+              <label className="flex items-center gap-2 text-sm text-slate-600 whitespace-nowrap">
+                <input
+                  type="checkbox"
+                  checked={searchInCurrentChannel}
+                  onChange={(e) => {
+                    setSearchInCurrentChannel(e.target.checked);
+                    if (searchQuery) handleSearch(searchQuery);
+                  }}
+                  className="rounded border-slate-300 text-brand-500 focus:ring-brand-500"
+                />
+                Current channel only
+              </label>
+              <button
+                onClick={() => {
+                  setShowSearch(false);
+                  setSearchQuery('');
+                  setSearchResults([]);
+                }}
+                className="p-1.5 hover:bg-slate-200 rounded-lg transition-colors"
+              >
+                <X className="w-4 h-4 text-slate-500" />
+              </button>
+            </div>
+
+            {/* Search Results */}
+            {searchResults.length > 0 && (
+              <div className="mt-3 max-h-64 overflow-y-auto space-y-2">
+                {searchResults.map((result) => (
+                  <button
+                    key={result.message.id}
+                    onClick={() => navigateToSearchResult(result)}
+                    className="w-full text-left p-3 bg-white rounded-lg border border-slate-200 hover:border-brand-300 hover:bg-brand-50 transition-colors"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-medium text-brand-600">
+                        {formatChannelName(result)}
+                      </span>
+                      <span className="text-xs text-slate-400">
+                        {new Date(result.message.timestamp).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-sm font-medium text-slate-700">{result.message.sender}</span>
+                    </div>
+                    <p className="text-sm text-slate-600 line-clamp-2">
+                      {result.message.text}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* No results message */}
+            {searchQuery && !isSearching && searchResults.length === 0 && (
+              <div className="mt-3 text-center py-4 text-sm text-slate-500">
+                No messages found for "{searchQuery}"
+              </div>
+            )}
+          </div>
+        )}
+
         <div
           className={`flex-1 overflow-y-auto p-3 md:p-6 space-y-4 md:space-y-6 ${getCurrentBackgroundStyle()} bg-cover bg-center bg-fixed`}
           style={getCurrentBackgroundImage() ? { backgroundImage: `url(${getCurrentBackgroundImage()})` } : undefined}
@@ -1819,7 +1988,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
             </div>
           )}
           {messages.map((msg) => (
-            <div key={msg.id} className={`flex gap-2 md:gap-4 group ${msg.isAi ? 'bg-brand-50/30 -mx-3 md:-mx-6 px-3 md:px-6 py-2' : ''}`}>
+            <div key={msg.id} id={`msg-${msg.id}`} className={`flex gap-2 md:gap-4 group transition-colors duration-500 ${msg.isAi ? 'bg-brand-50/30 -mx-3 md:-mx-6 px-3 md:px-6 py-2' : ''}`}>
               <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${msg.isAi ? 'bg-brand-500' : 'bg-slate-200'}`}>
                 {msg.isAi ? (
                   <Bot className="w-4 h-4 md:w-6 md:h-6 text-white" />
