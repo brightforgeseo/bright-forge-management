@@ -11,7 +11,7 @@ import {
   GeneratedEmail,
   EmailGenerationContext,
 } from '../types-portal';
-import { ClientBoard } from '../types';
+import { ClientBoard, TaskComment } from '../types';
 
 // ============================================
 // PARTNER ACCOUNT OPERATIONS
@@ -314,6 +314,83 @@ export const updatePartnerTaskStatus = async (
   }
 
   return true;
+};
+
+// Add a comment to a task (updates the client_boards JSONB)
+export const addCommentToTask = async (
+  clientBoardId: string,
+  groupId: string,
+  taskId: string,
+  comment: TaskComment
+): Promise<boolean> => {
+  try {
+    // Fetch the current client board data
+    const { data: boardsData, error: fetchError } = await supabaseAdmin
+      .from('client_boards')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (fetchError) {
+      console.error('[addCommentToTask] Fetch error:', fetchError.message);
+      return false;
+    }
+
+    // Find the board with matching ID
+    let targetRow: any = null;
+    for (const row of boardsData || []) {
+      const boardData = row.board_data as ClientBoard;
+      if (boardData && boardData.id === clientBoardId) {
+        targetRow = row;
+        break;
+      }
+    }
+
+    if (!targetRow) {
+      console.error('[addCommentToTask] Board not found:', clientBoardId);
+      return false;
+    }
+
+    const boardData = targetRow.board_data as ClientBoard;
+
+    // Find the group and task, then add the comment
+    let found = false;
+    for (const group of boardData.groups || []) {
+      if (group.id === groupId) {
+        for (const task of group.tasks || []) {
+          if (task.id === taskId) {
+            if (!task.comments) {
+              task.comments = [];
+            }
+            task.comments.push(comment);
+            found = true;
+            break;
+          }
+        }
+      }
+      if (found) break;
+    }
+
+    if (!found) {
+      console.error('[addCommentToTask] Task not found:', taskId);
+      return false;
+    }
+
+    // Update the board data
+    const { error: updateError } = await supabaseAdmin
+      .from('client_boards')
+      .update({ board_data: boardData, updated_at: new Date().toISOString() })
+      .eq('id', targetRow.id);
+
+    if (updateError) {
+      console.error('[addCommentToTask] Update error:', updateError.message);
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.error('[addCommentToTask] Unexpected error:', err);
+    return false;
+  }
 };
 
 export const assignTaskToPartner = async (

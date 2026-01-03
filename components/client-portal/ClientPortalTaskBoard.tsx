@@ -12,6 +12,7 @@ import {
   FileText,
   ChevronDown,
   ExternalLink,
+  MessageCircle,
 } from 'lucide-react';
 import { PartnerAccount, PartnerTask, PartnerTaskStatus, PartnerTaskColumn } from '../../types-portal';
 import { ClientBoard, ToastType } from '../../types';
@@ -20,6 +21,7 @@ import {
   upsertPartnerTaskStatus,
 } from '../../services/clientPortalService';
 import EmailGeneratorModal from './EmailGeneratorModal';
+import PartnerTaskDetailModal from './PartnerTaskDetailModal';
 
 interface ClientPortalTaskBoardProps {
   partnerAccount: PartnerAccount;
@@ -52,6 +54,10 @@ const ClientPortalTaskBoard: React.FC<ClientPortalTaskBoardProps> = ({
   // Email modal
   const [emailModalTask, setEmailModalTask] = useState<PartnerTask | null>(null);
   const [showEmailModal, setShowEmailModal] = useState(false);
+
+  // Task detail modal
+  const [selectedTask, setSelectedTask] = useState<PartnerTask | null>(null);
+  const [showTaskDetail, setShowTaskDetail] = useState(false);
 
   // Client dropdown
   const [showClientDropdown, setShowClientDropdown] = useState(false);
@@ -213,6 +219,20 @@ const ClientPortalTaskBoard: React.FC<ClientPortalTaskBoardProps> = ({
     return client?.name || 'All Clients';
   };
 
+  const handleTaskClick = (task: PartnerTask) => {
+    setSelectedTask(task);
+    setShowTaskDetail(true);
+  };
+
+  const handleTaskUpdated = (updatedTask: PartnerTask) => {
+    setAllTasks((prev) =>
+      prev.map((t) =>
+        t.task_id === updatedTask.task_id ? updatedTask : t
+      )
+    );
+    setSelectedTask(updatedTask);
+  };
+
   if (isLoading) {
     return (
       <div className="p-8">
@@ -353,8 +373,9 @@ const ClientPortalTaskBoard: React.FC<ClientPortalTaskBoardProps> = ({
                         key={task.id}
                         draggable
                         onDragStart={(e) => handleDragStart(e, task)}
-                        className={`bg-zinc-800 rounded-xl p-4 cursor-grab active:cursor-grabbing border border-zinc-700 hover:border-zinc-600 transition-all ${
-                          draggedTask?.id === task.id ? 'opacity-50' : ''
+                        onClick={() => handleTaskClick(task)}
+                        className={`bg-zinc-800 rounded-xl p-4 cursor-pointer border border-zinc-700 hover:border-amber-400/50 hover:bg-zinc-750 transition-all ${
+                          draggedTask?.id === task.id ? 'opacity-50 cursor-grabbing' : ''
                         }`}
                       >
                         <div className="flex items-start gap-2 mb-2">
@@ -384,9 +405,10 @@ const ClientPortalTaskBoard: React.FC<ClientPortalTaskBoardProps> = ({
                           </div>
                         )}
 
-                        {(task.task?.worksheet || task.task?.clientSheet) && (
-                          <div className="flex gap-2 mt-3 ml-6">
-                            {task.task.worksheet && (
+                        {/* Links and Comments Row */}
+                        <div className="flex items-center justify-between mt-3 ml-6">
+                          <div className="flex gap-2">
+                            {task.task?.worksheet && (
                               <a
                                 href={task.task.worksheet}
                                 target="_blank"
@@ -398,7 +420,7 @@ const ClientPortalTaskBoard: React.FC<ClientPortalTaskBoardProps> = ({
                                 Worksheet
                               </a>
                             )}
-                            {task.task.clientSheet && (
+                            {task.task?.clientSheet && (
                               <a
                                 href={task.task.clientSheet}
                                 target="_blank"
@@ -411,7 +433,14 @@ const ClientPortalTaskBoard: React.FC<ClientPortalTaskBoardProps> = ({
                               </a>
                             )}
                           </div>
-                        )}
+                          {/* Comment count */}
+                          {task.task?.comments && task.task.comments.length > 0 && (
+                            <div className="flex items-center gap-1 text-xs text-zinc-400">
+                              <MessageCircle className="w-3 h-3" />
+                              <span>{task.task.comments.length}</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ))
                   )}
@@ -435,6 +464,21 @@ const ClientPortalTaskBoard: React.FC<ClientPortalTaskBoardProps> = ({
           clientName={emailModalTask.client_name || 'Client'}
           onEmailSent={handleEmailSent}
           addToast={addToast}
+        />
+      )}
+
+      {/* Task Detail Modal */}
+      {showTaskDetail && selectedTask && (
+        <PartnerTaskDetailModal
+          isOpen={showTaskDetail}
+          onClose={() => {
+            setShowTaskDetail(false);
+            setSelectedTask(null);
+          }}
+          task={selectedTask}
+          partnerAccount={partnerAccount}
+          addToast={addToast}
+          onTaskUpdated={handleTaskUpdated}
         />
       )}
     </div>
