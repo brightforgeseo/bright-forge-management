@@ -177,6 +177,27 @@ export const fetchPartnerTasksByClient = async (
   return data as PartnerTask[];
 };
 
+// Helper to check if a status indicates task is done/completed
+const isCompletedStatus = (statusId: string, statusDefs: any[]): boolean => {
+  if (!statusDefs || !statusId) return false;
+
+  const statusDef = statusDefs.find((s: any) => s.id === statusId);
+  if (!statusDef) return false;
+
+  const label = (statusDef.label || '').toLowerCase();
+  const color = (statusDef.color || '').toLowerCase();
+
+  // Keywords that indicate completion
+  const completedKeywords = ['done', 'complete', 'finished', 'closed', 'approved', 'shipped', 'delivered', 'resolved', 'sent to client', 'ben to check', 'archived'];
+  // Green colors that typically indicate completion
+  const completedColors = ['#00c875', '#00ca72', '#22c55e', '#16a34a', '#15803d', '#166534', '#4ade80', '#86efac', 'green'];
+
+  if (completedKeywords.some(keyword => label.includes(keyword))) return true;
+  if (completedColors.includes(color)) return true;
+
+  return false;
+};
+
 // Fetch ALL tasks from client boards the partner has access to
 // Partners automatically see all tasks without explicit assignment
 export const fetchAllClientTasksForPartner = async (
@@ -204,9 +225,23 @@ export const fetchAllClientTasksForPartner = async (
   const allTasks: PartnerTask[] = [];
 
   for (const client of clients) {
+    // Get status definitions for this client to check completion
+    const statusDefs = (client as any).statusDefs || [];
+
     for (const group of client.groups || []) {
       for (const task of group.tasks || []) {
         const existingEntry = existingTaskMap.get(task.id);
+
+        // Check if task is marked as done in main portal
+        const isMainTaskDone = isCompletedStatus(task.status, statusDefs);
+
+        // Determine partner status:
+        // - If main task is done, show as completed
+        // - Otherwise use existing partner status or default to 'assigned'
+        let partnerStatus: PartnerTaskStatus = existingEntry?.partner_status || 'assigned';
+        if (isMainTaskDone) {
+          partnerStatus = 'completed';
+        }
 
         // Create a PartnerTask object with enriched data
         const partnerTask: PartnerTask = {
@@ -216,10 +251,10 @@ export const fetchAllClientTasksForPartner = async (
           task_id: task.id,
           group_id: group.id,
           visible_notes: existingEntry?.visible_notes,
-          partner_status: existingEntry?.partner_status || 'assigned', // Default to 'assigned'
+          partner_status: partnerStatus,
           assigned_at: existingEntry?.assigned_at || new Date().toISOString(),
           assigned_by: existingEntry?.assigned_by,
-          completed_at: existingEntry?.completed_at,
+          completed_at: isMainTaskDone ? (existingEntry?.completed_at || new Date().toISOString()) : existingEntry?.completed_at,
           // Enriched data
           task: task,
           client_name: client.name,
