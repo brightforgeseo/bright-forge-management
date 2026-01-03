@@ -12,8 +12,7 @@ import {
 import { PartnerAccount, PortalStats, PartnerTask } from '../../types-portal';
 import { ClientBoard, ToastType } from '../../types';
 import {
-  fetchPartnerClients,
-  fetchPartnerTasks,
+  fetchAllClientTasksForPartner,
   fetchPortalStats,
 } from '../../services/clientPortalService';
 
@@ -40,15 +39,18 @@ const ClientPortalDashboard: React.FC<ClientPortalDashboardProps> = ({
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [clientsData, statsData, tasksData] = await Promise.all([
-        fetchPartnerClients(partnerAccount.id),
+      const [{ tasks, clients: clientsData }, statsData] = await Promise.all([
+        fetchAllClientTasksForPartner(partnerAccount.id),
         fetchPortalStats(partnerAccount.id),
-        fetchPartnerTasks(partnerAccount.id),
       ]);
 
       setClients(clientsData);
       setStats(statsData);
-      setRecentTasks(tasksData.slice(0, 5));
+      // Show most recent tasks (sorted by assigned_at or just take first 5)
+      const sortedTasks = [...tasks].sort((a, b) =>
+        new Date(b.assigned_at).getTime() - new Date(a.assigned_at).getTime()
+      );
+      setRecentTasks(sortedTasks.slice(0, 5));
     } catch (err) {
       console.error('Error loading dashboard data:', err);
       addToast('error', 'Failed to load dashboard data');

@@ -14,11 +14,10 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { PartnerAccount, PartnerTask, PartnerTaskStatus, PartnerTaskColumn } from '../../types-portal';
-import { ClientBoard, ToastType, Task } from '../../types';
+import { ClientBoard, ToastType } from '../../types';
 import {
-  fetchPartnerClients,
-  fetchPartnerTasks,
-  updatePartnerTaskStatus,
+  fetchAllClientTasksForPartner,
+  upsertPartnerTaskStatus,
 } from '../../services/clientPortalService';
 import EmailGeneratorModal from './EmailGeneratorModal';
 
@@ -80,35 +79,12 @@ const ClientPortalTaskBoard: React.FC<ClientPortalTaskBoardProps> = ({
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [clientsData, tasksData] = await Promise.all([
-        fetchPartnerClients(partnerAccount.id),
-        fetchPartnerTasks(partnerAccount.id),
-      ]);
-
-      // Enrich tasks with client and task details
-      const enrichedTasks = tasksData.map((task) => {
-        const client = clientsData.find((c) => c.id === task.client_board_id);
-        let taskDetails: Task | undefined;
-
-        if (client) {
-          for (const group of client.groups) {
-            const found = group.tasks.find((t) => t.id === task.task_id);
-            if (found) {
-              taskDetails = found;
-              break;
-            }
-          }
-        }
-
-        return {
-          ...task,
-          task: taskDetails,
-          client_name: client?.name,
-        };
-      });
+      // Fetch all tasks from client boards the partner has access to
+      // Tasks are automatically visible without explicit assignment
+      const { tasks, clients: clientsData } = await fetchAllClientTasksForPartner(partnerAccount.id);
 
       setClients(clientsData);
-      setAllTasks(enrichedTasks);
+      setAllTasks(tasks);
     } catch (err) {
       console.error('Error loading task board data:', err);
       addToast('error', 'Failed to load tasks');
@@ -174,35 +150,57 @@ const ClientPortalTaskBoard: React.FC<ClientPortalTaskBoardProps> = ({
     // Optimistically update UI
     setAllTasks((prev) =>
       prev.map((t) =>
-        t.id === draggedTask.id ? { ...t, partner_status: newStatus } : t
+        t.task_id === draggedTask.task_id ? { ...t, partner_status: newStatus } : t
       )
     );
 
-    // Update in database
-    const success = await updatePartnerTaskStatus(draggedTask.id, newStatus);
+    // Upsert in database - creates entry if doesn't exist, updates if it does
+    const { success, taskEntry } = await upsertPartnerTaskStatus(
+      partnerAccount.id,
+      draggedTask.client_board_id,
+      draggedTask.task_id,
+      draggedTask.group_id,
+      newStatus
+    );
+
     if (!success) {
       // Revert on failure
       setAllTasks((prev) =>
         prev.map((t) =>
-          t.id === draggedTask.id ? { ...t, partner_status: draggedTask.partner_status } : t
+          t.task_id === draggedTask.task_id ? { ...t, partner_status: draggedTask.partner_status } : t
         )
       );
       addToast('error', 'Failed to update task status');
     } else {
+      // Update with actual DB id if it was a new entry
+      if (taskEntry && draggedTask.id.startsWith('temp-')) {
+        setAllTasks((prev) =>
+          prev.map((t) =>
+            t.task_id === draggedTask.task_id ? { ...t, id: taskEntry.id } : t
+          )
+        );
+      }
       addToast('success', `Task moved to ${COLUMNS.find((c) => c.id === newStatus)?.title}`);
     }
 
     setDraggedTask(null);
   };
 
-  const handleEmailSent = () => {
+  const handleEmailSent = async () => {
     // Move task to email_sent status
     if (emailModalTask) {
-      updatePartnerTaskStatus(emailModalTask.id, 'email_sent');
       setAllTasks((prev) =>
         prev.map((t) =>
-          t.id === emailModalTask.id ? { ...t, partner_status: 'email_sent' as PartnerTaskStatus } : t
+          t.task_id === emailModalTask.task_id ? { ...t, partner_status: 'email_sent' as PartnerTaskStatus } : t
         )
+      );
+      // Upsert the status in database
+      await upsertPartnerTaskStatus(
+        partnerAccount.id,
+        emailModalTask.client_board_id,
+        emailModalTask.task_id,
+        emailModalTask.group_id,
+        'email_sent'
       );
     }
     setShowEmailModal(false);

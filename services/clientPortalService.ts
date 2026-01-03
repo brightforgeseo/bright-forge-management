@@ -177,6 +177,123 @@ export const fetchPartnerTasksByClient = async (
   return data as PartnerTask[];
 };
 
+// Fetch ALL tasks from client boards the partner has access to
+// Partners automatically see all tasks without explicit assignment
+export const fetchAllClientTasksForPartner = async (
+  partnerId: string
+): Promise<{ tasks: PartnerTask[]; clients: ClientBoard[] }> => {
+  // Get clients the partner has access to
+  const clients = await fetchPartnerClients(partnerId);
+
+  if (!clients.length) {
+    return { tasks: [], clients: [] };
+  }
+
+  // Get existing partner_tasks entries to preserve status tracking
+  const { data: existingTasks } = await supabase
+    .from('partner_tasks')
+    .select('*')
+    .eq('partner_id', partnerId);
+
+  const existingTaskMap = new Map<string, PartnerTask>();
+  for (const task of existingTasks || []) {
+    existingTaskMap.set(task.task_id, task as PartnerTask);
+  }
+
+  // Extract all tasks from all accessible client boards
+  const allTasks: PartnerTask[] = [];
+
+  for (const client of clients) {
+    for (const group of client.groups || []) {
+      for (const task of group.tasks || []) {
+        const existingEntry = existingTaskMap.get(task.id);
+
+        // Create a PartnerTask object with enriched data
+        const partnerTask: PartnerTask = {
+          id: existingEntry?.id || `temp-${task.id}`, // Use existing ID or temp ID
+          partner_id: partnerId,
+          client_board_id: client.id,
+          task_id: task.id,
+          group_id: group.id,
+          visible_notes: existingEntry?.visible_notes,
+          partner_status: existingEntry?.partner_status || 'assigned', // Default to 'assigned'
+          assigned_at: existingEntry?.assigned_at || new Date().toISOString(),
+          assigned_by: existingEntry?.assigned_by,
+          completed_at: existingEntry?.completed_at,
+          // Enriched data
+          task: task,
+          client_name: client.name,
+          group_title: group.title,
+        };
+
+        allTasks.push(partnerTask);
+      }
+    }
+  }
+
+  return { tasks: allTasks, clients };
+};
+
+// Upsert partner task status - creates entry if doesn't exist, updates if it does
+export const upsertPartnerTaskStatus = async (
+  partnerId: string,
+  clientBoardId: string,
+  taskId: string,
+  groupId: string,
+  status: PartnerTaskStatus
+): Promise<{ success: boolean; taskEntry: PartnerTask | null }> => {
+  const updates: any = { partner_status: status };
+  if (status === 'completed') {
+    updates.completed_at = new Date().toISOString();
+  }
+
+  // Try to update first
+  const { data: existingData } = await supabase
+    .from('partner_tasks')
+    .select('*')
+    .eq('partner_id', partnerId)
+    .eq('task_id', taskId)
+    .single();
+
+  if (existingData) {
+    // Update existing entry
+    const { data, error } = await supabase
+      .from('partner_tasks')
+      .update(updates)
+      .eq('id', existingData.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[upsertPartnerTaskStatus] Update error:', error.message);
+      return { success: false, taskEntry: null };
+    }
+
+    return { success: true, taskEntry: data as PartnerTask };
+  } else {
+    // Create new entry
+    const { data, error } = await supabase
+      .from('partner_tasks')
+      .insert({
+        partner_id: partnerId,
+        task_id: taskId,
+        group_id: groupId,
+        client_board_id: clientBoardId,
+        partner_status: status,
+        completed_at: status === 'completed' ? new Date().toISOString() : null,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[upsertPartnerTaskStatus] Insert error:', error.message);
+      return { success: false, taskEntry: null };
+    }
+
+    return { success: true, taskEntry: data as PartnerTask };
+  }
+};
+
 export const updatePartnerTaskStatus = async (
   taskId: string,
   status: PartnerTaskStatus
@@ -517,9 +634,8 @@ export const disconnectEmail = async (partnerId: string): Promise<boolean> => {
 // ============================================
 
 export const fetchPortalStats = async (partnerId: string): Promise<PortalStats> => {
-  const [clients, tasks, emails, unread] = await Promise.all([
-    fetchPartnerClients(partnerId),
-    fetchPartnerTasks(partnerId),
+  const [{ tasks, clients }, emails, unread] = await Promise.all([
+    fetchAllClientTasksForPartner(partnerId),
     fetchPartnerEmails(partnerId),
     getUnreadMessageCount(partnerId, true),
   ]);
