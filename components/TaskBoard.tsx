@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Plus, Sparkles, ChevronDown, ChevronUp, ChevronRight, Trash2, Briefcase, CheckCircle2, Settings, Mail, Phone, Globe, X, Image as ImageIcon, Edit3, Palette, Loader2, Upload, UserCircle, Link as LinkIcon, MessageCircle, Send, Search, Share2, Hash, Users, Archive, RotateCcw } from 'lucide-react';
+import { Plus, Sparkles, ChevronDown, ChevronUp, ChevronRight, Trash2, Briefcase, CheckCircle2, Settings, Mail, Phone, Globe, X, Image as ImageIcon, Edit3, Palette, Loader2, Upload, UserCircle, Link as LinkIcon, MessageCircle, Send, Search, Share2, Hash, Users, Archive, RotateCcw, UserPlus } from 'lucide-react';
+import AssignToPartnerModal from './client-portal/AssignToPartnerModal';
 import { Task, TaskGroup, User, ClientBoard, ToastType, LabelDefinition, Profile, TaskComment, ChatChannel, ChatMessage, ArchivedTask } from '../types';
 import { generateProjectTasks } from '../services/geminiService';
 import { fetchClientBoards, saveClientBoard, deleteClientBoard, uploadFile, fetchProfiles, createNotification, fetchChannels, sendChatMessage, logActivity } from '../services/databaseService';
@@ -413,6 +414,15 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
 
   // Archive panel state
   const [showArchivePanel, setShowArchivePanel] = useState(false);
+
+  // Partner assignment modal state
+  const [partnerAssignModal, setPartnerAssignModal] = useState<{
+    isOpen: boolean;
+    task: Task | null;
+    groupId: string;
+    boardId: string;
+    boardName: string;
+  }>({ isOpen: false, task: null, groupId: '', boardId: '', boardName: '' });
 
   // Track in-flight saves to prevent realtime from overwriting them
   const pendingSaveRef = useRef<{ taskId: string; boardId: string } | null>(null);
@@ -1585,9 +1595,14 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                            </div>
                                         </td>
                                         <td className="py-2 px-2 text-center">
-                                           <button onClick={() => archiveTask(activeClient.id, group.id, task.id)} className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-amber-500 transition-colors" title="Archive task">
-                                              <Archive className="w-4 h-4" />
-                                           </button>
+                                           <div className="flex items-center justify-center gap-1">
+                                             <button onClick={() => setPartnerAssignModal({ isOpen: true, task, groupId: group.id, boardId: activeClient.id, boardName: activeClient.name })} className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-purple-500 transition-colors" title="Assign to Partner">
+                                                <UserPlus className="w-4 h-4" />
+                                             </button>
+                                             <button onClick={() => archiveTask(activeClient.id, group.id, task.id)} className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-amber-500 transition-colors" title="Archive task">
+                                                <Archive className="w-4 h-4" />
+                                             </button>
+                                           </div>
                                         </td>
                                       </tr>
                                     );
@@ -2346,6 +2361,20 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Assign to Partner Modal */}
+      {partnerAssignModal.isOpen && partnerAssignModal.task && (
+        <AssignToPartnerModal
+          isOpen={partnerAssignModal.isOpen}
+          onClose={() => setPartnerAssignModal({ isOpen: false, task: null, groupId: '', boardId: '', boardName: '' })}
+          task={partnerAssignModal.task}
+          groupId={partnerAssignModal.groupId}
+          boardId={partnerAssignModal.boardId}
+          boardName={partnerAssignModal.boardName}
+          onAssigned={() => setPartnerAssignModal({ isOpen: false, task: null, groupId: '', boardId: '', boardName: '' })}
+          addToast={addToast}
+        />
       )}
 
       {/* Archive Panel Modal */}

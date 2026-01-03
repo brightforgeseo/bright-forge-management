@@ -4,6 +4,8 @@ import { ChatChannel, ChatMessage, User, ToastType, Profile, MessageReaction } f
 import { getChatResponse } from '../services/geminiService';
 import { storeEchoConversation, buildConversationContext } from '../services/echoMemory';
 import { fetchChatMessages, sendChatMessage, clearChatHistory, uploadFile, fetchChannels, createChannel, deleteChannel, fetchProfiles, getOrCreateDMChannel, createNotification, editChatMessage, fetchMessageReactions, addMessageReaction, removeMessageReaction, fetchChannelMembers, addChannelMember, removeChannelMember, deleteChatMessage, isChannelMember, searchChatMessages, SearchResult } from '../services/databaseService';
+import { fetchAllPartners, fetchPartnerMessages, sendPartnerMessage, markPartnerMessagesRead } from '../services/clientPortalService';
+import { PartnerWithStats, PartnerMessage } from '../types-portal';
 import { supabase } from '../lib/supabaseClient';
 // Removed custom VideoCall - now using Google Meet
 
@@ -59,6 +61,13 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
   const [showMembersModal, setShowMembersModal] = useState(false);
   const [channelMembers, setChannelMembers] = useState<any[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
+
+  // Partner chat state
+  const [partners, setPartners] = useState<PartnerWithStats[]>([]);
+  const [activePartnerId, setActivePartnerId] = useState<string | null>(null);
+  const [partnerMessages, setPartnerMessages] = useState<PartnerMessage[]>([]);
+  const [partnerMessage, setPartnerMessage] = useState('');
+  const [loadingPartnerMessages, setLoadingPartnerMessages] = useState(false);
 
   // Mobile sidebar state
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -551,11 +560,57 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
   // Load Data
   const refreshData = async () => {
     setIsRefreshing(true);
-    const [chans, profs] = await Promise.all([fetchChannels(), fetchProfiles()]);
+    const [chans, profs, partnersData] = await Promise.all([
+      fetchChannels(),
+      fetchProfiles(),
+      fetchAllPartners().catch(() => [])
+    ]);
     setChannels(chans);
     setProfiles(profs);
+    setPartners(partnersData);
     setIsRefreshing(false);
     return chans;
+  };
+
+  // Load partner messages when partner is selected
+  const loadPartnerMessages = async (partnerId: string) => {
+    setLoadingPartnerMessages(true);
+    try {
+      const msgs = await fetchPartnerMessages(partnerId);
+      setPartnerMessages(msgs);
+    } catch (error) {
+      console.error('Error loading partner messages:', error);
+    } finally {
+      setLoadingPartnerMessages(false);
+    }
+  };
+
+  // Send message to partner
+  const handleSendPartnerMessage = async () => {
+    if (!activePartnerId || !partnerMessage.trim()) return;
+
+    try {
+      await sendPartnerMessage(
+        activePartnerId,
+        partnerMessage.trim(),
+        'team',
+        currentUser.id,
+        currentUser.name
+      );
+      setPartnerMessage('');
+      // Reload messages
+      loadPartnerMessages(activePartnerId);
+    } catch (error) {
+      console.error('Error sending partner message:', error);
+      addToast('error', 'Failed to send message');
+    }
+  };
+
+  // Handle selecting a partner chat
+  const handleSelectPartner = (partnerId: string) => {
+    setActivePartnerId(partnerId);
+    setActiveChannelId(''); // Deselect any regular channel
+    loadPartnerMessages(partnerId);
   };
 
   // Helper: Parse DM channel name to get participant IDs
@@ -1691,6 +1746,49 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
             </ul>
           </div>
 
+          {/* Partner Chats */}
+          {partners.length > 0 && (
+            <div>
+              <div className="px-3 flex items-center justify-between group text-[#bcabbc] mb-1">
+                <span className="text-[10px] font-semibold uppercase tracking-wider">Partner Chats</span>
+                <Users className="w-2.5 h-2.5 text-purple-400" />
+              </div>
+              <ul>
+                {partners.map(partner => (
+                  <li
+                    key={partner.id}
+                    onClick={() => handleSelectPartner(partner.id)}
+                    className={`px-3 py-2.5 md:py-1.5 flex items-center gap-2 md:gap-1.5 mx-1.5 rounded-lg md:rounded group cursor-pointer active:opacity-80 ${activePartnerId === partner.id ? 'bg-purple-600 text-white' : 'text-[#bcabbc] hover:bg-[#350d36]'}`}
+                  >
+                    <div className="relative w-5 h-5 md:w-4 md:h-4 flex-shrink-0">
+                      {partner.avatar_url ? (
+                        <img src={partner.avatar_url} alt="" className="w-5 h-5 md:w-4 md:h-4 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-5 h-5 md:w-4 md:h-4 rounded-full bg-purple-500 flex items-center justify-center text-[9px] md:text-[8px] text-white font-bold">
+                          {partner.company_name.charAt(0)}
+                        </div>
+                      )}
+                      {partner.unreadMessages > 0 && (
+                        <div className="absolute -top-1 -right-1 w-2.5 h-2.5 md:w-2 md:h-2 bg-red-500 rounded-full border border-[#3F0E40]" title="Unread messages"></div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className={`truncate text-base md:text-sm block ${partner.unreadMessages > 0 ? 'font-bold text-white' : ''}`}>
+                        {partner.company_name}
+                      </span>
+                      <span className="text-[10px] text-slate-400 truncate block">{partner.full_name}</span>
+                    </div>
+                    {partner.unreadMessages > 0 && (
+                      <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                        {partner.unreadMessages}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {/* All Team Members */}
           <div>
             <div className="px-3 flex items-center justify-between group text-[#bcabbc] mb-1">
@@ -1735,6 +1833,120 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
       {/* Main Chat */}
       <div className="flex-1 flex flex-col min-w-0 bg-white h-full">
+        {/* Partner Chat View */}
+        {activePartnerId ? (
+          <>
+            {/* Partner Chat Header */}
+            <div className="h-14 md:h-16 border-b border-slate-200 flex items-center justify-between px-2 md:px-6 flex-shrink-0 bg-gradient-to-r from-purple-50 to-white safe-area-inset-top">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <button
+                  onClick={() => setIsMobileSidebarOpen(true)}
+                  className="md:hidden p-2.5 hover:bg-slate-100 rounded-xl flex-shrink-0 active:bg-slate-200 transition-colors"
+                  title="Open menu"
+                  aria-label="Open channel list"
+                >
+                  <Menu className="w-6 h-6 text-slate-600" />
+                </button>
+                {(() => {
+                  const activePartner = partners.find(p => p.id === activePartnerId);
+                  return activePartner ? (
+                    <div className="flex items-center gap-2">
+                      {activePartner.avatar_url ? (
+                        <img src={activePartner.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-white font-bold text-sm">
+                          {activePartner.company_name.charAt(0)}
+                        </div>
+                      )}
+                      <div>
+                        <h3 className="font-bold text-slate-900 text-sm md:text-base">{activePartner.company_name}</h3>
+                        <p className="text-xs text-slate-500">{activePartner.full_name} - Partner</p>
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
+              </div>
+              <button
+                onClick={() => {
+                  setActivePartnerId(null);
+                  setPartnerMessages([]);
+                }}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                title="Close partner chat"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Partner Chat Messages */}
+            <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-slate-50">
+              {loadingPartnerMessages ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-6 h-6 text-purple-500 animate-spin" />
+                </div>
+              ) : partnerMessages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                  <MessageSquare className="w-12 h-12 mb-3 opacity-30" />
+                  <p className="font-medium">No messages yet</p>
+                  <p className="text-sm mt-1">Start a conversation with this partner</p>
+                </div>
+              ) : (
+                partnerMessages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`flex gap-3 ${msg.sender_type === 'team' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    {msg.sender_type === 'partner' && (
+                      <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                        {msg.sender_name.charAt(0)}
+                      </div>
+                    )}
+                    <div
+                      className={`max-w-[70%] rounded-2xl px-4 py-2.5 ${
+                        msg.sender_type === 'team'
+                          ? 'bg-purple-600 text-white rounded-br-md'
+                          : 'bg-white border border-slate-200 text-slate-900 rounded-bl-md'
+                      }`}
+                    >
+                      <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                      <p className={`text-[10px] mt-1 ${msg.sender_type === 'team' ? 'text-purple-200' : 'text-slate-400'}`}>
+                        {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                    {msg.sender_type === 'team' && (
+                      <div className="w-8 h-8 rounded-full bg-brand-500 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                        {currentUser.name.charAt(0)}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Partner Chat Input */}
+            <div className="p-4 bg-white border-t border-slate-200">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={partnerMessage}
+                  onChange={(e) => setPartnerMessage(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendPartnerMessage()}
+                  placeholder="Type a message to partner..."
+                  className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-purple-400 focus:bg-white transition-colors"
+                />
+                <button
+                  onClick={handleSendPartnerMessage}
+                  disabled={!partnerMessage.trim()}
+                  className="p-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Send className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </>
+        ) : (
+        <>
+        {/* Regular Channel Chat Header */}
         <div className="h-14 md:h-16 border-b border-slate-200 flex items-center justify-between px-2 md:px-6 flex-shrink-0 bg-white safe-area-inset-top">
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <button
@@ -2417,6 +2629,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
             </div>
           </div>
         </div>
+        </>
+        )}
       </div>
 
       {/* Members Management Modal */}

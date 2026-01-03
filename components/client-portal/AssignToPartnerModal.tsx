@@ -1,0 +1,238 @@
+import React, { useState, useEffect } from 'react';
+import { X, Users, Loader2, Search, Check, AlertCircle } from 'lucide-react';
+import { Task } from '../../types';
+import { ToastType } from '../../types';
+import { PartnerAccount } from '../../types-portal';
+import { fetchAllPartners, assignTaskToPartner } from '../../services/clientPortalService';
+
+interface AssignToPartnerModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  task: Task;
+  groupId: string;
+  boardId: string;
+  boardName: string;
+  onAssigned: () => void;
+  addToast: (type: ToastType, message: string) => void;
+}
+
+const AssignToPartnerModal: React.FC<AssignToPartnerModalProps> = ({
+  isOpen,
+  onClose,
+  task,
+  groupId,
+  boardId,
+  boardName,
+  onAssigned,
+  addToast,
+}) => {
+  const [partners, setPartners] = useState<PartnerAccount[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAssigning, setIsAssigning] = useState(false);
+  const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [visibleNotes, setVisibleNotes] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      loadPartners();
+    }
+  }, [isOpen]);
+
+  const loadPartners = async () => {
+    setIsLoading(true);
+    setError('');
+    try {
+      const data = await fetchAllPartners();
+      setPartners(data.filter(p => p.is_active));
+    } catch (err) {
+      console.error('Error loading partners:', err);
+      setError('Failed to load partners');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAssign = async () => {
+    if (!selectedPartnerId) {
+      setError('Please select a partner');
+      return;
+    }
+
+    setIsAssigning(true);
+    setError('');
+
+    try {
+      await assignTaskToPartner(
+        selectedPartnerId,
+        boardId,
+        task.id,
+        groupId,
+        visibleNotes || undefined
+      );
+
+      addToast('success', 'Task assigned to partner');
+      onAssigned();
+      onClose();
+    } catch (err: any) {
+      console.error('Error assigning task:', err);
+      setError(err.message || 'Failed to assign task');
+      addToast('error', 'Failed to assign task to partner');
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
+  const filteredPartners = partners.filter(partner =>
+    partner.company_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    partner.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    partner.email.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-slate-900/50" onClick={onClose} />
+
+      {/* Modal */}
+      <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-purple-50 to-white">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
+              <Users className="w-5 h-5 text-purple-600" />
+            </div>
+            <div>
+              <h2 className="font-bold text-lg text-slate-900">Assign to Partner</h2>
+              <p className="text-sm text-slate-500">{task.title}</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-5 space-y-5">
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-100 rounded-xl flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
+
+          {/* Client Info */}
+          <div className="p-3 bg-slate-50 rounded-xl">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Client Board</p>
+            <p className="font-medium text-slate-900">{boardName}</p>
+          </div>
+
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search partners..."
+              className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-purple-400 focus:bg-white transition-colors"
+            />
+          </div>
+
+          {/* Partner List */}
+          <div className="max-h-48 overflow-y-auto space-y-2">
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 text-purple-500 animate-spin" />
+              </div>
+            ) : filteredPartners.length === 0 ? (
+              <div className="text-center py-8 text-slate-400">
+                {partners.length === 0 ? 'No partners available' : 'No partners match your search'}
+              </div>
+            ) : (
+              filteredPartners.map((partner) => (
+                <button
+                  key={partner.id}
+                  onClick={() => setSelectedPartnerId(partner.id)}
+                  className={`w-full p-3 rounded-xl flex items-center gap-3 transition-all ${
+                    selectedPartnerId === partner.id
+                      ? 'bg-purple-50 border-2 border-purple-400'
+                      : 'bg-slate-50 border-2 border-transparent hover:border-slate-200'
+                  }`}
+                >
+                  {partner.avatar_url ? (
+                    <img
+                      src={partner.avatar_url}
+                      alt={partner.full_name}
+                      className="w-10 h-10 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+                      <span className="text-sm font-bold text-purple-600">
+                        {partner.full_name.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex-1 text-left">
+                    <p className="font-semibold text-slate-900">{partner.company_name}</p>
+                    <p className="text-sm text-slate-500">{partner.full_name}</p>
+                  </div>
+                  {selectedPartnerId === partner.id && (
+                    <div className="w-6 h-6 rounded-full bg-purple-500 flex items-center justify-center">
+                      <Check className="w-4 h-4 text-white" />
+                    </div>
+                  )}
+                </button>
+              ))
+            )}
+          </div>
+
+          {/* Visible Notes */}
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">
+              Notes for Partner (optional)
+            </label>
+            <textarea
+              value={visibleNotes}
+              onChange={(e) => setVisibleNotes(e.target.value)}
+              placeholder="Add any instructions or context for the partner..."
+              rows={3}
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-purple-400 focus:bg-white resize-none transition-colors"
+            />
+            <p className="text-xs text-slate-400 mt-1">These notes will be visible to the partner</p>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-5 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-5 py-2 text-slate-600 hover:text-slate-900 font-medium transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleAssign}
+            disabled={isAssigning || !selectedPartnerId}
+            className="flex items-center gap-2 px-5 py-2 bg-purple-600 text-white font-semibold rounded-xl hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {isAssigning ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Users className="w-4 h-4" />
+            )}
+            {isAssigning ? 'Assigning...' : 'Assign Task'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default AssignToPartnerModal;

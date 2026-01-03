@@ -569,8 +569,8 @@ export const createPartnerAccount = async (
       return null;
     }
 
-    // Create partner_accounts record
-    const { data, error } = await supabase
+    // Create partner_accounts record (use admin client to bypass RLS)
+    const { data, error } = await supabaseAdmin
       .from('partner_accounts')
       .insert({
         id: authData.user.id,
