@@ -105,7 +105,7 @@ export const grantClientAccess = async (
   clientBoardId: string,
   grantedBy: string
 ): Promise<boolean> => {
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from('partner_client_access')
     .insert({
       partner_id: partnerId,
@@ -125,7 +125,7 @@ export const revokeClientAccess = async (
   partnerId: string,
   clientBoardId: string
 ): Promise<boolean> => {
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from('partner_client_access')
     .delete()
     .eq('partner_id', partnerId)
@@ -201,21 +201,19 @@ export const updatePartnerTaskStatus = async (
 
 export const assignTaskToPartner = async (
   partnerId: string,
+  clientBoardId: string,
   taskId: string,
   groupId: string,
-  clientBoardId: string,
-  visibleNotes: string,
-  assignedBy: string
+  visibleNotes?: string
 ): Promise<boolean> => {
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from('partner_tasks')
     .insert({
       partner_id: partnerId,
       task_id: taskId,
       group_id: groupId,
       client_board_id: clientBoardId,
-      visible_notes: visibleNotes,
-      assigned_by: assignedBy,
+      visible_notes: visibleNotes || null,
     });
 
   if (error) {
@@ -230,7 +228,7 @@ export const unassignTaskFromPartner = async (
   partnerId: string,
   taskId: string
 ): Promise<boolean> => {
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from('partner_tasks')
     .delete()
     .eq('partner_id', partnerId)
@@ -595,9 +593,9 @@ export const createPartnerAccount = async (
   }
 };
 
-// Fetch all partners (for admin view)
+// Fetch all partners (for admin view) - uses admin client to bypass RLS
 export const fetchAllPartners = async (): Promise<PartnerWithStats[]> => {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('partner_accounts')
     .select('*')
     .order('created_at', { ascending: false });
@@ -611,16 +609,16 @@ export const fetchAllPartners = async (): Promise<PartnerWithStats[]> => {
   const partnersWithStats: PartnerWithStats[] = [];
   for (const partner of data as PartnerAccount[]) {
     const [clients, tasks, unread, lastMessage] = await Promise.all([
-      supabase
+      supabaseAdmin
         .from('partner_client_access')
         .select('*', { count: 'exact', head: true })
         .eq('partner_id', partner.id),
-      supabase
+      supabaseAdmin
         .from('partner_tasks')
         .select('*', { count: 'exact', head: true })
         .eq('partner_id', partner.id),
       getUnreadMessageCount(partner.id, false),
-      supabase
+      supabaseAdmin
         .from('partner_messages')
         .select('created_at')
         .eq('partner_id', partner.id)
@@ -651,7 +649,7 @@ export const deletePartnerAccount = async (partnerId: string): Promise<boolean> 
     }
 
     // Delete from partner_accounts (cascades to related tables)
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
       .from('partner_accounts')
       .delete()
       .eq('id', partnerId);
@@ -673,7 +671,7 @@ export const togglePartnerActive = async (
   partnerId: string,
   isActive: boolean
 ): Promise<boolean> => {
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from('partner_accounts')
     .update({ is_active: isActive })
     .eq('id', partnerId);
