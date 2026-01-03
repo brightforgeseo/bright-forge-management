@@ -250,7 +250,7 @@ export const fetchPartnerMessages = async (
   partnerId: string,
   limit: number = 100
 ): Promise<PartnerMessage[]> => {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('partner_messages')
     .select('*')
     .eq('partner_id', partnerId)
@@ -275,7 +275,7 @@ export const sendPartnerMessage = async (
   attachmentType?: 'image' | 'file',
   attachmentName?: string
 ): Promise<PartnerMessage | null> => {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('partner_messages')
     .insert({
       partner_id: partnerId,
@@ -303,7 +303,7 @@ export const markPartnerMessagesRead = async (
   senderType: 'partner' | 'team'
 ): Promise<boolean> => {
   // Mark messages from the other party as read
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from('partner_messages')
     .update({ is_read: true })
     .eq('partner_id', partnerId)
@@ -323,7 +323,7 @@ export const getUnreadMessageCount = async (
   forPartner: boolean = true
 ): Promise<number> => {
   const senderType = forPartner ? 'team' : 'partner';
-  const { count, error } = await supabase
+  const { count, error } = await supabaseAdmin
     .from('partner_messages')
     .select('*', { count: 'exact', head: true })
     .eq('partner_id', partnerId)
