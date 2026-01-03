@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { BrandingConfig, ToastType, User } from '../types';
-import { Save, Monitor, User as UserIcon, Upload, Loader2, Users, Key, Trash2, Shield, X } from 'lucide-react';
+import { BrandingConfig, ToastType, User, ClientBoard } from '../types';
+import { PartnerWithStats } from '../types-portal';
+import { Save, Monitor, User as UserIcon, Upload, Loader2, Users, Key, Trash2, Shield, X, Building2, Plus, UserPlus, Check, Copy, Mail } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
-import { uploadFile, fetchAllAuthUsers, resetUserPassword, deleteAuthUser, updateUserRole, AuthUser } from '../services/databaseService';
+import { uploadFile, fetchAllAuthUsers, resetUserPassword, deleteAuthUser, updateUserRole, AuthUser, fetchClientBoards } from '../services/databaseService';
+import { fetchAllPartners, createPartnerAccount, deletePartnerAccount, togglePartnerActive, grantClientAccess, revokeClientAccess } from '../services/clientPortalService';
 import ActivityLog from './ActivityLog';
 
 interface SettingsProps {
@@ -28,10 +30,23 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
   const [deleteModal, setDeleteModal] = useState<{ open: boolean; user: AuthUser | null }>({ open: false, user: null });
   const [actionLoading, setActionLoading] = useState(false);
 
-  // Fetch users on mount for Owners
+  // Partner management state
+  const [partners, setPartners] = useState<PartnerWithStats[]>([]);
+  const [loadingPartners, setLoadingPartners] = useState(false);
+  const [showCreatePartnerModal, setShowCreatePartnerModal] = useState(false);
+  const [showAssignClientsModal, setShowAssignClientsModal] = useState<{ open: boolean; partner: PartnerWithStats | null }>({ open: false, partner: null });
+  const [showDeletePartnerModal, setShowDeletePartnerModal] = useState<{ open: boolean; partner: PartnerWithStats | null }>({ open: false, partner: null });
+  const [newPartner, setNewPartner] = useState({ email: '', companyName: '', fullName: '', password: '' });
+  const [createdPartnerCreds, setCreatedPartnerCreds] = useState<{ email: string; password: string } | null>(null);
+  const [clients, setClients] = useState<ClientBoard[]>([]);
+  const [partnerClientIds, setPartnerClientIds] = useState<string[]>([]);
+  const [partnerActionLoading, setPartnerActionLoading] = useState(false);
+
+  // Fetch users and partners on mount for Owners
   useEffect(() => {
     if (currentUser.role === 'Owner') {
       loadUsers();
+      loadPartners();
     }
   }, [currentUser.role]);
 
@@ -47,6 +62,138 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
       setLoadingUsers(false);
     }
   };
+
+  const loadPartners = async () => {
+    setLoadingPartners(true);
+    try {
+      const partnerList = await fetchAllPartners();
+      setPartners(partnerList);
+    } catch (error) {
+      console.error('Failed to load partners:', error);
+      addToast('error', 'Failed to load partners');
+    } finally {
+      setLoadingPartners(false);
+    }
+  };
+
+  const loadClients = async () => {
+    try {
+      const clientList = await fetchClientBoards();
+      setClients(clientList);
+    } catch (error) {
+      console.error('Failed to load clients:', error);
+    }
+  };
+
+  const generatePartnerPassword = () => {
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$';
+    let pass = '';
+    for (let i = 0; i < 12; i++) pass += chars.charAt(Math.floor(Math.random() * chars.length));
+    setNewPartner(prev => ({ ...prev, password: pass }));
+  };
+
+  const handleCreatePartner = async () => {
+    if (!newPartner.email.trim() || !newPartner.companyName.trim() || !newPartner.fullName.trim() || !newPartner.password.trim()) {
+      addToast('error', 'Please fill in all fields');
+      return;
+    }
+
+    setPartnerActionLoading(true);
+    try {
+      const partner = await createPartnerAccount(
+        newPartner.email,
+        newPartner.password,
+        newPartner.companyName,
+        newPartner.fullName
+      );
+
+      if (partner) {
+        setCreatedPartnerCreds({ email: newPartner.email, password: newPartner.password });
+        addToast('success', 'Partner account created');
+        loadPartners();
+      } else {
+        addToast('error', 'Failed to create partner account');
+      }
+    } catch (error) {
+      console.error('Failed to create partner:', error);
+      addToast('error', 'Failed to create partner account');
+    } finally {
+      setPartnerActionLoading(false);
+    }
+  };
+
+  const handleDeletePartner = async () => {
+    if (!showDeletePartnerModal.partner) return;
+
+    setPartnerActionLoading(true);
+    try {
+      const success = await deletePartnerAccount(showDeletePartnerModal.partner.id);
+      if (success) {
+        addToast('success', 'Partner account deleted');
+        setShowDeletePartnerModal({ open: false, partner: null });
+        loadPartners();
+      } else {
+        addToast('error', 'Failed to delete partner');
+      }
+    } catch (error) {
+      console.error('Failed to delete partner:', error);
+      addToast('error', 'Failed to delete partner');
+    } finally {
+      setPartnerActionLoading(false);
+    }
+  };
+
+  const handleTogglePartnerActive = async (partner: PartnerWithStats) => {
+    try {
+      const success = await togglePartnerActive(partner.id, !partner.is_active);
+      if (success) {
+        addToast('success', `Partner ${partner.is_active ? 'deactivated' : 'activated'}`);
+        loadPartners();
+      }
+    } catch (error) {
+      console.error('Failed to toggle partner status:', error);
+      addToast('error', 'Failed to update partner status');
+    }
+  };
+
+  const openAssignClientsModal = async (partner: PartnerWithStats) => {
+    await loadClients();
+    // Get current client assignments for this partner
+    const { data } = await supabase
+      .from('partner_client_access')
+      .select('client_board_id')
+      .eq('partner_id', partner.id);
+    setPartnerClientIds(data?.map(d => d.client_board_id) || []);
+    setShowAssignClientsModal({ open: true, partner });
+  };
+
+  const handleToggleClientAccess = async (clientId: string) => {
+    if (!showAssignClientsModal.partner) return;
+
+    const partnerId = showAssignClientsModal.partner.id;
+    const hasAccess = partnerClientIds.includes(clientId);
+
+    try {
+      if (hasAccess) {
+        await revokeClientAccess(partnerId, clientId);
+        setPartnerClientIds(prev => prev.filter(id => id !== clientId));
+      } else {
+        await grantClientAccess(partnerId, clientId, currentUser.id);
+        setPartnerClientIds(prev => [...prev, clientId]);
+      }
+    } catch (error) {
+      console.error('Failed to update client access:', error);
+      addToast('error', 'Failed to update client access');
+    }
+  };
+
+  const resetCreatePartnerModal = () => {
+    setShowCreatePartnerModal(false);
+    setNewPartner({ email: '', companyName: '', fullName: '', password: '' });
+    setCreatedPartnerCreds(null);
+  };
+
+  const getPartnerPortalUrl = () => `${window.location.origin}/client-portal`;
 
   const handleResetPassword = async () => {
     if (!resetPasswordModal.user || !newPassword) return;
@@ -382,6 +529,101 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
         </div>
       )}
 
+      {/* Partner Management - Only visible to Owners */}
+      {currentUser.role === 'Owner' && (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Building2 className="w-5 h-5 text-slate-500" />
+              <h3 className="font-semibold text-slate-900">Partner Management</h3>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={loadPartners}
+                disabled={loadingPartners}
+                className="text-sm text-brand-600 hover:text-brand-700 font-medium"
+              >
+                {loadingPartners ? 'Loading...' : 'Refresh'}
+              </button>
+              <button
+                onClick={() => setShowCreatePartnerModal(true)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-sm rounded-lg font-medium"
+              >
+                <Plus className="w-4 h-4" />
+                Add Partner
+              </button>
+            </div>
+          </div>
+
+          <div className="p-6">
+            {loadingPartners ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+              </div>
+            ) : partners.length === 0 ? (
+              <div className="text-center py-8">
+                <Building2 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                <p className="text-slate-500">No partner accounts yet</p>
+                <p className="text-sm text-slate-400 mt-1">Create a partner account to give agencies access to their clients</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {partners.map(partner => (
+                  <div
+                    key={partner.id}
+                    className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-slate-900 truncate">{partner.company_name}</p>
+                        {!partner.is_active && (
+                          <span className="px-2 py-0.5 text-xs bg-red-100 text-red-600 rounded-full">Inactive</span>
+                        )}
+                      </div>
+                      <p className="text-sm text-slate-500 truncate">{partner.full_name} - {partner.email}</p>
+                      <div className="flex items-center gap-4 mt-1 text-xs text-slate-400">
+                        <span>{partner.clientCount} clients</span>
+                        <span>{partner.taskCount} tasks</span>
+                        {partner.unreadMessages > 0 && (
+                          <span className="text-amber-600">{partner.unreadMessages} unread messages</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 ml-4">
+                      <button
+                        onClick={() => openAssignClientsModal(partner)}
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Assign Clients"
+                      >
+                        <UserPlus className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleTogglePartnerActive(partner)}
+                        className={`p-2 rounded-lg transition-colors ${
+                          partner.is_active
+                            ? 'text-amber-600 hover:bg-amber-50'
+                            : 'text-green-600 hover:bg-green-50'
+                        }`}
+                        title={partner.is_active ? 'Deactivate' : 'Activate'}
+                      >
+                        <Shield className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setShowDeletePartnerModal({ open: true, partner })}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete Partner"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Activity Log - Only visible to Owners */}
       {currentUser.role === 'Owner' && (
         <ActivityLog onError={(msg) => addToast('error', msg)} />
@@ -475,6 +717,251 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
                 >
                   {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                   Delete User
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Partner Modal */}
+      {showCreatePartnerModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Building2 className="w-5 h-5 text-brand-600" />
+                <h3 className="font-semibold text-slate-900">
+                  {createdPartnerCreds ? 'Partner Created' : 'Create Partner Account'}
+                </h3>
+              </div>
+              <button
+                onClick={resetCreatePartnerModal}
+                className="p-2 hover:bg-slate-100 rounded-lg"
+              >
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              {createdPartnerCreds ? (
+                <>
+                  <div className="p-4 bg-green-50 border border-green-100 rounded-xl">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Check className="w-5 h-5 text-green-600" />
+                      <p className="font-medium text-green-800">Partner account created successfully!</p>
+                    </div>
+                    <p className="text-sm text-green-700">Share these login credentials with the partner:</p>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="p-3 bg-slate-50 rounded-lg">
+                      <p className="text-xs text-slate-500 mb-1">Portal URL</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-mono text-slate-700">{getPartnerPortalUrl()}</p>
+                        <button
+                          onClick={() => { navigator.clipboard.writeText(getPartnerPortalUrl()); addToast('success', 'Copied!'); }}
+                          className="p-1 text-slate-400 hover:text-slate-600"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="p-3 bg-slate-50 rounded-lg">
+                      <p className="text-xs text-slate-500 mb-1">Email</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-mono text-slate-700">{createdPartnerCreds.email}</p>
+                        <button
+                          onClick={() => { navigator.clipboard.writeText(createdPartnerCreds.email); addToast('success', 'Copied!'); }}
+                          className="p-1 text-slate-400 hover:text-slate-600"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="p-3 bg-slate-50 rounded-lg">
+                      <p className="text-xs text-slate-500 mb-1">Password</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-mono text-slate-700">{createdPartnerCreds.password}</p>
+                        <button
+                          onClick={() => { navigator.clipboard.writeText(createdPartnerCreds.password); addToast('success', 'Copied!'); }}
+                          className="p-1 text-slate-400 hover:text-slate-600"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={resetCreatePartnerModal}
+                    className="w-full px-4 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-medium"
+                  >
+                    Done
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Company Name</label>
+                    <input
+                      type="text"
+                      value={newPartner.companyName}
+                      onChange={(e) => setNewPartner({ ...newPartner, companyName: e.target.value })}
+                      placeholder="e.g., 10XR Agency"
+                      className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Contact Name</label>
+                    <input
+                      type="text"
+                      value={newPartner.fullName}
+                      onChange={(e) => setNewPartner({ ...newPartner, fullName: e.target.value })}
+                      placeholder="e.g., John Smith"
+                      className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Email</label>
+                    <input
+                      type="email"
+                      value={newPartner.email}
+                      onChange={(e) => setNewPartner({ ...newPartner, email: e.target.value })}
+                      placeholder="partner@company.com"
+                      className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Password</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newPartner.password}
+                        onChange={(e) => setNewPartner({ ...newPartner, password: e.target.value })}
+                        placeholder="Enter password"
+                        className="flex-1 p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none"
+                      />
+                      <button
+                        onClick={generatePartnerPassword}
+                        className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-medium text-sm"
+                      >
+                        Generate
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      onClick={resetCreatePartnerModal}
+                      className="flex-1 px-4 py-3 border border-slate-200 text-slate-700 rounded-xl font-medium hover:bg-slate-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleCreatePartner}
+                      disabled={partnerActionLoading}
+                      className="flex-1 px-4 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {partnerActionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                      Create Partner
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Clients Modal */}
+      {showAssignClientsModal.open && showAssignClientsModal.partner && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <UserPlus className="w-5 h-5 text-blue-600" />
+                <div>
+                  <h3 className="font-semibold text-slate-900">Assign Clients</h3>
+                  <p className="text-sm text-slate-500">{showAssignClientsModal.partner.company_name}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAssignClientsModal({ open: false, partner: null })}
+                className="p-2 hover:bg-slate-100 rounded-lg"
+              >
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+            <div className="p-6">
+              {clients.length === 0 ? (
+                <p className="text-slate-500 text-center py-4">No clients available</p>
+              ) : (
+                <div className="space-y-2">
+                  {clients.map(client => (
+                    <button
+                      key={client.id}
+                      onClick={() => handleToggleClientAccess(client.id)}
+                      className={`w-full flex items-center justify-between p-3 rounded-xl border transition-colors ${
+                        partnerClientIds.includes(client.id)
+                          ? 'bg-blue-50 border-blue-200'
+                          : 'bg-slate-50 border-slate-100 hover:bg-slate-100'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-semibold"
+                          style={{ backgroundColor: client.color || '#3b82f6' }}
+                        >
+                          {client.initials}
+                        </div>
+                        <span className="font-medium text-slate-700">{client.name}</span>
+                      </div>
+                      {partnerClientIds.includes(client.id) && (
+                        <Check className="w-5 h-5 text-blue-600" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Partner Modal */}
+      {showDeletePartnerModal.open && showDeletePartnerModal.partner && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Trash2 className="w-5 h-5 text-red-600" />
+                <h3 className="font-semibold text-slate-900">Delete Partner</h3>
+              </div>
+              <button
+                onClick={() => setShowDeletePartnerModal({ open: false, partner: null })}
+                className="p-2 hover:bg-slate-100 rounded-lg"
+              >
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="p-4 bg-red-50 border border-red-100 rounded-xl">
+                <p className="text-red-800">
+                  Are you sure you want to delete <strong>{showDeletePartnerModal.partner.company_name}</strong>?
+                  This will remove all their access and message history. This action cannot be undone.
+                </p>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setShowDeletePartnerModal({ open: false, partner: null })}
+                  className="flex-1 px-4 py-3 border border-slate-200 text-slate-700 rounded-xl font-medium hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeletePartner}
+                  disabled={partnerActionLoading}
+                  className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {partnerActionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                  Delete Partner
                 </button>
               </div>
             </div>

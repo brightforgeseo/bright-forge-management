@@ -1,9 +1,13 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import ClientPortalApp from './ClientPortalApp';
 import './styles.css';
 
 console.log("Starting Application Mount...");
+
+// Check if we're on the client portal route
+const isClientPortal = window.location.pathname.startsWith('/client-portal');
 
 interface ErrorBoundaryProps {
   children?: React.ReactNode;
@@ -68,11 +72,11 @@ try {
   root.render(
     <React.StrictMode>
       <ErrorBoundary>
-        <App />
+        {isClientPortal ? <ClientPortalApp /> : <App />}
       </ErrorBoundary>
     </React.StrictMode>
   );
-  console.log("Mount Successful");
+  console.log(`Mount Successful - ${isClientPortal ? 'Client Portal' : 'Main App'}`);
 } catch (e: any) {
   console.error("Mount Error:", e);
   const overlay = document.getElementById('error-overlay');
