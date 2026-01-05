@@ -560,10 +560,12 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
   // Load Data
   const refreshData = async () => {
     setIsRefreshing(true);
+    const isAdminOrOwner = currentUser.role === 'Owner' || currentUser.role === 'Admin';
     const [chans, profs, partnersData] = await Promise.all([
       fetchChannels(),
       fetchProfiles(),
-      fetchAllPartners().catch(() => [])
+      // Only fetch partners for Owners/Admins
+      isAdminOrOwner ? fetchAllPartners().catch(() => []) : Promise.resolve([])
     ]);
     setChannels(chans);
     setProfiles(profs);
@@ -1746,8 +1748,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
             </ul>
           </div>
 
-          {/* Partner Chats */}
-          {partners.length > 0 && (
+          {/* Partner Chats - Only visible to Owners and Admins */}
+          {partners.length > 0 && (currentUser.role === 'Owner' || currentUser.role === 'Admin') && (
             <div>
               <div className="px-3 flex items-center justify-between group text-[#bcabbc] mb-1">
                 <span className="text-[10px] font-semibold uppercase tracking-wider">Partner Chats</span>
