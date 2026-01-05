@@ -1028,11 +1028,26 @@ export const sendEmailViaProvider = async (
       },
     });
 
-    console.log('[sendEmailViaProvider] Response:', { data, error });
+    console.log('[sendEmailViaProvider] Response data:', JSON.stringify(data, null, 2));
+    console.log('[sendEmailViaProvider] Response error:', JSON.stringify(error, null, 2));
 
     if (error) {
-      console.error('[sendEmailViaProvider] Error:', error.message);
-      return { success: false, error: error.message };
+      // Try to extract error from context (Edge Function response body)
+      let errorMsg = error.message;
+      try {
+        if (error.context && typeof error.context === 'object') {
+          const ctx = error.context as any;
+          if (ctx.error) errorMsg = ctx.error;
+          if (ctx.body) {
+            const bodyData = typeof ctx.body === 'string' ? JSON.parse(ctx.body) : ctx.body;
+            if (bodyData.error) errorMsg = bodyData.error;
+          }
+        }
+      } catch (e) {
+        // Ignore parsing errors
+      }
+      console.error('[sendEmailViaProvider] Error:', errorMsg);
+      return { success: false, error: errorMsg };
     }
 
     // Check for error in response data
