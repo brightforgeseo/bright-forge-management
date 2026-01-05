@@ -41,7 +41,7 @@ serve(async (req) => {
     if (!partnerId || !to || !subject || !body) {
       return new Response(
         JSON.stringify({ success: false, error: 'Missing required parameters' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -57,8 +57,8 @@ serve(async (req) => {
 
     if (partnerError || !partner) {
       return new Response(
-        JSON.stringify({ success: false, error: 'Partner not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ success: false, error: 'Partner not found', details: partnerError?.message }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -73,7 +73,7 @@ serve(async (req) => {
     if (!partner.email_provider || !partner.email_access_token) {
       return new Response(
         JSON.stringify({ success: false, error: 'Email not connected. Please connect your email in Settings.' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -135,7 +135,7 @@ serve(async (req) => {
         } else {
           return new Response(
             JSON.stringify({ success: false, error: 'Email authorization expired. Please reconnect your email in Settings.' }),
-            { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
         }
       }
@@ -204,7 +204,7 @@ serve(async (req) => {
         }
         return new Response(
           JSON.stringify({ success: false, error: `Gmail error (${sendResponse.response.status}): ${errorMsg}` }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
 
@@ -218,14 +218,14 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({ success: false, error: 'Unsupported email provider' }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Send email error:', error)
     return new Response(
-      JSON.stringify({ success: false, error: 'Internal server error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: false, error: `Internal server error: ${error.message || 'Unknown'}` }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 })
