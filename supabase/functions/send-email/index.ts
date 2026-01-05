@@ -28,9 +28,9 @@ serve(async (req) => {
   }
 
   try {
-    const { partnerId, to, subject, body } = await req.json()
+    const { partnerId, to, subject, body, taskId, clientBoardId } = await req.json()
 
-    console.log('Send email request:', { partnerId, to, subject, hasBody: !!body })
+    console.log('Send email request:', { partnerId, to, subject, hasBody: !!body, taskId, clientBoardId })
     console.log('Environment check:', {
       hasSupabaseUrl: !!SUPABASE_URL,
       hasServiceRoleKey: !!SUPABASE_SERVICE_ROLE_KEY,
@@ -210,8 +210,27 @@ serve(async (req) => {
 
       const sendData = sendResponse.data
 
+      // Save sent email to database for tracking replies
+      if (taskId && clientBoardId && sendData.id && sendData.threadId) {
+        try {
+          await supabase.from('partner_sent_emails').insert({
+            partner_id: partnerId,
+            task_id: taskId,
+            client_board_id: clientBoardId,
+            gmail_message_id: sendData.id,
+            gmail_thread_id: sendData.threadId,
+            recipient_email: to,
+            subject: subject,
+          })
+          console.log('Saved sent email to database:', { messageId: sendData.id, threadId: sendData.threadId })
+        } catch (dbErr: any) {
+          console.error('Failed to save sent email:', dbErr.message)
+          // Don't fail the request if DB save fails
+        }
+      }
+
       return new Response(
-        JSON.stringify({ success: true, messageId: sendData.id }),
+        JSON.stringify({ success: true, messageId: sendData.id, threadId: sendData.threadId }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }

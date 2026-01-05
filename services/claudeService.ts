@@ -452,6 +452,7 @@ Return ONLY valid JSON:
  * Client Email Generation using Claude Haiku 3.5
  * Generates natural, human-written emails for partner-to-client communication
  * Uses rich context from task comments, previous tasks, and project history
+ * Also handles generating replies to client emails
  */
 export const generateClientEmail = async (
   context: EmailGenerationContext
@@ -462,8 +463,19 @@ export const generateClientEmail = async (
     // Build context sections
     let contextSections = '';
 
+    // If this is a reply, include the conversation history
+    if (context.isReply && context.previousConversation) {
+      contextSections += `\n## EMAIL CONVERSATION HISTORY
+${context.previousConversation}`;
+
+      if (context.lastClientMessage) {
+        contextSections += `\n\n## CLIENT'S LATEST MESSAGE (respond to this)
+${context.lastClientMessage}`;
+      }
+    }
+
     // Current task info
-    contextSections += `\n## CURRENT TASK
+    contextSections += `\n\n## CURRENT TASK
 - Title: ${context.taskTitle}
 - Status: ${context.taskStatus || 'In Progress'}
 ${context.taskDueDate ? `- Due Date: ${context.taskDueDate}` : ''}
@@ -515,14 +527,26 @@ ${context.notes ? `- Notes: ${context.notes}` : ''}`;
 - Company: ${context.partnerCompany}
 - Client: ${context.clientName}${context.clientIndustry ? ` (${context.clientIndustry} industry)` : ''}`;
 
-    const response = await client.messages.create({
-      model: CLAUDE_HAIKU,
-      max_tokens: 1024,
-      system: systemPrompt,
-      messages: [
-        {
-          role: 'user',
-          content: `Write a client update email about this SEO task. Use the context below to write a specific, relevant email.
+    // Different prompts for new emails vs replies
+    const userPrompt = context.isReply
+      ? `Write a reply to the client's email. Use the conversation history and task context below.
+${contextSections}
+
+## REQUIREMENTS
+1. Subject line: Keep "Re: " prefix if present, otherwise use "Re: [original subject]"
+2. Email body: 2-3 paragraphs that:
+   - Directly address the client's question or concern
+   - Be helpful and provide the information they need
+   - Keep it conversational - you're continuing a discussion
+   - Don't repeat information they already know
+   - Sound like a real human wrote it
+
+Return ONLY valid JSON:
+{
+  "subject": "Re: Subject line",
+  "body": "Full email body with proper line breaks using \\n"
+}`
+      : `Write a client update email about this SEO task. Use the context below to write a specific, relevant email.
 ${contextSections}
 
 ## REQUIREMENTS
@@ -537,7 +561,16 @@ Return ONLY valid JSON:
 {
   "subject": "Email subject line",
   "body": "Full email body with proper line breaks using \\n"
-}`,
+}`;
+
+    const response = await client.messages.create({
+      model: CLAUDE_HAIKU,
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: [
+        {
+          role: 'user',
+          content: userPrompt,
         },
       ],
     });

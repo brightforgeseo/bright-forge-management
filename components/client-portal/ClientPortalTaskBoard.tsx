@@ -13,6 +13,7 @@ import {
   ChevronDown,
   ExternalLink,
   MessageCircle,
+  Inbox,
 } from 'lucide-react';
 import { PartnerAccount, PartnerTask, PartnerTaskStatus, PartnerTaskColumn } from '../../types-portal';
 import { ClientBoard, ToastType } from '../../types';
@@ -22,6 +23,7 @@ import {
 } from '../../services/clientPortalService';
 import EmailGeneratorModal from './EmailGeneratorModal';
 import PartnerTaskDetailModal from './PartnerTaskDetailModal';
+import EmailThreadModal from './EmailThreadModal';
 
 interface ClientPortalTaskBoardProps {
   partnerAccount: PartnerAccount;
@@ -59,6 +61,10 @@ const ClientPortalTaskBoard: React.FC<ClientPortalTaskBoardProps> = ({
   // Task detail modal
   const [selectedTask, setSelectedTask] = useState<PartnerTask | null>(null);
   const [showTaskDetail, setShowTaskDetail] = useState(false);
+
+  // Email thread modal
+  const [emailThreadTask, setEmailThreadTask] = useState<PartnerTask | null>(null);
+  const [showEmailThread, setShowEmailThread] = useState(false);
 
   // Client dropdown
   const [showClientDropdown, setShowClientDropdown] = useState(false);
@@ -453,6 +459,21 @@ const ClientPortalTaskBoard: React.FC<ClientPortalTaskBoardProps> = ({
                             </div>
                           )}
                         </div>
+
+                        {/* View Emails button for email_sent tasks */}
+                        {task.partner_status === 'email_sent' && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEmailThreadTask(task);
+                              setShowEmailThread(true);
+                            }}
+                            className="mt-3 ml-6 flex items-center gap-2 px-3 py-1.5 bg-purple-500/20 text-purple-400 text-xs rounded-lg hover:bg-purple-500/30 transition-colors"
+                          >
+                            <Inbox className="w-3 h-3" />
+                            View Emails
+                          </button>
+                        )}
                       </div>
                     ))
                   )}
@@ -491,6 +512,20 @@ const ClientPortalTaskBoard: React.FC<ClientPortalTaskBoardProps> = ({
           partnerAccount={partnerAccount}
           addToast={addToast}
           onTaskUpdated={handleTaskUpdated}
+        />
+      )}
+
+      {/* Email Thread Modal */}
+      {showEmailThread && emailThreadTask && (
+        <EmailThreadModal
+          isOpen={showEmailThread}
+          onClose={() => {
+            setShowEmailThread(false);
+            setEmailThreadTask(null);
+          }}
+          task={emailThreadTask}
+          partnerAccount={partnerAccount}
+          addToast={addToast}
         />
       )}
     </div>

@@ -141,7 +141,9 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({
         partnerAccount.id,
         recipientEmail,
         subject,
-        body
+        body,
+        task.task_id,
+        task.client_board_id
       );
 
       if (result.success) {

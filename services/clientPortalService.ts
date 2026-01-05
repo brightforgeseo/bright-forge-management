@@ -1016,8 +1016,10 @@ export const sendEmailViaProvider = async (
   partnerId: string,
   to: string,
   subject: string,
-  body: string
-): Promise<{ success: boolean; error?: string }> => {
+  body: string,
+  taskId?: string,
+  clientBoardId?: string
+): Promise<{ success: boolean; error?: string; threadId?: string }> => {
   try {
     const { data, error } = await supabase.functions.invoke('send-email', {
       body: {
@@ -1025,6 +1027,8 @@ export const sendEmailViaProvider = async (
         to,
         subject,
         body,
+        taskId,
+        clientBoardId,
       },
     });
 
@@ -1056,9 +1060,53 @@ export const sendEmailViaProvider = async (
       return { success: false, error: data.error || 'Failed to send email' };
     }
 
-    return { success: true };
+    return { success: true, threadId: data?.threadId };
   } catch (err: any) {
     console.error('[sendEmailViaProvider] Unexpected error:', err);
     return { success: false, error: err.message || 'Unknown error' };
+  }
+};
+
+// ============================================
+// EMAIL THREAD / REPLIES
+// ============================================
+
+export interface EmailMessage {
+  id: string;
+  threadId: string;
+  from: string;
+  to: string;
+  subject: string;
+  body: string;
+  date: string;
+  isFromPartner: boolean;
+}
+
+export const fetchEmailThread = async (
+  partnerId: string,
+  taskId: string
+): Promise<{ success: boolean; messages: EmailMessage[]; hasThread: boolean; error?: string }> => {
+  try {
+    const { data, error } = await supabase.functions.invoke('fetch-email-thread', {
+      body: { partnerId, taskId },
+    });
+
+    if (error) {
+      console.error('[fetchEmailThread] Error:', error.message);
+      return { success: false, messages: [], hasThread: false, error: error.message };
+    }
+
+    if (data && !data.success) {
+      return { success: false, messages: [], hasThread: false, error: data.error };
+    }
+
+    return {
+      success: true,
+      messages: data?.messages || [],
+      hasThread: data?.hasThread || false,
+    };
+  } catch (err: any) {
+    console.error('[fetchEmailThread] Unexpected error:', err);
+    return { success: false, messages: [], hasThread: false, error: err.message };
   }
 };

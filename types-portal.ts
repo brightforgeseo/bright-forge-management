@@ -169,6 +169,11 @@ export interface EmailGenerationContext {
   partnerName: string;
   partnerCompany: string;
   partnerFullName: string;
+
+  // Reply context (for generating responses to client emails)
+  isReply?: boolean;
+  previousConversation?: string;
+  lastClientMessage?: string;
 }
 
 export interface GeneratedEmail {
