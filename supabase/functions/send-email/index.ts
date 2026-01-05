@@ -79,47 +79,65 @@ serve(async (req) => {
 
     let accessToken = partner.email_access_token
 
-    // Check if token is expired and refresh if needed
+    // Helper function to refresh the token
+    const refreshAccessToken = async (): Promise<string | null> => {
+      if (!partner.email_refresh_token) {
+        console.log('No refresh token available')
+        return null
+      }
+
+      console.log('Refreshing access token...')
+      const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: GOOGLE_CLIENT_ID,
+          client_secret: GOOGLE_CLIENT_SECRET,
+          refresh_token: partner.email_refresh_token,
+          grant_type: 'refresh_token',
+        }),
+      })
+
+      const refreshData = await refreshResponse.json()
+      console.log('Refresh response:', { status: refreshResponse.status, hasError: !!refreshData.error })
+
+      if (refreshData.error) {
+        console.error('Token refresh error:', JSON.stringify(refreshData))
+        return null
+      }
+
+      const newToken = refreshData.access_token
+      const newExpiresAt = new Date(Date.now() + refreshData.expires_in * 1000).toISOString()
+
+      // Update token in database
+      await supabase
+        .from('partner_accounts')
+        .update({
+          email_access_token: newToken,
+          email_token_expires_at: newExpiresAt,
+        })
+        .eq('id', partnerId)
+
+      return newToken
+    }
+
+    // Check if token is expired or about to expire
     if (partner.email_token_expires_at) {
       const expiresAt = new Date(partner.email_token_expires_at)
       const now = new Date()
 
       // Refresh if token expires within 5 minutes
       if (expiresAt.getTime() - now.getTime() < 5 * 60 * 1000) {
-        console.log('Token expired or expiring soon, refreshing...')
-
-        const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({
-            client_id: GOOGLE_CLIENT_ID,
-            client_secret: GOOGLE_CLIENT_SECRET,
-            refresh_token: partner.email_refresh_token,
-            grant_type: 'refresh_token',
-          }),
-        })
-
-        const refreshData = await refreshResponse.json()
-
-        if (refreshData.error) {
-          console.error('Token refresh error:', refreshData)
+        console.log('Token expired or expiring soon')
+        const newToken = await refreshAccessToken()
+        if (newToken) {
+          accessToken = newToken
+        } else {
           return new Response(
-            JSON.stringify({ success: false, error: 'Email authorization expired. Please reconnect your email.' }),
+            JSON.stringify({ success: false, error: 'Email authorization expired. Please reconnect your email in Settings.' }),
             { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
         }
-
-        accessToken = refreshData.access_token
-        const newExpiresAt = new Date(Date.now() + refreshData.expires_in * 1000).toISOString()
-
-        // Update token in database
-        await supabase
-          .from('partner_accounts')
-          .update({
-            email_access_token: accessToken,
-            email_token_expires_at: newExpiresAt,
-          })
-          .eq('id', partnerId)
       }
     }
 
@@ -149,31 +167,48 @@ serve(async (req) => {
         encodedLength: encodedEmail.length
       })
 
-      const sendResponse = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ raw: encodedEmail }),
-      })
+      // Function to send email with current token
+      const sendGmailEmail = async (token: string) => {
+        const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ raw: encodedEmail }),
+        })
+        const data = await response.json()
+        return { response, data }
+      }
 
-      const sendData = await sendResponse.json()
+      let sendResponse = await sendGmailEmail(accessToken)
+      console.log('Gmail API response:', { status: sendResponse.response.status, data: JSON.stringify(sendResponse.data) })
 
-      console.log('Gmail API response:', { status: sendResponse.status, data: JSON.stringify(sendData) })
+      // If 401, try refreshing token and retry once
+      if (sendResponse.response.status === 401) {
+        console.log('Got 401 from Gmail, attempting token refresh and retry...')
+        const newToken = await refreshAccessToken()
+        if (newToken) {
+          accessToken = newToken
+          sendResponse = await sendGmailEmail(newToken)
+          console.log('Gmail API retry response:', { status: sendResponse.response.status, data: JSON.stringify(sendResponse.data) })
+        }
+      }
 
-      if (!sendResponse.ok || sendData.error) {
-        console.error('Gmail send error:', JSON.stringify(sendData))
+      if (!sendResponse.response.ok || sendResponse.data.error) {
+        console.error('Gmail send error:', JSON.stringify(sendResponse.data))
         // Return detailed error message
         let errorMsg = 'Unknown error'
-        if (sendData.error) {
-          errorMsg = sendData.error.message || sendData.error.status || JSON.stringify(sendData.error)
+        if (sendResponse.data.error) {
+          errorMsg = sendResponse.data.error.message || sendResponse.data.error.status || JSON.stringify(sendResponse.data.error)
         }
         return new Response(
-          JSON.stringify({ success: false, error: `Gmail error (${sendResponse.status}): ${errorMsg}` }),
+          JSON.stringify({ success: false, error: `Gmail error (${sendResponse.response.status}): ${errorMsg}` }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
+
+      const sendData = sendResponse.data
 
       return new Response(
         JSON.stringify({ success: true, messageId: sendData.id }),
