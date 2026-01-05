@@ -34,6 +34,7 @@ const COLUMNS: { id: PartnerTaskStatus; title: string; color: string; icon: Reac
   { id: 'in_progress', title: 'In Progress', color: 'bg-yellow-500', icon: Clock },
   { id: 'needs_content', title: 'Needs Content', color: 'bg-orange-500', icon: FileText },
   { id: 'send_email', title: 'Send Email', color: 'bg-purple-500', icon: Mail },
+  { id: 'email_sent', title: 'Email Sent', color: 'bg-emerald-500', icon: CheckCircle2 },
   { id: 'completed', title: 'Completed', color: 'bg-green-500', icon: CheckCircle2 },
 ];
 
