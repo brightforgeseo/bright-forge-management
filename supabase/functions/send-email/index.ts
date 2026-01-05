@@ -24,6 +24,14 @@ serve(async (req) => {
   try {
     const { partnerId, to, subject, body } = await req.json()
 
+    console.log('Send email request:', { partnerId, to, subject, hasBody: !!body })
+    console.log('Environment check:', {
+      hasSupabaseUrl: !!SUPABASE_URL,
+      hasServiceRoleKey: !!SUPABASE_SERVICE_ROLE_KEY,
+      hasGoogleClientId: !!GOOGLE_CLIENT_ID,
+      hasGoogleClientSecret: !!GOOGLE_CLIENT_SECRET
+    })
+
     if (!partnerId || !to || !subject || !body) {
       return new Response(
         JSON.stringify({ success: false, error: 'Missing required parameters' }),
@@ -47,6 +55,14 @@ serve(async (req) => {
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+
+    console.log('Partner data:', {
+      email_provider: partner.email_provider,
+      email_address: partner.email_address,
+      has_access_token: !!partner.email_access_token,
+      has_refresh_token: !!partner.email_refresh_token,
+      token_expires_at: partner.email_token_expires_at
+    })
 
     if (!partner.email_provider || !partner.email_access_token) {
       return new Response(
