@@ -19,7 +19,7 @@ interface EmailConnectionModalProps {
 }
 
 // Gmail OAuth configuration
-const GMAIL_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+const GMAIL_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '1093075047200-mrpnqhebclmc7o5082hvh6uugm5g3gsv.apps.googleusercontent.com';
 const GMAIL_REDIRECT_URI = `${window.location.origin}/client-portal/oauth/gmail/callback`;
 const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.send';
 
