@@ -24,10 +24,25 @@ serve(async (req) => {
   try {
     const { code, provider, partnerId, redirectUri } = await req.json()
 
+    console.log('OAuth callback received:', { provider, partnerId, hasCode: !!code })
+    console.log('Environment check:', {
+      hasGoogleClientId: !!GOOGLE_CLIENT_ID,
+      hasGoogleClientSecret: !!GOOGLE_CLIENT_SECRET,
+      hasSupabaseUrl: !!SUPABASE_URL,
+      hasServiceRoleKey: !!SUPABASE_SERVICE_ROLE_KEY
+    })
+
     if (!code || !provider || !partnerId || !redirectUri) {
       return new Response(
         JSON.stringify({ success: false, error: 'Missing required parameters' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Server configuration error: Missing Supabase credentials' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -65,8 +80,11 @@ serve(async (req) => {
       const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
 
       // Save credentials to database using service role (bypasses RLS)
+      console.log('Creating Supabase client with URL:', SUPABASE_URL.substring(0, 30) + '...')
       const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-      const { error: dbError } = await supabase
+
+      console.log('Attempting to update partner_accounts for:', partnerId)
+      const { data: updateData, error: dbError } = await supabase
         .from('partner_accounts')
         .update({
           email_provider: 'gmail',
@@ -76,12 +94,23 @@ serve(async (req) => {
           email_address: userInfo.email,
         })
         .eq('id', partnerId)
+        .select()
+
+      console.log('Database update result:', { data: updateData, error: dbError })
 
       if (dbError) {
         console.error('Database save error:', dbError)
         return new Response(
           JSON.stringify({ success: false, error: 'Failed to save credentials: ' + dbError.message }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      if (!updateData || updateData.length === 0) {
+        console.error('No rows updated - partner ID may not exist:', partnerId)
+        return new Response(
+          JSON.stringify({ success: false, error: 'Partner account not found' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
 
