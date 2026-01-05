@@ -148,10 +148,14 @@ serve(async (req) => {
 
       const sendData = await sendResponse.json()
 
+      console.log('Gmail API response:', { status: sendResponse.status, data: sendData })
+
       if (sendData.error) {
         console.error('Gmail send error:', sendData)
+        // Return detailed error message
+        const errorMsg = sendData.error.message || sendData.error.status || JSON.stringify(sendData.error)
         return new Response(
-          JSON.stringify({ success: false, error: sendData.error.message || 'Failed to send email' }),
+          JSON.stringify({ success: false, error: `Gmail error: ${errorMsg}` }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
