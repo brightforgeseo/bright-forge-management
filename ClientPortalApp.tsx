@@ -6,6 +6,7 @@ import ClientPortalDashboard from './components/client-portal/ClientPortalDashbo
 import ClientPortalTaskBoard from './components/client-portal/ClientPortalTaskBoard';
 import ClientPortalChat from './components/client-portal/ClientPortalChat';
 import ClientPortalSettings from './components/client-portal/ClientPortalSettings';
+import OAuthCallback from './components/client-portal/OAuthCallback';
 import { PortalView, PartnerAccount } from './types-portal';
 import { ToastNotification, ToastType } from './types';
 import { supabase } from './lib/supabaseClient';
@@ -16,6 +17,12 @@ import {
   subscribeToPartnerMessages,
 } from './services/clientPortalService';
 
+// Check if current URL is an OAuth callback
+const isOAuthCallback = () => {
+  const path = window.location.pathname;
+  return path.includes('/oauth/gmail/callback') || path.includes('/oauth/outlook/callback');
+};
+
 const ClientPortalApp: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -23,6 +30,7 @@ const ClientPortalApp: React.FC = () => {
   const [partnerAccount, setPartnerAccount] = useState<PartnerAccount | null>(null);
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [selectedClientId, setSelectedClientId] = useState<string | undefined>();
+  const [isHandlingOAuth, setIsHandlingOAuth] = useState(isOAuthCallback());
 
   // Toast notifications
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
@@ -31,6 +39,23 @@ const ClientPortalApp: React.FC = () => {
   };
   const removeToast = (id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
+  };
+
+  // Handle OAuth callback completion
+  const handleOAuthComplete = (success: boolean, email?: string) => {
+    setIsHandlingOAuth(false);
+    // Clear URL parameters and redirect to settings
+    window.history.replaceState({}, '', '/client-portal');
+    if (success && email) {
+      addToast('success', `Email connected: ${email}`);
+      // Refresh partner account to get updated email settings
+      if (partnerAccount) {
+        fetchPartnerAccount(partnerAccount.id).then(account => {
+          if (account) setPartnerAccount(account);
+        });
+      }
+    }
+    setCurrentView(PortalView.SETTINGS);
   };
 
   // Session debounce ref
@@ -159,6 +184,16 @@ const ClientPortalApp: React.FC = () => {
   const handleAccountUpdated = (account: PartnerAccount) => {
     setPartnerAccount(account);
   };
+
+  // OAuth callback handling
+  if (isHandlingOAuth) {
+    return (
+      <>
+        <OAuthCallback onComplete={handleOAuthComplete} />
+        <ToastContainer toasts={toasts} removeToast={removeToast} />
+      </>
+    );
+  }
 
   // Loading state
   if (isLoading) {

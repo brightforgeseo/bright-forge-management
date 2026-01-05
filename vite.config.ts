@@ -13,7 +13,9 @@ export default defineConfig(({ mode }) => {
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GIPHY_API_KEY': JSON.stringify(env.GIPHY_API_KEY)
+        'process.env.GIPHY_API_KEY': JSON.stringify(env.GIPHY_API_KEY),
+        'process.env.GOOGLE_CLIENT_ID': JSON.stringify(env.GOOGLE_CLIENT_ID),
+        'process.env.MICROSOFT_CLIENT_ID': JSON.stringify(env.MICROSOFT_CLIENT_ID),
       },
       resolve: {
         alias: {
