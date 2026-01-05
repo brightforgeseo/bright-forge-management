@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { KeywordResult, AuditResult, ContentResult, Task } from '../types';
+import { EmailGenerationContext, GeneratedEmail } from '../types-portal';
 import { getChatSystemPrompt, getSEOSystemPrompt } from './skillsLoader';
 import { loadBusinessContext, formatBusinessContextForPrompt, getClientContext } from './businessContextLoader';
 
@@ -443,6 +444,116 @@ Return ONLY valid JSON:
     throw new Error('Analysis failed');
   } catch (error) {
     console.error('Claude audit failed:', error);
+    throw error;
+  }
+};
+
+/**
+ * Client Email Generation using Claude Haiku 3.5
+ * Generates natural, human-written emails for partner-to-client communication
+ * Uses rich context from task comments, previous tasks, and project history
+ */
+export const generateClientEmail = async (
+  context: EmailGenerationContext
+): Promise<GeneratedEmail> => {
+  const client = getClaudeClient();
+
+  try {
+    // Build context sections
+    let contextSections = '';
+
+    // Current task info
+    contextSections += `\n## CURRENT TASK
+- Title: ${context.taskTitle}
+- Status: ${context.taskStatus || 'In Progress'}
+${context.taskDueDate ? `- Due Date: ${context.taskDueDate}` : ''}
+${context.taskDescription ? `- Description: ${context.taskDescription}` : ''}
+${context.notes ? `- Notes: ${context.notes}` : ''}`;
+
+    // Task comments from main portal (internal team discussions)
+    if (context.taskComments && context.taskComments.length > 0) {
+      contextSections += `\n\n## INTERNAL TEAM COMMENTS (for context, do not share directly)`;
+      context.taskComments.slice(-5).forEach(comment => {
+        contextSections += `\n- ${comment.author} (${comment.createdAt}): ${comment.text}`;
+      });
+    }
+
+    // Partner comments (partner's own notes)
+    if (context.partnerComments && context.partnerComments.length > 0) {
+      contextSections += `\n\n## YOUR PREVIOUS NOTES`;
+      context.partnerComments.slice(-3).forEach(comment => {
+        contextSections += `\n- ${comment.createdAt}: ${comment.text}`;
+      });
+    }
+
+    // Previous tasks for project history
+    if (context.previousTasks && context.previousTasks.length > 0) {
+      contextSections += `\n\n## PREVIOUS WORK FOR THIS CLIENT (for context)`;
+      context.previousTasks.slice(-5).forEach(task => {
+        contextSections += `\n- ${task.title} (${task.status})${task.completedAt ? ` - Completed: ${task.completedAt}` : ''}`;
+      });
+    }
+
+    const systemPrompt = `You are a professional SEO account manager writing emails to clients. Your job is to write emails that sound completely natural and human - like a real person wrote them, not AI.
+
+## WRITING STYLE RULES
+1. **Sound Human**: Write like you're actually talking to the client. Use contractions (I'm, we've, you'll). Be warm but professional.
+2. **Be Specific**: Reference the actual task and work being done. Don't be vague or generic.
+3. **Keep it Concise**: Get to the point. Busy clients appreciate brevity. 2-4 short paragraphs max.
+4. **No AI Clichés**: NEVER use phrases like "I hope this email finds you well", "I wanted to reach out", "Please don't hesitate to", "Moving forward", "As per our discussion"
+5. **Natural Sign-off**: Use simple closings like "Thanks," or "Best," or "Cheers," - not formal corporate language
+6. **No Fluff**: Every sentence should provide value. Cut unnecessary words.
+
+## TONE
+- Friendly and professional, like a trusted partner
+- Confident but not salesy
+- Direct and clear
+- Personable - you know this client
+
+## CONTEXT ABOUT THE SENDER
+- Name: ${context.partnerFullName}
+- Company: ${context.partnerCompany}
+- Client: ${context.clientName}${context.clientIndustry ? ` (${context.clientIndustry} industry)` : ''}`;
+
+    const response = await client.messages.create({
+      model: CLAUDE_HAIKU,
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: [
+        {
+          role: 'user',
+          content: `Write a client update email about this SEO task. Use the context below to write a specific, relevant email.
+${contextSections}
+
+## REQUIREMENTS
+1. Subject line: Short, specific, and relevant to the task (under 50 chars)
+2. Email body: 2-4 paragraphs that:
+   - Reference the specific work being done
+   - Provide a meaningful update (use context from comments if available)
+   - Include next steps or what you need from them (if applicable)
+   - Sound like a real human wrote it
+
+Return ONLY valid JSON:
+{
+  "subject": "Email subject line",
+  "body": "Full email body with proper line breaks using \\n"
+}`,
+        },
+      ],
+    });
+
+    const text = response.content[0].type === 'text' ? response.content[0].text : '';
+
+    // Extract JSON from response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const result = JSON.parse(jsonMatch[0]) as GeneratedEmail;
+      return result;
+    }
+
+    throw new Error('Failed to parse email response');
+  } catch (error) {
+    console.error('Claude email generation failed:', error);
     throw error;
   }
 };

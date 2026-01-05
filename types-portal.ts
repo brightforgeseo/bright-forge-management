@@ -132,13 +132,43 @@ export interface PartnerEmail {
 // EMAIL GENERATION
 // ============================================
 
+export interface TaskComment {
+  author: string;
+  text: string;
+  createdAt: string;
+}
+
+export interface PreviousTaskSummary {
+  title: string;
+  status: string;
+  completedAt?: string;
+}
+
 export interface EmailGenerationContext {
+  // Current task info
   taskTitle: string;
   taskDescription?: string;
+  taskStatus?: string;
+  taskDueDate?: string;
+
+  // Task comments from both portals
+  taskComments?: TaskComment[];
+  partnerComments?: TaskComment[];
+
+  // Client info
   clientName: string;
   clientIndustry?: string;
+
+  // Previous tasks for context about the SEO project
+  previousTasks?: PreviousTaskSummary[];
+
+  // Notes visible to partner
   notes: string;
+
+  // Partner info
   partnerName: string;
+  partnerCompany: string;
+  partnerFullName: string;
 }
 
 export interface GeneratedEmail {

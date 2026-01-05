@@ -10,8 +10,11 @@ import {
   PortalStats,
   GeneratedEmail,
   EmailGenerationContext,
+  TaskComment as PortalTaskComment,
+  PreviousTaskSummary,
 } from '../types-portal';
 import { ClientBoard, TaskComment } from '../types';
+import { generateClientEmail } from './claudeService';
 
 // ============================================
 // PARTNER ACCOUNT OPERATIONS
@@ -913,23 +916,92 @@ export const togglePartnerActive = async (
 };
 
 // ============================================
-// EMAIL GENERATION (calls Supabase Edge Function)
+// EMAIL GENERATION (uses Claude Haiku 3.5)
 // ============================================
 
-export const generateEmailWithAI = async (
-  context: EmailGenerationContext
-): Promise<GeneratedEmail | null> => {
+// Helper to fetch previous tasks for a client to give AI context about the SEO project
+const fetchPreviousTasksForClient = async (
+  clientBoardId: string,
+  excludeTaskId: string
+): Promise<PreviousTaskSummary[]> => {
   try {
-    const { data, error } = await supabase.functions.invoke('generate-email', {
-      body: context,
-    });
+    // Get the client board data
+    const { data: boardData } = await supabase
+      .from('client_boards')
+      .select('board_data')
+      .single();
 
-    if (error) {
-      console.error('[generateEmailWithAI] Error:', error.message);
-      return null;
+    if (!boardData?.board_data) return [];
+
+    const board = boardData.board_data;
+    if (board.id !== clientBoardId) return [];
+
+    const previousTasks: PreviousTaskSummary[] = [];
+
+    // Extract tasks from all groups
+    for (const group of board.groups || []) {
+      for (const task of group.tasks || []) {
+        if (task.id === excludeTaskId) continue;
+        previousTasks.push({
+          title: task.title,
+          status: task.status || 'Unknown',
+          completedAt: task.status === 'Done' ? task.updatedAt : undefined,
+        });
+      }
     }
 
-    return data as GeneratedEmail;
+    // Return last 10 tasks
+    return previousTasks.slice(-10);
+  } catch (err) {
+    console.error('[fetchPreviousTasksForClient] Error:', err);
+    return [];
+  }
+};
+
+// Helper to extract comments from a task
+const extractTaskComments = (task: any): PortalTaskComment[] => {
+  if (!task?.comments || !Array.isArray(task.comments)) return [];
+
+  return task.comments.map((comment: any) => ({
+    author: comment.userName || 'Team Member',
+    text: comment.text || '',
+    createdAt: comment.createdAt
+      ? new Date(comment.createdAt).toLocaleDateString()
+      : 'Unknown date',
+  }));
+};
+
+export const generateEmailWithAI = async (
+  context: EmailGenerationContext,
+  task?: any, // Optional full task object with comments
+  clientBoardId?: string
+): Promise<GeneratedEmail | null> => {
+  try {
+    // Enrich context with task comments if task provided
+    let enrichedContext = { ...context };
+
+    if (task) {
+      // Extract comments from task
+      enrichedContext.taskComments = extractTaskComments(task);
+
+      // Get task status and due date
+      enrichedContext.taskStatus = task.status;
+      enrichedContext.taskDueDate = task.dueDate
+        ? new Date(task.dueDate).toLocaleDateString()
+        : undefined;
+    }
+
+    // Fetch previous tasks for context about the SEO project
+    if (clientBoardId && task?.id) {
+      enrichedContext.previousTasks = await fetchPreviousTasksForClient(
+        clientBoardId,
+        task.id
+      );
+    }
+
+    // Call Claude Haiku to generate the email
+    const result = await generateClientEmail(enrichedContext);
+    return result;
   } catch (err) {
     console.error('[generateEmailWithAI] Unexpected error:', err);
     return null;

@@ -61,15 +61,32 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({
     setError('');
 
     try {
+      // Build rich context for AI email generation
       const context: EmailGenerationContext = {
+        // Current task info
         taskTitle: task.task?.title || 'Task Update',
-        taskDescription: task.task?.status || '',
+        taskDescription: task.task?.description || '',
+        taskStatus: task.partner_status || task.task?.status || 'In Progress',
+        taskDueDate: task.task?.dueDate,
+
+        // Client info
         clientName: clientName,
+
+        // Notes visible to partner
         notes: task.visible_notes || '',
+
+        // Partner info
         partnerName: partnerAccount.company_name,
+        partnerCompany: partnerAccount.company_name,
+        partnerFullName: partnerAccount.full_name,
       };
 
-      const result = await generateEmailWithAI(context);
+      // Pass the full task object (with comments) and client board ID for rich context
+      const result = await generateEmailWithAI(
+        context,
+        task.task, // Full task object with comments
+        task.client_board_id // Client board ID for fetching previous tasks
+      );
 
       if (result) {
         setSubject(result.subject);
