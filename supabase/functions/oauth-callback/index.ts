@@ -1,7 +1,8 @@
 // Supabase Edge Function: oauth-callback
-// Exchanges OAuth authorization code for access tokens
+// Exchanges OAuth authorization code for access tokens and saves to database
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,6 +12,8 @@ const corsHeaders = {
 // Environment variables (set in Supabase Dashboard > Edge Functions > Secrets)
 const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID') || ''
 const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET') || ''
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || ''
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -61,12 +64,30 @@ serve(async (req) => {
       // Calculate expiration time
       const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
 
+      // Save credentials to database using service role (bypasses RLS)
+      const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+      const { error: dbError } = await supabase
+        .from('partner_accounts')
+        .update({
+          email_provider: 'gmail',
+          email_access_token: tokenData.access_token,
+          email_refresh_token: tokenData.refresh_token,
+          email_token_expires_at: expiresAt,
+          email_address: userInfo.email,
+        })
+        .eq('id', partnerId)
+
+      if (dbError) {
+        console.error('Database save error:', dbError)
+        return new Response(
+          JSON.stringify({ success: false, error: 'Failed to save credentials: ' + dbError.message }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
       return new Response(
         JSON.stringify({
           success: true,
-          accessToken: tokenData.access_token,
-          refreshToken: tokenData.refresh_token,
-          expiresAt,
           email: userInfo.email,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
