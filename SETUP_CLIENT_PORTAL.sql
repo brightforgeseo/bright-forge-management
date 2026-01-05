@@ -132,6 +132,9 @@ CREATE POLICY "Admins can manage client access" ON partner_client_access
 CREATE POLICY "Partners can view own tasks" ON partner_tasks
   FOR SELECT USING (partner_id = auth.uid());
 
+CREATE POLICY "Partners can insert own tasks" ON partner_tasks
+  FOR INSERT WITH CHECK (partner_id = auth.uid());
+
 CREATE POLICY "Partners can update own task status" ON partner_tasks
   FOR UPDATE USING (partner_id = auth.uid())
   WITH CHECK (partner_id = auth.uid());
