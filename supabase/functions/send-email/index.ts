@@ -3,6 +3,12 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { encode as base64Encode } from 'https://deno.land/std@0.168.0/encoding/base64.ts'
+
+// Helper function to convert base64 to base64url
+function base64ToBase64Url(base64: string): string {
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -131,11 +137,17 @@ serve(async (req) => {
       ]
       const email = emailLines.join('\r\n')
 
-      // Base64url encode the email
-      const encodedEmail = btoa(unescape(encodeURIComponent(email)))
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '')
+      // Base64url encode the email using Deno's encoder
+      const encoder = new TextEncoder()
+      const emailBytes = encoder.encode(email)
+      const encodedEmail = base64ToBase64Url(base64Encode(emailBytes))
+
+      console.log('Sending email:', {
+        from: partner.email_address,
+        to,
+        subject,
+        encodedLength: encodedEmail.length
+      })
 
       const sendResponse = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
         method: 'POST',
@@ -148,14 +160,17 @@ serve(async (req) => {
 
       const sendData = await sendResponse.json()
 
-      console.log('Gmail API response:', { status: sendResponse.status, data: sendData })
+      console.log('Gmail API response:', { status: sendResponse.status, data: JSON.stringify(sendData) })
 
-      if (sendData.error) {
-        console.error('Gmail send error:', sendData)
+      if (!sendResponse.ok || sendData.error) {
+        console.error('Gmail send error:', JSON.stringify(sendData))
         // Return detailed error message
-        const errorMsg = sendData.error.message || sendData.error.status || JSON.stringify(sendData.error)
+        let errorMsg = 'Unknown error'
+        if (sendData.error) {
+          errorMsg = sendData.error.message || sendData.error.status || JSON.stringify(sendData.error)
+        }
         return new Response(
-          JSON.stringify({ success: false, error: `Gmail error: ${errorMsg}` }),
+          JSON.stringify({ success: false, error: `Gmail error (${sendResponse.status}): ${errorMsg}` }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
