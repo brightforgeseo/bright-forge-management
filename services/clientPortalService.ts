@@ -1028,9 +1028,17 @@ export const sendEmailViaProvider = async (
       },
     });
 
+    console.log('[sendEmailViaProvider] Response:', { data, error });
+
     if (error) {
       console.error('[sendEmailViaProvider] Error:', error.message);
       return { success: false, error: error.message };
+    }
+
+    // Check for error in response data
+    if (data && !data.success) {
+      console.error('[sendEmailViaProvider] API Error:', data.error);
+      return { success: false, error: data.error || 'Failed to send email' };
     }
 
     return { success: true };
