@@ -126,6 +126,11 @@ const ClientPortalTaskBoard: React.FC<ClientPortalTaskBoardProps> = ({
   const handleDragStart = (e: React.DragEvent, task: PartnerTask) => {
     setDraggedTask(task);
     e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', task.id);
+    // Set a drag image
+    if (e.currentTarget instanceof HTMLElement) {
+      e.dataTransfer.setDragImage(e.currentTarget, 20, 20);
+    }
   };
 
   const handleDragOver = (e: React.DragEvent, columnId: PartnerTaskStatus) => {
@@ -134,6 +139,11 @@ const ClientPortalTaskBoard: React.FC<ClientPortalTaskBoardProps> = ({
   };
 
   const handleDragLeave = () => {
+    setDragOverColumn(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedTask(null);
     setDragOverColumn(null);
   };
 
@@ -249,7 +259,7 @@ const ClientPortalTaskBoard: React.FC<ClientPortalTaskBoardProps> = ({
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col bg-zinc-950">
       {/* Header */}
       <div className="p-6 border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="flex flex-col lg:flex-row lg:items-center gap-4">
@@ -343,8 +353,8 @@ const ClientPortalTaskBoard: React.FC<ClientPortalTaskBoardProps> = ({
             return (
               <div
                 key={column.id}
-                className={`w-72 flex-shrink-0 bg-zinc-900/50 rounded-xl border transition-all ${
-                  isOver ? 'border-amber-400 bg-amber-400/5' : 'border-zinc-800'
+                className={`w-72 flex-shrink-0 bg-zinc-900 rounded-xl border transition-all ${
+                  isOver ? 'border-amber-400 bg-amber-950' : 'border-zinc-800'
                 }`}
                 onDragOver={(e) => handleDragOver(e, column.id)}
                 onDragLeave={handleDragLeave}
@@ -373,13 +383,14 @@ const ClientPortalTaskBoard: React.FC<ClientPortalTaskBoardProps> = ({
                         key={task.id}
                         draggable
                         onDragStart={(e) => handleDragStart(e, task)}
+                        onDragEnd={handleDragEnd}
                         onClick={() => handleTaskClick(task)}
-                        className={`bg-zinc-800 rounded-xl p-4 cursor-pointer border border-zinc-700 hover:border-amber-400/50 hover:bg-zinc-750 transition-all ${
+                        className={`bg-zinc-800 rounded-xl p-4 cursor-grab border border-zinc-700 hover:border-amber-400/50 hover:bg-zinc-700 transition-all select-none ${
                           draggedTask?.id === task.id ? 'opacity-50 cursor-grabbing' : ''
                         }`}
                       >
                         <div className="flex items-start gap-2 mb-2">
-                          <GripVertical className="w-4 h-4 text-zinc-500 flex-shrink-0 mt-1" />
+                          <GripVertical className="w-4 h-4 text-zinc-400 flex-shrink-0 mt-1 cursor-grab active:cursor-grabbing" />
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-white text-sm line-clamp-2">
                               {task.task?.title || `Task ${task.task_id.slice(0, 8)}`}
