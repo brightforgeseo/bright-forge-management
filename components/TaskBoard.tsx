@@ -723,7 +723,8 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
       setLoading(true);
       try {
         const rawTasks = await generateProjectTasks(goal);
-        const client = clients.find(c => c.id === clientId);
+        // Use clientsRef.current to avoid stale closure issues
+        const client = clientsRef.current.find(c => c.id === clientId);
         if (!client) throw new Error("Client not found");
         const getStatusId = (text: string) => {
             if (!text) return client.statusDefs[client.statusDefs.length - 1].id;
@@ -766,7 +767,8 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   const handleAddTask = (cid: string, gid: string) => {
       const text = newItemText[gid];
       if(!text?.trim()) return;
-      const client = clients.find(c => c.id === cid);
+      // Use clientsRef.current to avoid stale closure issues
+      const client = clientsRef.current.find(c => c.id === cid);
       if(!client) return;
       const newTask: Task = { id: generateId(), title: text, status: client.statusDefs[client.statusDefs.length-1].id, priority: client.priorityDefs[client.priorityDefs.length-1].id, dueDate: new Date().toISOString().split('T')[0] };
       updateClient(cid, c => ({ ...c, groups: c.groups.map(g => g.id === gid ? { ...g, tasks: [...g.tasks, newTask] } : g) }));
@@ -1614,7 +1616,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                       <div className="flex items-center gap-3 pl-4">
                                          <input 
                                            value={newItemText[group.id] || ''}
-                                           onChange={(e) => setNewItemText({ ...newItemText, [group.id]: e.target.value })}
+                                           onChange={(e) => setNewItemText(prev => ({ ...prev, [group.id]: e.target.value }))}
                                            onKeyDown={(e) => e.key === 'Enter' && handleAddTask(activeClient.id, group.id)}
                                            placeholder="+ Add Item"
                                            className="flex-1 bg-transparent outline-none text-sm text-slate-500 placeholder:text-slate-400 hover:placeholder:text-slate-600"
