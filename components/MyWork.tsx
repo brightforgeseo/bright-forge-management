@@ -52,6 +52,7 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
   const [selectedUserId, setSelectedUserId] = useState<string>('all');
   const [selectedStatusId, setSelectedStatusId] = useState<string>('all');
   const [hideDone, setHideDone] = useState(false);
+  const [hideSentToClient, setHideSentToClient] = useState(false);
 
   // Task Modal State
   const [selectedTask, setSelectedTask] = useState<TaskWithContext | null>(null);
@@ -522,6 +523,16 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
       }
     }
 
+    // Hide sent to client filter
+    if (hideSentToClient) {
+      const statusDef = task.boardData.statusDefs.find(s => s.id === task.status);
+      const statusLabel = statusDef?.label?.toLowerCase() || '';
+
+      if (statusLabel === 'sent to client') {
+        return false;
+      }
+    }
+
     return true;
   });
 
@@ -639,6 +650,19 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
             >
               <CheckCircle2 className="w-4 h-4" />
               <span className="hidden sm:inline">Hide Done</span>
+            </button>
+
+            {/* Hide Sent to Client Toggle */}
+            <button
+              onClick={() => setHideSentToClient(!hideSentToClient)}
+              className={`px-2.5 lg:px-3 py-2.5 rounded-xl lg:rounded-lg text-xs lg:text-sm font-medium transition-all flex items-center gap-1.5 lg:gap-2 border active:scale-95 ${
+                hideSentToClient
+                  ? 'bg-brand-50 text-brand-700 border-brand-300'
+                  : 'bg-white text-slate-600 border-slate-300 hover:border-slate-400'
+              }`}
+            >
+              <Send className="w-4 h-4" />
+              <span className="hidden sm:inline">Hide Sent</span>
             </button>
 
             {/* View Toggle */}
