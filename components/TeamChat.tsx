@@ -205,6 +205,25 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     return bg?.dark || false;
   };
 
+  const formatMessageTime = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+    const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    if (isToday) {
+      return time;
+    }
+
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (date.toDateString() === yesterday.toDateString()) {
+      return `Yesterday ${time}`;
+    }
+
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + time;
+  };
+
   // Search messages handler with debouncing
   const handleSearch = (query: string) => {
     setSearchQuery(query);
@@ -1912,7 +1931,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                     >
                       <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
                       <p className={`text-[10px] mt-1 ${msg.sender_type === 'team' ? 'text-purple-200' : 'text-slate-400'}`}>
-                        {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {formatMessageTime(msg.created_at)}
                       </p>
                     </div>
                     {msg.sender_type === 'team' && (
@@ -2216,7 +2235,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                 <div className="flex items-baseline gap-1 md:gap-2">
                   <span className={`font-bold text-sm md:text-base ${isDarkBackground() ? 'text-white' : 'text-slate-900'}`}>{msg.sender}</span>
                   <span className={`text-[10px] md:text-xs ${isDarkBackground() ? 'text-slate-400' : 'text-slate-400'}`}>
-                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {formatMessageTime(msg.timestamp)}
                     {msg.isEdited && <span className="ml-1 italic">(edited)</span>}
                   </span>
                 </div>
