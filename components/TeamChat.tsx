@@ -207,21 +207,9 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
   const formatMessageTime = (timestamp: string) => {
     const date = new Date(timestamp);
-    const now = new Date();
-    const isToday = date.toDateString() === now.toDateString();
     const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    if (isToday) {
-      return time;
-    }
-
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    if (date.toDateString() === yesterday.toDateString()) {
-      return `Yesterday ${time}`;
-    }
-
-    return date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + time;
+    const dateStr = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    return `${dateStr}, ${time}`;
   };
 
   // Search messages handler with debouncing
