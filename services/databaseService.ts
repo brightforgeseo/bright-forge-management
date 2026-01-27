@@ -470,6 +470,9 @@ export const fetchChatMessages = async (
     attachmentName: row.attachment_name,
     isEdited: row.is_edited,
     editedAt: row.edited_at,
+    isPinned: row.is_pinned,
+    pinnedAt: row.pinned_at,
+    pinnedBy: row.pinned_by,
     taskLink: row.task_link,
     callRoomId: row.call_room_id,
     callType: row.call_type
@@ -554,6 +557,80 @@ export const deleteChatMessage = async (messageId: string) => {
 
   return data;
 }
+
+// --- Message Pinning ---
+
+export const pinMessage = async (messageId: string, userId: string) => {
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .update({
+      is_pinned: true,
+      pinned_at: new Date().toISOString(),
+      pinned_by: userId
+    })
+    .eq('id', messageId)
+    .select();
+
+  if (error) {
+    console.error('[pinMessage] Error:', error.message);
+    throw error;
+  }
+
+  return data?.[0];
+};
+
+export const unpinMessage = async (messageId: string) => {
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .update({
+      is_pinned: false,
+      pinned_at: null,
+      pinned_by: null
+    })
+    .eq('id', messageId)
+    .select();
+
+  if (error) {
+    console.error('[unpinMessage] Error:', error.message);
+    throw error;
+  }
+
+  return data?.[0];
+};
+
+export const fetchPinnedMessages = async (channelId: string): Promise<ChatMessage[]> => {
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .select('*')
+    .eq('channel_id', channelId)
+    .eq('is_pinned', true)
+    .order('pinned_at', { ascending: false });
+
+  if (error) {
+    console.error('[fetchPinnedMessages] Error:', error.message);
+    return [];
+  }
+
+  return data.map((row: any) => ({
+    id: row.id,
+    channelId: row.channel_id,
+    sender: row.sender,
+    senderId: row.sender_id,
+    text: row.text,
+    timestamp: row.created_at,
+    isAi: row.is_ai,
+    avatar: row.avatar,
+    attachmentUrl: row.attachment_url,
+    attachmentType: row.attachment_type,
+    attachmentName: row.attachment_name,
+    isEdited: row.is_edited,
+    editedAt: row.edited_at,
+    isPinned: row.is_pinned,
+    pinnedAt: row.pinned_at,
+    pinnedBy: row.pinned_by,
+    taskLink: row.task_link
+  }));
+};
 
 // --- Message Reactions ---
 

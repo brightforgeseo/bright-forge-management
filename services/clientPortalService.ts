@@ -1032,8 +1032,11 @@ export const sendEmailViaProvider = async (
       },
     });
 
-    console.log('[sendEmailViaProvider] Response data:', JSON.stringify(data, null, 2));
-    console.log('[sendEmailViaProvider] Response error:', JSON.stringify(error, null, 2));
+    console.log('=== SEND EMAIL RESPONSE ===');
+    console.log('Full response data:', data);
+    console.log('DB Save result:', data?.dbSave);
+    console.log('Response error:', error);
+    console.log('=== END RESPONSE ===');
 
     if (error) {
       // Try to extract error from context (Edge Function response body)

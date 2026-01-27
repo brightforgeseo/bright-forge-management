@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check, Smile, Film, SmilePlus, Video, Lock, UserPlus, Menu, ClipboardList, Calendar, ArrowRight, Palette, Paperclip, Download, File, Search } from 'lucide-react';
+import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check, Smile, Film, SmilePlus, Video, Lock, UserPlus, Menu, ClipboardList, Calendar, ArrowRight, Palette, Paperclip, Download, File, Search, Pin, PinOff } from 'lucide-react';
 import { ChatChannel, ChatMessage, User, ToastType, Profile, MessageReaction } from '../types';
 import { getChatResponse } from '../services/geminiService';
 import { storeEchoConversation, buildConversationContext } from '../services/echoMemory';
-import { fetchChatMessages, sendChatMessage, clearChatHistory, uploadFile, fetchChannels, createChannel, deleteChannel, fetchProfiles, getOrCreateDMChannel, createNotification, editChatMessage, fetchMessageReactions, addMessageReaction, removeMessageReaction, fetchChannelMembers, addChannelMember, removeChannelMember, deleteChatMessage, isChannelMember, searchChatMessages, SearchResult } from '../services/databaseService';
+import { fetchChatMessages, sendChatMessage, clearChatHistory, uploadFile, fetchChannels, createChannel, deleteChannel, fetchProfiles, getOrCreateDMChannel, createNotification, editChatMessage, fetchMessageReactions, addMessageReaction, removeMessageReaction, fetchChannelMembers, addChannelMember, removeChannelMember, deleteChatMessage, isChannelMember, searchChatMessages, SearchResult, pinMessage, unpinMessage, fetchPinnedMessages } from '../services/databaseService';
 import { fetchAllPartners, fetchPartnerMessages, sendPartnerMessage, markPartnerMessagesRead } from '../services/clientPortalService';
 import { PartnerWithStats, PartnerMessage } from '../types-portal';
 import { supabase } from '../lib/supabaseClient';
@@ -87,6 +87,10 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
   // Staged attachment state (for paste preview before sending)
   const [stagedAttachment, setStagedAttachment] = useState<{ url: string; file: File; type: 'image' | 'video' | 'file'; name: string } | null>(null);
+
+  // Pinned messages state
+  const [pinnedMessages, setPinnedMessages] = useState<ChatMessage[]>([]);
+  const [showPinnedMessages, setShowPinnedMessages] = useState(false);
 
   // Chat background state - per channel
   const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
@@ -887,6 +891,12 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       setHasMoreMessages(msgs.length === 100);
       scrollToBottom();
 
+      // Load pinned messages for this channel
+      const pinned = await fetchPinnedMessages(currentChannelId);
+      if (activeChannelRef.current === currentChannelId) {
+        setPinnedMessages(pinned);
+      }
+
       // Reset unread count
       setChannels(prev => prev.map(c =>
         c.id === currentChannelId ? { ...c, unread: 0 } : c
@@ -1138,6 +1148,44 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       console.error('[TeamChat] Failed to delete message:', error);
       addToast('error', `Failed to delete: ${error?.message || 'Unknown error'}`);
     }
+  };
+
+  const handlePinMessage = async (messageId: string) => {
+    try {
+      await pinMessage(messageId, currentUser.id);
+      // Update message in UI
+      setMessages(prev => prev.map(m =>
+        m.id === messageId ? { ...m, isPinned: true, pinnedAt: new Date().toISOString(), pinnedBy: currentUser.id } : m
+      ));
+      // Update pinned messages list
+      const pinned = await fetchPinnedMessages(activeChannelId);
+      setPinnedMessages(pinned);
+      addToast('success', 'Message pinned');
+    } catch (error: any) {
+      console.error('[TeamChat] Failed to pin message:', error);
+      addToast('error', `Failed to pin: ${error?.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleUnpinMessage = async (messageId: string) => {
+    try {
+      await unpinMessage(messageId);
+      // Update message in UI
+      setMessages(prev => prev.map(m =>
+        m.id === messageId ? { ...m, isPinned: false, pinnedAt: undefined, pinnedBy: undefined } : m
+      ));
+      // Update pinned messages list
+      setPinnedMessages(prev => prev.filter(m => m.id !== messageId));
+      addToast('success', 'Message unpinned');
+    } catch (error: any) {
+      console.error('[TeamChat] Failed to unpin message:', error);
+      addToast('error', `Failed to unpin: ${error?.message || 'Unknown error'}`);
+    }
+  };
+
+  const loadPinnedMessages = async (channelId: string) => {
+    const pinned = await fetchPinnedMessages(channelId);
+    setPinnedMessages(pinned);
   };
 
   const handleReaction = async (messageId: string, emoji: string) => {
@@ -1971,6 +2019,19 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
             )}
           </div>
           <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
+            {/* Pinned Messages Button */}
+            {pinnedMessages.length > 0 && (
+              <button
+                onClick={() => setShowPinnedMessages(!showPinnedMessages)}
+                className={`p-1.5 md:p-2 hover:bg-amber-50 rounded-lg transition-colors group relative ${showPinnedMessages ? 'bg-amber-50' : ''}`}
+                title={`${pinnedMessages.length} Pinned Message${pinnedMessages.length > 1 ? 's' : ''}`}
+              >
+                <Pin className={`w-4 h-4 md:w-5 md:h-5 ${showPinnedMessages ? 'text-amber-600' : 'text-slate-400 group-hover:text-amber-600'}`} />
+                <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                  {pinnedMessages.length}
+                </span>
+              </button>
+            )}
             {/* Search Button */}
             <button
               onClick={() => {
@@ -2167,6 +2228,61 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
           </div>
         )}
 
+        {/* Pinned Messages Panel */}
+        {showPinnedMessages && pinnedMessages.length > 0 && (
+          <div className="border-b border-slate-200 bg-amber-50 p-3">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Pin className="w-4 h-4 text-amber-600" />
+                <h4 className="font-semibold text-slate-700">Pinned Messages ({pinnedMessages.length})</h4>
+              </div>
+              <button
+                onClick={() => setShowPinnedMessages(false)}
+                className="p-1.5 hover:bg-amber-100 rounded-lg transition-colors"
+              >
+                <X className="w-4 h-4 text-slate-500" />
+              </button>
+            </div>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {pinnedMessages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className="p-3 bg-white rounded-lg border border-amber-200 hover:border-amber-300 transition-colors"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-slate-700">{msg.sender}</span>
+                      <span className="text-xs text-slate-400">
+                        {new Date(msg.timestamp).toLocaleDateString()} {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => handleUnpinMessage(msg.id)}
+                      className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-red-500 transition-colors"
+                      title="Unpin message"
+                    >
+                      <PinOff className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <p className="text-sm text-slate-600 line-clamp-3">{msg.text}</p>
+                  {msg.attachmentUrl && (
+                    <div className="mt-2">
+                      {msg.attachmentType === 'image' ? (
+                        <img src={msg.attachmentUrl} alt="" className="max-h-20 rounded" />
+                      ) : (
+                        <a href={msg.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                          <File className="w-3 h-3" />
+                          {msg.attachmentName || 'Attachment'}
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div
           className={`flex-1 overflow-y-auto p-3 md:p-6 space-y-4 md:space-y-6 ${getCurrentBackgroundStyle()} bg-cover bg-center bg-fixed`}
           style={getCurrentBackgroundImage() ? { backgroundImage: `url(${getCurrentBackgroundImage()})` } : undefined}
@@ -2297,6 +2413,20 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
+                      )}
+                      {!msg.isAi && editingMessageId !== msg.id && (
+                        <button
+                          onClick={() => msg.isPinned ? handleUnpinMessage(msg.id) : handlePinMessage(msg.id)}
+                          className={`opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center align-middle ${msg.isPinned ? 'text-amber-500 hover:text-slate-400' : 'text-slate-400 hover:text-amber-500'}`}
+                          title={msg.isPinned ? 'Unpin message' : 'Pin message'}
+                        >
+                          {msg.isPinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
+                        </button>
+                      )}
+                      {msg.isPinned && (
+                        <span className="text-amber-500 ml-1" title="Pinned message">
+                          <Pin className="w-3 h-3 inline" />
+                        </span>
                       )}
                     </span>
                     {/* Task Link Card */}

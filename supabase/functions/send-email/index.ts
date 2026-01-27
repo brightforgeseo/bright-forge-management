@@ -211,26 +211,55 @@ serve(async (req) => {
       const sendData = sendResponse.data
 
       // Save sent email to database for tracking replies
-      if (taskId && clientBoardId && sendData.id && sendData.threadId) {
+      console.log('Checking if should save email:', {
+        hasTaskId: !!taskId,
+        taskId,
+        hasClientBoardId: !!clientBoardId,
+        clientBoardId,
+        hasMessageId: !!sendData.id,
+        hasThreadId: !!sendData.threadId
+      })
+
+      // Always try to save if we have the Gmail IDs
+      let dbSaveResult = { saved: false, error: null as string | null }
+      if (sendData.id && sendData.threadId) {
         try {
-          await supabase.from('partner_sent_emails').insert({
+          const insertData = {
             partner_id: partnerId,
-            task_id: taskId,
-            client_board_id: clientBoardId,
+            task_id: taskId || 'unknown',
+            client_board_id: clientBoardId || partnerId, // fallback to partnerId if no clientBoardId
             gmail_message_id: sendData.id,
             gmail_thread_id: sendData.threadId,
             recipient_email: to,
             subject: subject,
-          })
-          console.log('Saved sent email to database:', { messageId: sendData.id, threadId: sendData.threadId })
+          }
+          console.log('Inserting email record:', insertData)
+
+          const { data: insertResult, error: insertError } = await supabase
+            .from('partner_sent_emails')
+            .insert(insertData)
+            .select()
+
+          if (insertError) {
+            console.error('Database insert error:', JSON.stringify(insertError))
+            dbSaveResult = { saved: false, error: insertError.message || JSON.stringify(insertError) }
+          } else {
+            console.log('Saved sent email to database:', insertResult)
+            dbSaveResult = { saved: true, error: null }
+          }
         } catch (dbErr: any) {
           console.error('Failed to save sent email:', dbErr.message)
-          // Don't fail the request if DB save fails
+          dbSaveResult = { saved: false, error: dbErr.message }
         }
       }
 
       return new Response(
-        JSON.stringify({ success: true, messageId: sendData.id, threadId: sendData.threadId }),
+        JSON.stringify({
+          success: true,
+          messageId: sendData.id,
+          threadId: sendData.threadId,
+          dbSave: dbSaveResult
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }

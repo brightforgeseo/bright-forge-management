@@ -149,6 +149,9 @@ export interface ChatMessage {
   isEdited?: boolean; // Flag to show message was edited
   editedAt?: string; // Timestamp of last edit
   reactions?: MessageReaction[]; // Emoji reactions on this message
+  isPinned?: boolean; // Whether this message is pinned
+  pinnedAt?: string; // When the message was pinned
+  pinnedBy?: string; // Who pinned the message
   // Call room ID for voice/video calls
   callRoomId?: string;
   callType?: 'video' | 'voice';
