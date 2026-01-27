@@ -429,14 +429,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     console.log('[searchGifs] Searching for:', query);
     setGifLoading(true);
     try {
-      // Use environment variable for API key (set GIPHY_API_KEY in .env file)
-      const apiKey = process.env.GIPHY_API_KEY || '';
-      if (!apiKey) {
-        console.warn('[searchGifs] GIPHY_API_KEY not configured');
-        setGifs([]);
-        setGifLoading(false);
-        return;
-      }
+      // Giphy public API key (safe to use client-side)
+      const apiKey = 'sXpGFDGZs0Dv1mmNFvYaGUvYwKX0PWIh';
       const limit = 20;
       const endpoint = query === 'trending'
         ? `https://api.giphy.com/v1/gifs/trending?api_key=${apiKey}&limit=${limit}`
