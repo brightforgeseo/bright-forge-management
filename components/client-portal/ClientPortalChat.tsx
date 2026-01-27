@@ -8,6 +8,7 @@ import {
   Check,
   CheckCheck,
   User,
+  X,
 } from 'lucide-react';
 import { PartnerAccount, PartnerMessage } from '../../types-portal';
 import { ToastType } from '../../types';
@@ -35,6 +36,8 @@ const ClientPortalChat: React.FC<ClientPortalChatProps> = ({
   const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [stagedAttachment, setStagedAttachment] = useState<{ url: string; file: File; type: 'image' | 'file'; name: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -88,21 +91,32 @@ const ClientPortalChat: React.FC<ClientPortalChatProps> = ({
   };
 
   const handleSend = async () => {
-    if (!newMessage.trim()) return;
+    // Allow sending if there's a message OR a staged attachment
+    if (!newMessage.trim() && !stagedAttachment) return;
 
     setIsSending(true);
     try {
+      // Determine message text
+      let messageText = newMessage.trim();
+      if (!messageText && stagedAttachment) {
+        messageText = stagedAttachment.type === 'image' ? 'Sent an image' : `Sent a file: ${stagedAttachment.name}`;
+      }
+
       const message = await sendPartnerMessage(
         partnerAccount.id,
-        newMessage.trim(),
+        messageText,
         'partner',
         partnerAccount.id,
-        partnerAccount.full_name
+        partnerAccount.full_name,
+        stagedAttachment?.url,
+        stagedAttachment?.type,
+        stagedAttachment?.name
       );
 
       if (message) {
         setMessages((prev) => [...prev, message]);
         setNewMessage('');
+        setStagedAttachment(null);
         scrollToBottom();
       } else {
         addToast('error', 'Failed to send message');
@@ -126,34 +140,62 @@ const ClientPortalChat: React.FC<ClientPortalChatProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setIsSending(true);
+    setIsUploading(true);
     try {
       const url = await uploadFile(file, 'uploads');
       if (url) {
         const isImage = file.type.startsWith('image/');
-        const message = await sendPartnerMessage(
-          partnerAccount.id,
-          isImage ? 'Sent an image' : `Sent a file: ${file.name}`,
-          'partner',
-          partnerAccount.id,
-          partnerAccount.full_name,
+        // Stage the file for preview instead of sending immediately
+        setStagedAttachment({
           url,
-          isImage ? 'image' : 'file',
-          file.name
-        );
-
-        if (message) {
-          setMessages((prev) => [...prev, message]);
-          scrollToBottom();
-        }
+          file,
+          type: isImage ? 'image' : 'file',
+          name: file.name
+        });
+      } else {
+        addToast('error', 'Failed to upload file');
       }
     } catch (err) {
       console.error('Error uploading file:', err);
       addToast('error', 'Failed to upload file');
     } finally {
-      setIsSending(false);
+      setIsUploading(false);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData.items;
+
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        e.preventDefault();
+        const file = items[i].getAsFile();
+        if (file) {
+          // Stage the image for preview instead of sending immediately
+          setIsUploading(true);
+          try {
+            const url = await uploadFile(file, 'uploads');
+            if (url) {
+              setStagedAttachment({
+                url,
+                file,
+                type: 'image',
+                name: file.name || 'clipboard-image.png'
+              });
+            } else {
+              addToast('error', 'Failed to upload image from clipboard');
+            }
+          } catch (err) {
+            console.error('Error uploading pasted image:', err);
+            addToast('error', 'Failed to upload image');
+          } finally {
+            setIsUploading(false);
+          }
+        }
+        return;
       }
     }
   };
@@ -329,6 +371,41 @@ const ClientPortalChat: React.FC<ClientPortalChatProps> = ({
 
       {/* Input */}
       <div className="p-4 border-t border-zinc-800 bg-zinc-900/50">
+        {/* Staged attachment preview */}
+        {stagedAttachment && (
+          <div className="relative mb-3 p-3 bg-zinc-800 rounded-xl">
+            <div className="flex items-start gap-3">
+              {stagedAttachment.type === 'image' ? (
+                <img
+                  src={stagedAttachment.url}
+                  alt="Attachment preview"
+                  className="max-h-32 max-w-[200px] rounded-lg object-contain"
+                />
+              ) : (
+                <div className="flex items-center gap-2 p-2 bg-zinc-700 rounded-lg">
+                  <File className="w-5 h-5 text-zinc-400" />
+                  <span className="text-sm text-zinc-300">{stagedAttachment.name}</span>
+                </div>
+              )}
+              <button
+                onClick={() => setStagedAttachment(null)}
+                className="absolute top-2 right-2 p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors"
+                title="Remove attachment"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Uploading indicator */}
+        {isUploading && (
+          <div className="mb-3 p-3 bg-zinc-800 rounded-xl flex items-center gap-2 text-zinc-400">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span className="text-sm">Uploading...</span>
+          </div>
+        )}
+
         <div className="flex items-end gap-3">
           <input
             type="file"
@@ -339,7 +416,7 @@ const ClientPortalChat: React.FC<ClientPortalChatProps> = ({
           />
           <button
             onClick={() => fileInputRef.current?.click()}
-            disabled={isSending}
+            disabled={isSending || isUploading}
             className="p-3 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-xl transition-colors disabled:opacity-50"
           >
             <Paperclip className="w-5 h-5" />
@@ -350,6 +427,7 @@ const ClientPortalChat: React.FC<ClientPortalChatProps> = ({
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyPress={handleKeyPress}
+              onPaste={handlePaste}
               placeholder="Type a message..."
               rows={1}
               className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400 resize-none max-h-32"
@@ -359,7 +437,7 @@ const ClientPortalChat: React.FC<ClientPortalChatProps> = ({
 
           <button
             onClick={handleSend}
-            disabled={isSending || !newMessage.trim()}
+            disabled={isSending || isUploading || (!newMessage.trim() && !stagedAttachment)}
             className="p-3 bg-amber-400 hover:bg-amber-500 text-zinc-900 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSending ? (

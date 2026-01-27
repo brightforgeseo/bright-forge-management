@@ -85,6 +85,9 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Staged attachment state (for paste preview before sending)
+  const [stagedAttachment, setStagedAttachment] = useState<{ url: string; file: File; type: 'image' | 'video' | 'file'; name: string } | null>(null);
+
   // Chat background state - per channel
   const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
   const [channelBackgrounds, setChannelBackgrounds] = useState<Record<string, { bg: string; customUrl?: string }>>(() => {
@@ -1238,30 +1241,47 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     console.log('[handleSendMessage] Starting...');
     console.log('[handleSendMessage] Message text:', message);
     console.log('[handleSendMessage] Active channel ID:', activeChannelId);
+    console.log('[handleSendMessage] Staged attachment:', stagedAttachment);
 
-    if (!message.trim()) {
-      console.log('[handleSendMessage] Empty message, aborting');
+    // Allow sending if there's a message OR a staged attachment
+    if (!message.trim() && !stagedAttachment) {
+      console.log('[handleSendMessage] Empty message and no attachment, aborting');
       return;
     }
 
     const currentCh = channels.find(c => c.id === activeChannelId);
     console.log('[handleSendMessage] Current channel:', currentCh);
 
+    // Determine message text for sending
+    let sendText = message.trim();
+    if (!sendText && stagedAttachment) {
+      if (stagedAttachment.type === 'image') sendText = 'Sent an image';
+      else if (stagedAttachment.type === 'video') sendText = 'Sent a video';
+      else sendText = `Sent file: ${stagedAttachment.name}`;
+    }
+
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
       channelId: activeChannelId,
       sender: currentUser.name,
       senderId: currentUser.id,
-      text: message,
+      text: sendText,
       timestamp: new Date().toISOString(),
-      avatar: currentUser.avatarUrl || 'user'
+      avatar: currentUser.avatarUrl || 'user',
+      ...(stagedAttachment && {
+        attachmentUrl: stagedAttachment.url,
+        attachmentType: stagedAttachment.type,
+        attachmentName: stagedAttachment.name
+      })
     };
 
     console.log('[handleSendMessage] Constructed message:', userMsg);
 
     const mentions = detectMentions(message.trim());
     const messageText = message;
+    const savedStagedAttachment = stagedAttachment;
     setMessage('');
+    setStagedAttachment(null);
     setMentionDropdown(null);
 
     // Send to database - realtime listener will add it to UI
@@ -1306,6 +1326,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       alert(`Message failed: ${errorMsg}\n\nCode: ${error.code || 'none'}\nHint: ${error.hint || 'none'}`);
       addToast('error', `Failed to send message: ${errorMsg}`);
       setMessage(messageText); // Restore message on error
+      setStagedAttachment(savedStagedAttachment); // Restore attachment on error
       return;
     }
 
@@ -1440,37 +1461,17 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
         e.preventDefault();
         const file = items[i].getAsFile();
         if (file) {
+          // Stage the image for preview instead of sending immediately
           setIsUploading(true);
           const url = await uploadFile(file);
           setIsUploading(false);
           if (url) {
-            await sendChatMessage({
-              id: Date.now().toString(),
-              channelId: activeChannelId,
-              sender: currentUser.name,
-              senderId: currentUser.id,
-              text: 'Sent an image from clipboard',
-              timestamp: new Date().toISOString(),
-              avatar: currentUser.avatarUrl || 'user',
-              attachmentUrl: url,
-              attachmentType: 'image'
+            setStagedAttachment({
+              url,
+              file,
+              type: 'image',
+              name: file.name || 'clipboard-image.png'
             });
-
-            const currentCh = channels.find(c => c.id === activeChannelId);
-            if (currentCh?.type === 'dm') {
-              const ids = parseDMChannel(currentCh.name);
-              const otherId = ids.find(id => id !== currentUser.id);
-              if (otherId && otherId !== currentUser.id) {
-                await createNotification(
-                  otherId,
-                  'New Attachment',
-                  `${currentUser.name} sent an image`,
-                  'message',
-                  'TEAM_CHAT',
-                  { channelId: activeChannelId, channelName: currentCh.name, channelType: 'dm' }
-                );
-              }
-            }
           } else {
             addToast('error', 'Failed to upload image from clipboard');
           }
@@ -1496,49 +1497,29 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !e.target.files[0]) return;
+    const file = e.target.files[0];
     setIsUploading(true);
-    const url = await uploadFile(e.target.files[0]);
+    const url = await uploadFile(file);
     setIsUploading(false);
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+
     if (url) {
-      const file = e.target.files[0];
       const mimeType = file.type;
       let type: 'image' | 'video' | 'file' = 'file';
       if (mimeType.startsWith('image/')) type = 'image';
       else if (mimeType.startsWith('video/')) type = 'video';
 
-      const fileName = file.name;
-      let displayText = `Sent file: ${fileName}`;
-      if (type === 'image') displayText = 'Sent an image';
-      else if (type === 'video') displayText = 'Sent a video';
-
-      await sendChatMessage({
-        id: Date.now().toString(),
-        channelId: activeChannelId,
-        sender: currentUser.name,
-        senderId: currentUser.id,
-        text: displayText,
-        timestamp: new Date().toISOString(),
-        avatar: currentUser.avatarUrl || 'user',
-        attachmentUrl: url,
-        attachmentType: type,
-        attachmentName: fileName
+      // Stage the file for preview instead of sending immediately
+      setStagedAttachment({
+        url,
+        file,
+        type,
+        name: file.name
       });
-
-      const currentCh = channels.find(c => c.id === activeChannelId);
-      if (currentCh?.type === 'dm') {
-        const ids = parseDMChannel(currentCh.name);
-        const otherId = ids.find(id => id !== currentUser.id);
-        if (otherId && otherId !== currentUser.id) {
-          await createNotification(
-            otherId,
-            'New Attachment',
-            `${currentUser.name} sent an attachment`,
-            'message',
-            'TEAM_CHAT',
-            { channelId: activeChannelId, channelName: currentCh.name, channelType: 'dm' }
-          );
-        }
-      }
     } else {
       addToast('error', 'Upload failed');
     }
@@ -2454,6 +2435,33 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
               </div>
               );
             })()}
+
+            {/* Staged attachment preview */}
+            {stagedAttachment && (
+              <div className="relative p-2 bg-slate-100 border-b border-slate-200">
+                <div className="flex items-start gap-2">
+                  {stagedAttachment.type === 'image' ? (
+                    <img
+                      src={stagedAttachment.url}
+                      alt="Attachment preview"
+                      className="max-h-32 max-w-[200px] rounded-lg object-contain"
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2 p-2 bg-white rounded-lg">
+                      <File className="w-5 h-5 text-slate-500" />
+                      <span className="text-sm text-slate-700">{stagedAttachment.name}</span>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => setStagedAttachment(null)}
+                    className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors"
+                    title="Remove attachment"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
 
             <textarea
               value={message}
