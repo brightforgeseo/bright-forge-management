@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Plus, Sparkles, ChevronDown, ChevronUp, ChevronRight, Trash2, Briefcase, CheckCircle2, Settings, Mail, Phone, Globe, X, Image as ImageIcon, Edit3, Palette, Loader2, Upload, UserCircle, Link as LinkIcon, MessageCircle, Send, Search, Share2, Hash, Users, Archive, RotateCcw, UserPlus } from 'lucide-react';
+import { Plus, Sparkles, ChevronDown, ChevronUp, ChevronRight, Trash2, Briefcase, CheckCircle2, Settings, Mail, Phone, Globe, X, Image as ImageIcon, Edit3, Palette, Loader2, Upload, UserCircle, Link as LinkIcon, MessageCircle, Send, Search, Share2, Hash, Users, Archive, RotateCcw, UserPlus, GripVertical } from 'lucide-react';
 import AssignToPartnerModal from './client-portal/AssignToPartnerModal';
 import { Task, TaskGroup, User, ClientBoard, ToastType, LabelDefinition, Profile, TaskComment, ChatChannel, ChatMessage, ArchivedTask } from '../types';
 import { generateProjectTasks } from '../services/geminiService';
@@ -423,6 +423,12 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
     boardId: string;
     boardName: string;
   }>({ isOpen: false, task: null, groupId: '', boardId: '', boardName: '' });
+
+  // Drag-and-drop state
+  const [draggedTask, setDraggedTask] = useState<{task: Task, groupId: string} | null>(null);
+  const [dragOverGroupId, setDragOverGroupId] = useState<string | null>(null);
+  const [draggedGroupId, setDraggedGroupId] = useState<string | null>(null);
+  const [dragOverGroupPosition, setDragOverGroupPosition] = useState<string | null>(null);
 
   // Track in-flight saves to prevent realtime from overwriting them
   const pendingSaveRef = useRef<{ taskId: string; boardId: string } | null>(null);
@@ -1092,6 +1098,76 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
           return { ...c, groups };
       });
   };
+  // Task drag handlers
+  const handleTaskDragStart = (e: React.DragEvent, task: Task, groupId: string) => {
+    setDraggedTask({ task, groupId });
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', task.id);
+    if (e.currentTarget instanceof HTMLElement) {
+      e.dataTransfer.setDragImage(e.currentTarget, 20, 20);
+    }
+  };
+
+  const handleTaskDragOver = (e: React.DragEvent, groupId: string) => {
+    if (!draggedTask) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverGroupId(groupId);
+  };
+
+  const handleTaskDragLeave = () => {
+    setDragOverGroupId(null);
+  };
+
+  const handleTaskDrop = (e: React.DragEvent, targetGroupId: string) => {
+    e.preventDefault();
+    if (!draggedTask || !activeClient) { setDragOverGroupId(null); return; }
+    const { task, groupId: sourceGroupId } = draggedTask;
+    if (sourceGroupId === targetGroupId) { setDraggedTask(null); setDragOverGroupId(null); return; }
+    updateClient(activeClient.id, c => {
+      const groups = c.groups.map(g => {
+        if (g.id === sourceGroupId) return { ...g, tasks: g.tasks.filter(t => t.id !== task.id) };
+        if (g.id === targetGroupId) return { ...g, tasks: [...g.tasks, task] };
+        return g;
+      });
+      return { ...c, groups };
+    });
+    setDraggedTask(null);
+    setDragOverGroupId(null);
+  };
+
+  // Group drag handlers
+  const handleGroupDragStart = (e: React.DragEvent, groupId: string) => {
+    setDraggedGroupId(groupId);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', groupId);
+  };
+
+  const handleGroupDragOver = (e: React.DragEvent, groupId: string) => {
+    if (!draggedGroupId) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverGroupPosition(groupId);
+  };
+
+  const handleGroupDrop = (e: React.DragEvent, targetGroupId: string) => {
+    e.preventDefault();
+    if (!draggedGroupId || !activeClient || draggedGroupId === targetGroupId) {
+      setDraggedGroupId(null); setDragOverGroupPosition(null); return;
+    }
+    updateClient(activeClient.id, c => {
+      const groups = [...c.groups];
+      const fromIdx = groups.findIndex(g => g.id === draggedGroupId);
+      const toIdx = groups.findIndex(g => g.id === targetGroupId);
+      if (fromIdx === -1 || toIdx === -1) return c;
+      const [moved] = groups.splice(fromIdx, 1);
+      groups.splice(toIdx, 0, moved);
+      return { ...c, groups };
+    });
+    setDraggedGroupId(null);
+    setDragOverGroupPosition(null);
+  };
+
   const handleLabelClick = (e: React.MouseEvent, type: 'status'|'priority', tid: string, gid: string, cid: string) => {
       e.stopPropagation();
       setActivePicker({ type, taskId: tid, groupId: gid, clientId: cid, anchor: e.currentTarget as HTMLElement });
@@ -1437,10 +1513,22 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                  if (selectedPersonFilter && filteredTasks.length === 0) return null;
 
                  return (
-                 <div key={group.id} className="animate-fadeIn">
+                 <div
+                   key={group.id}
+                   className="animate-fadeIn"
+                   style={{ opacity: draggedGroupId === group.id ? 0.5 : 1 }}
+                   onDragOver={(e) => { if (draggedGroupId) { e.preventDefault(); handleGroupDragOver(e, group.id); } }}
+                   onDrop={(e) => { if (draggedGroupId) handleGroupDrop(e, group.id); }}
+                 >
                     {/* Group Header */}
-                    <div className="flex items-center gap-2 mb-2 group cursor-pointer">
-                       <button onClick={() => toggleCollapse(activeClient.id, group.id)} className="p-1 hover:bg-slate-100 rounded text-slate-400 transition-colors">
+                    <div className={`flex items-center gap-2 mb-2 group cursor-pointer ${dragOverGroupPosition === group.id && draggedGroupId !== group.id ? 'border-2 border-blue-400 rounded-lg bg-blue-50/30' : ''}`}>
+                       <button
+                         draggable
+                         onDragStart={(e) => { e.stopPropagation(); handleGroupDragStart(e, group.id); }}
+                         onDragEnd={() => { setDraggedGroupId(null); setDragOverGroupPosition(null); }}
+                         onClick={() => toggleCollapse(activeClient.id, group.id)}
+                         className="p-1 hover:bg-slate-100 rounded text-slate-400 transition-colors cursor-grab"
+                       >
                           {group.isCollapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                        </button>
                        <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors flex-1">
@@ -1472,7 +1560,12 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
 
                     {/* Tasks Table */}
                     {!group.isCollapsed && (
-                      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden ml-0 lg:ml-8">
+                      <div
+                        className={`bg-white border rounded-xl shadow-sm overflow-hidden ml-0 lg:ml-8 ${dragOverGroupId === group.id && draggedTask && draggedTask.groupId !== group.id ? 'border-blue-400 bg-blue-50/30 border-2' : 'border-slate-200'}`}
+                        onDragOver={(e) => { if (draggedTask) handleTaskDragOver(e, group.id); }}
+                        onDragLeave={handleTaskDragLeave}
+                        onDrop={(e) => { if (draggedTask) handleTaskDrop(e, group.id); }}
+                      >
                          <div className="overflow-y-auto custom-scrollbar">
                            <table className="w-full table-fixed">
                               <thead className="bg-slate-50 border-b border-slate-200">
@@ -1493,12 +1586,20 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                     const priorityDef = getLabelDef(activeClient.id, task.priority, 'priority');
                                     
                                     return (
-                                      <tr key={task.id} className="group hover:bg-slate-50/80 transition-colors">
+                                      <tr
+                                        key={task.id}
+                                        className="group hover:bg-slate-50/80 transition-colors"
+                                        style={{ opacity: draggedTask?.task.id === task.id ? 0.5 : 1 }}
+                                      >
                                         <td className="py-2 px-2 lg:px-4 bg-white group-hover:bg-slate-50/80 transition-colors">
                                             <div className="flex items-center gap-2 lg:gap-3">
-                                                <div className="hidden lg:flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button onClick={() => moveTask(activeClient.id, group.id, task.id, 'up')}><ChevronUp className="w-3 h-3 text-slate-400 hover:text-brand-600" /></button>
-                                                    <button onClick={() => moveTask(activeClient.id, group.id, task.id, 'down')}><ChevronDown className="w-3 h-3 text-slate-400 hover:text-brand-600" /></button>
+                                                <div
+                                                  className="hidden lg:flex items-center opacity-0 group-hover:opacity-100 transition-opacity cursor-grab"
+                                                  draggable
+                                                  onDragStart={(e) => { e.stopPropagation(); handleTaskDragStart(e, task, group.id); }}
+                                                  onDragEnd={() => { setDraggedTask(null); setDragOverGroupId(null); }}
+                                                >
+                                                    <GripVertical className="w-4 h-4 text-slate-400 hover:text-brand-600" />
                                                 </div>
                                                 <div className="w-1 lg:w-1.5 h-6 lg:h-8 rounded-full flex-shrink-0" style={{ backgroundColor: group.color }}></div>
                                                 <span
