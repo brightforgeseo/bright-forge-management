@@ -1588,18 +1588,16 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                     return (
                                       <tr
                                         key={task.id}
-                                        className="group hover:bg-slate-50/80 transition-colors"
+                                        className="group hover:bg-slate-50/80 transition-colors cursor-grab"
+                                        draggable
+                                        onDragStart={(e) => { e.stopPropagation(); handleTaskDragStart(e, task, group.id); }}
+                                        onDragEnd={() => { setDraggedTask(null); setDragOverGroupId(null); }}
                                         style={{ opacity: draggedTask?.task.id === task.id ? 0.5 : 1 }}
                                       >
                                         <td className="py-2 px-2 lg:px-4 bg-white group-hover:bg-slate-50/80 transition-colors">
                                             <div className="flex items-center gap-2 lg:gap-3">
-                                                <div
-                                                  className="hidden lg:flex items-center opacity-0 group-hover:opacity-100 transition-opacity cursor-grab"
-                                                  draggable
-                                                  onDragStart={(e) => { e.stopPropagation(); handleTaskDragStart(e, task, group.id); }}
-                                                  onDragEnd={() => { setDraggedTask(null); setDragOverGroupId(null); }}
-                                                >
-                                                    <GripVertical className="w-4 h-4 text-slate-400 hover:text-brand-600" />
+                                                <div className="hidden lg:flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <GripVertical className="w-4 h-4 text-slate-400" />
                                                 </div>
                                                 <div className="w-1 lg:w-1.5 h-6 lg:h-8 rounded-full flex-shrink-0" style={{ backgroundColor: group.color }}></div>
                                                 <span
