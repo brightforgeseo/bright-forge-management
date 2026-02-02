@@ -1143,13 +1143,10 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
             if (g.id !== targetGroupId) return g;
             const fromIdx = g.tasks.findIndex(t => t.id === task.id);
             const toIdx = g.tasks.findIndex(t => t.id === targetTaskId);
-            if (fromIdx === -1 || toIdx === -1) return g;
-            const draggingDown = fromIdx < toIdx;
+            if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return g;
             const tasks = [...g.tasks];
             const [moved] = tasks.splice(fromIdx, 1);
-            const insertIdx = tasks.findIndex(t => t.id === targetTaskId);
-            // When dragging down, insert after the target; when dragging up, insert before
-            tasks.splice(insertIdx === -1 ? tasks.length : draggingDown ? insertIdx + 1 : insertIdx, 0, moved);
+            tasks.splice(toIdx, 0, moved);
             return { ...g, tasks };
           });
           return { ...c, groups };
