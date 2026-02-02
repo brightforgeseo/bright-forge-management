@@ -427,6 +427,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   // Drag-and-drop state
   const [draggedTask, setDraggedTask] = useState<{task: Task, groupId: string} | null>(null);
   const [dragOverGroupId, setDragOverGroupId] = useState<string | null>(null);
+  const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
   const [draggedGroupId, setDraggedGroupId] = useState<string | null>(null);
   const [dragOverGroupPosition, setDragOverGroupPosition] = useState<string | null>(null);
 
@@ -1119,21 +1120,47 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
     setDragOverGroupId(null);
   };
 
-  const handleTaskDrop = (e: React.DragEvent, targetGroupId: string) => {
+  const handleTaskDrop = (e: React.DragEvent, targetGroupId: string, targetTaskId?: string) => {
     e.preventDefault();
-    if (!draggedTask || !activeClient) { setDragOverGroupId(null); return; }
+    if (!draggedTask || !activeClient) { setDragOverGroupId(null); setDragOverTaskId(null); return; }
     const { task, groupId: sourceGroupId } = draggedTask;
-    if (sourceGroupId === targetGroupId) { setDraggedTask(null); setDragOverGroupId(null); return; }
-    updateClient(activeClient.id, c => {
-      const groups = c.groups.map(g => {
-        if (g.id === sourceGroupId) return { ...g, tasks: g.tasks.filter(t => t.id !== task.id) };
-        if (g.id === targetGroupId) return { ...g, tasks: [...g.tasks, task] };
-        return g;
+
+    if (sourceGroupId === targetGroupId) {
+      // Reorder within same group
+      if (targetTaskId && targetTaskId !== task.id) {
+        updateClient(activeClient.id, c => {
+          const groups = c.groups.map(g => {
+            if (g.id !== targetGroupId) return g;
+            const tasks = g.tasks.filter(t => t.id !== task.id);
+            const targetIdx = tasks.findIndex(t => t.id === targetTaskId);
+            if (targetIdx === -1) return { ...g, tasks: [...tasks, task] };
+            tasks.splice(targetIdx, 0, task);
+            return { ...g, tasks };
+          });
+          return { ...c, groups };
+        });
+      }
+    } else {
+      // Move to different group
+      updateClient(activeClient.id, c => {
+        const groups = c.groups.map(g => {
+          if (g.id === sourceGroupId) return { ...g, tasks: g.tasks.filter(t => t.id !== task.id) };
+          if (g.id === targetGroupId) {
+            if (targetTaskId) {
+              const tasks = [...g.tasks];
+              const targetIdx = tasks.findIndex(t => t.id === targetTaskId);
+              if (targetIdx !== -1) { tasks.splice(targetIdx, 0, task); return { ...g, tasks }; }
+            }
+            return { ...g, tasks: [...g.tasks, task] };
+          }
+          return g;
+        });
+        return { ...c, groups };
       });
-      return { ...c, groups };
-    });
+    }
     setDraggedTask(null);
     setDragOverGroupId(null);
+    setDragOverTaskId(null);
   };
 
   // Group drag handlers
@@ -1588,10 +1615,12 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                     return (
                                       <tr
                                         key={task.id}
-                                        className="group hover:bg-slate-50/80 transition-colors cursor-grab"
+                                        className={`group hover:bg-slate-50/80 transition-colors cursor-grab ${dragOverTaskId === task.id && draggedTask?.task.id !== task.id ? 'border-t-2 border-blue-400' : ''}`}
                                         draggable
                                         onDragStart={(e) => { e.stopPropagation(); handleTaskDragStart(e, task, group.id); }}
-                                        onDragEnd={() => { setDraggedTask(null); setDragOverGroupId(null); }}
+                                        onDragEnd={() => { setDraggedTask(null); setDragOverGroupId(null); setDragOverTaskId(null); }}
+                                        onDragOver={(e) => { if (draggedTask) { e.preventDefault(); e.stopPropagation(); setDragOverTaskId(task.id); setDragOverGroupId(group.id); } }}
+                                        onDrop={(e) => { e.stopPropagation(); handleTaskDrop(e, group.id, task.id); }}
                                         style={{ opacity: draggedTask?.task.id === task.id ? 0.5 : 1 }}
                                       >
                                         <td className="py-2 px-2 lg:px-4 bg-white group-hover:bg-slate-50/80 transition-colors">
