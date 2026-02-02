@@ -1082,6 +1082,16 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
           return { ...c, groups: gs };
       });
   };
+  const moveGroup = (cid: string, gid: string, dir: 'up'|'down') => {
+      updateClient(cid, c => {
+          const idx = c.groups.findIndex(g => g.id === gid);
+          if(idx === -1) return c;
+          const groups = [...c.groups];
+          if(dir === 'up' && idx > 0) [groups[idx], groups[idx-1]] = [groups[idx-1], groups[idx]];
+          else if(dir === 'down' && idx < groups.length-1) [groups[idx], groups[idx+1]] = [groups[idx+1], groups[idx]];
+          return { ...c, groups };
+      });
+  };
   const handleLabelClick = (e: React.MouseEvent, type: 'status'|'priority', tid: string, gid: string, cid: string) => {
       e.stopPropagation();
       setActivePicker({ type, taskId: tid, groupId: gid, clientId: cid, anchor: e.currentTarget as HTMLElement });
@@ -1447,6 +1457,14 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                              {filteredTasks.length}{selectedPersonFilter && ` of ${group.tasks.length}`} {filteredTasks.length === 1 ? 'item' : 'items'}
                            </span>
                        </div>
+                       <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition-opacity">
+                         <button onClick={(e) => { e.stopPropagation(); moveGroup(activeClient.id, group.id, 'up'); }} className="p-1.5 hover:bg-slate-100 text-slate-300 hover:text-slate-600 rounded transition-all" title="Move group up">
+                           <ChevronUp className="w-4 h-4" />
+                         </button>
+                         <button onClick={(e) => { e.stopPropagation(); moveGroup(activeClient.id, group.id, 'down'); }} className="p-1.5 hover:bg-slate-100 text-slate-300 hover:text-slate-600 rounded transition-all" title="Move group down">
+                           <ChevronDown className="w-4 h-4" />
+                         </button>
+                       </div>
                        <button onClick={(e) => { e.stopPropagation(); handleDeleteGroup(activeClient.id, group.id); }} className="opacity-0 group-hover:opacity-100 p-2 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded transition-all">
                            <Trash2 className="w-4 h-4" />
                        </button>
@@ -1483,12 +1501,10 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                                     <button onClick={() => moveTask(activeClient.id, group.id, task.id, 'down')}><ChevronDown className="w-3 h-3 text-slate-400 hover:text-brand-600" /></button>
                                                 </div>
                                                 <div className="w-1 lg:w-1.5 h-6 lg:h-8 rounded-full flex-shrink-0" style={{ backgroundColor: group.color }}></div>
-                                                <input
-                                                  value={task.title}
-                                                  onChange={(e) => updateTaskField(activeClient.id, group.id, task.id, 'title', e.target.value)}
+                                                <span
                                                   onClick={() => setTaskModal({ task, groupId: group.id, clientId: activeClient.id, groupTitle: group.title, groupColor: group.color })}
-                                                  className="flex-1 min-w-0 bg-transparent outline-none text-xs lg:text-sm font-medium text-slate-700 cursor-pointer hover:text-brand-600 truncate"
-                                                />
+                                                  className="flex-1 min-w-0 text-xs lg:text-sm font-medium text-slate-700 cursor-pointer hover:text-brand-600 truncate"
+                                                >{task.title}</span>
                                                 {(task.comments && task.comments.length > 0) && (
                                                   <MessageCircle className="w-4 h-4 text-slate-400 flex-shrink-0" />
                                                 )}
@@ -1785,6 +1801,21 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
 
             {/* Modal Body - Scrollable */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Description */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Description</label>
+                <textarea
+                  value={taskModal.task.description || ''}
+                  onChange={(e) => {
+                    updateTaskField(taskModal.clientId, taskModal.groupId, taskModal.task.id, 'description', e.target.value);
+                    setTaskModal({ ...taskModal, task: { ...taskModal.task, description: e.target.value } });
+                  }}
+                  placeholder="Add a description..."
+                  className="w-full p-3 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-lg outline-none hover:border-brand-500 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 resize-none min-h-[80px]"
+                  rows={3}
+                />
+              </div>
+
               {/* Task Details Grid */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
