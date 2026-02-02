@@ -51,6 +51,7 @@ export interface ClientBoard {
   phone?: string;
   website?: string;
   logoUrl?: string;
+  notes?: string;
   groups: TaskGroup[];
   statusDefs: LabelDefinition[];
   priorityDefs: LabelDefinition[];

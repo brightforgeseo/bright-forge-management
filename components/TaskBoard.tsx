@@ -390,8 +390,8 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   const [isPersonFilterOpen, setIsPersonFilterOpen] = useState(false);
   
   const [isEditingClient, setIsEditingClient] = useState(false);
-  const [editForm, setEditForm] = useState<{name: string, email: string, phone: string, website: string, logoUrl: string}>({
-    name: '', email: '', phone: '', website: '', logoUrl: ''
+  const [editForm, setEditForm] = useState<{name: string, email: string, phone: string, website: string, logoUrl: string, notes: string}>({
+    name: '', email: '', phone: '', website: '', logoUrl: '', notes: ''
   });
   const logoInputRef = useRef<HTMLInputElement>(null);
 
@@ -651,7 +651,8 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
         email: activeClient.email || '',
         phone: activeClient.phone || '',
         website: activeClient.website || '',
-        logoUrl: activeClient.logoUrl || ''
+        logoUrl: activeClient.logoUrl || '',
+        notes: activeClient.notes || ''
       });
     }
   }, [isEditingClient, activeClient]);
@@ -687,7 +688,8 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
           email: editForm.email,
           phone: editForm.phone,
           website: editForm.website,
-          logoUrl: editForm.logoUrl
+          logoUrl: editForm.logoUrl,
+          notes: editForm.notes
         };
       }
       return c;
@@ -2355,6 +2357,10 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                    <div>
                       <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Website</label>
                       <input value={editForm.website} onChange={e => setEditForm({...editForm, website: e.target.value})} className="w-full p-2 border rounded-lg outline-none focus:border-brand-500 text-sm" />
+                   </div>
+                   <div>
+                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Client Notes</label>
+                      <textarea value={editForm.notes} onChange={e => setEditForm({...editForm, notes: e.target.value})} rows={4} placeholder="Add notes about this client..." className="w-full p-2 border rounded-lg outline-none focus:border-brand-500 text-sm resize-none" />
                    </div>
                 </div>
                 <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
