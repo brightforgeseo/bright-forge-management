@@ -1141,10 +1141,14 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
         updateClient(activeClient.id, c => {
           const groups = c.groups.map(g => {
             if (g.id !== targetGroupId) return g;
-            const tasks = g.tasks.filter(t => t.id !== task.id);
-            const targetIdx = tasks.findIndex(t => t.id === targetTaskId);
-            if (targetIdx === -1) return { ...g, tasks: [...tasks, task] };
-            tasks.splice(targetIdx, 0, task);
+            const fromIdx = g.tasks.findIndex(t => t.id === task.id);
+            const toIdx = g.tasks.findIndex(t => t.id === targetTaskId);
+            if (fromIdx === -1 || toIdx === -1) return g;
+            const tasks = [...g.tasks];
+            const [moved] = tasks.splice(fromIdx, 1);
+            // After removing, insert at the target's new position
+            const insertIdx = tasks.findIndex(t => t.id === targetTaskId);
+            tasks.splice(insertIdx === -1 ? tasks.length : insertIdx, 0, moved);
             return { ...g, tasks };
           });
           return { ...c, groups };
