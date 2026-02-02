@@ -1109,14 +1109,22 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
     }
   };
 
+  const dragOverGroupRef = useRef<string | null>(null);
+  const dragOverTaskRef = useRef<string | null>(null);
+  const dragOverGroupPosRef = useRef<string | null>(null);
+
   const handleTaskDragOver = (e: React.DragEvent, groupId: string) => {
     if (!draggedTask) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    setDragOverGroupId(groupId);
+    if (dragOverGroupRef.current !== groupId) {
+      dragOverGroupRef.current = groupId;
+      setDragOverGroupId(groupId);
+    }
   };
 
   const handleTaskDragLeave = () => {
+    dragOverGroupRef.current = null;
     setDragOverGroupId(null);
   };
 
@@ -1161,6 +1169,8 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
     setDraggedTask(null);
     setDragOverGroupId(null);
     setDragOverTaskId(null);
+    dragOverGroupRef.current = null;
+    dragOverTaskRef.current = null;
   };
 
   // Group drag handlers
@@ -1174,13 +1184,16 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
     if (!draggedGroupId) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    setDragOverGroupPosition(groupId);
+    if (dragOverGroupPosRef.current !== groupId) {
+      dragOverGroupPosRef.current = groupId;
+      setDragOverGroupPosition(groupId);
+    }
   };
 
   const handleGroupDrop = (e: React.DragEvent, targetGroupId: string) => {
     e.preventDefault();
     if (!draggedGroupId || !activeClient || draggedGroupId === targetGroupId) {
-      setDraggedGroupId(null); setDragOverGroupPosition(null); return;
+      setDraggedGroupId(null); setDragOverGroupPosition(null); dragOverGroupPosRef.current = null; return;
     }
     updateClient(activeClient.id, c => {
       const groups = [...c.groups];
@@ -1193,6 +1206,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
     });
     setDraggedGroupId(null);
     setDragOverGroupPosition(null);
+    dragOverGroupPosRef.current = null;
   };
 
   const handleLabelClick = (e: React.MouseEvent, type: 'status'|'priority', tid: string, gid: string, cid: string) => {
@@ -1552,7 +1566,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                        <button
                          draggable
                          onDragStart={(e) => { e.stopPropagation(); handleGroupDragStart(e, group.id); }}
-                         onDragEnd={() => { setDraggedGroupId(null); setDragOverGroupPosition(null); }}
+                         onDragEnd={() => { setDraggedGroupId(null); setDragOverGroupPosition(null); dragOverGroupPosRef.current = null; }}
                          onClick={() => toggleCollapse(activeClient.id, group.id)}
                          className="p-1 hover:bg-slate-100 rounded text-slate-400 transition-colors cursor-grab"
                        >
@@ -1618,8 +1632,8 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                         className={`group hover:bg-slate-50/80 transition-colors cursor-grab ${dragOverTaskId === task.id && draggedTask?.task.id !== task.id ? 'border-t-2 border-blue-400' : ''}`}
                                         draggable
                                         onDragStart={(e) => { e.stopPropagation(); handleTaskDragStart(e, task, group.id); }}
-                                        onDragEnd={() => { setDraggedTask(null); setDragOverGroupId(null); setDragOverTaskId(null); }}
-                                        onDragOver={(e) => { if (draggedTask) { e.preventDefault(); e.stopPropagation(); setDragOverTaskId(task.id); setDragOverGroupId(group.id); } }}
+                                        onDragEnd={() => { setDraggedTask(null); setDragOverGroupId(null); setDragOverTaskId(null); dragOverGroupRef.current = null; dragOverTaskRef.current = null; }}
+                                        onDragOver={(e) => { if (draggedTask) { e.preventDefault(); e.stopPropagation(); if (dragOverTaskRef.current !== task.id) { dragOverTaskRef.current = task.id; setDragOverTaskId(task.id); } if (dragOverGroupRef.current !== group.id) { dragOverGroupRef.current = group.id; setDragOverGroupId(group.id); } } }}
                                         onDrop={(e) => { e.stopPropagation(); handleTaskDrop(e, group.id, task.id); }}
                                         style={{ opacity: draggedTask?.task.id === task.id ? 0.5 : 1 }}
                                       >
