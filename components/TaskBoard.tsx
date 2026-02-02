@@ -1457,11 +1457,11 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                              {filteredTasks.length}{selectedPersonFilter && ` of ${group.tasks.length}`} {filteredTasks.length === 1 ? 'item' : 'items'}
                            </span>
                        </div>
-                       <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition-opacity">
-                         <button onClick={(e) => { e.stopPropagation(); moveGroup(activeClient.id, group.id, 'up'); }} className="p-1.5 hover:bg-slate-100 text-slate-300 hover:text-slate-600 rounded transition-all" title="Move group up">
+                       <div className="flex items-center gap-0.5">
+                         <button onClick={(e) => { e.stopPropagation(); moveGroup(activeClient.id, group.id, 'up'); }} className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded transition-all" title="Move group up">
                            <ChevronUp className="w-4 h-4" />
                          </button>
-                         <button onClick={(e) => { e.stopPropagation(); moveGroup(activeClient.id, group.id, 'down'); }} className="p-1.5 hover:bg-slate-100 text-slate-300 hover:text-slate-600 rounded transition-all" title="Move group down">
+                         <button onClick={(e) => { e.stopPropagation(); moveGroup(activeClient.id, group.id, 'down'); }} className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded transition-all" title="Move group down">
                            <ChevronDown className="w-4 h-4" />
                          </button>
                        </div>
@@ -1780,7 +1780,14 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="w-1 h-8 rounded-full" style={{ backgroundColor: taskModal.groupColor }}></div>
-                  <h3 className="font-bold text-xl text-slate-900">{taskModal.task.title}</h3>
+                  <input
+                    value={taskModal.task.title}
+                    onChange={(e) => {
+                      updateTaskField(taskModal.clientId, taskModal.groupId, taskModal.task.id, 'title', e.target.value);
+                      setTaskModal({ ...taskModal, task: { ...taskModal.task, title: e.target.value } });
+                    }}
+                    className="font-bold text-xl text-slate-900 bg-transparent outline-none w-full hover:bg-slate-50 focus:bg-slate-50 rounded px-1 -ml-1"
+                  />
                 </div>
                 <p className="text-sm text-slate-500">{taskModal.groupTitle} • {activeClient.name}</p>
               </div>
