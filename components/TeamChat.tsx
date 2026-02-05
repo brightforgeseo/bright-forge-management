@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check, Smile, Film, SmilePlus, Video, Lock, UserPlus, Menu, ClipboardList, Calendar, ArrowRight, Palette, Paperclip, Download, File, Search, Pin, PinOff } from 'lucide-react';
+import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check, Smile, Film, SmilePlus, Video, Lock, UserPlus, Menu, ClipboardList, Calendar, ArrowRight, Palette, Paperclip, Download, File, Search, Pin, PinOff, Reply, ChevronDown, ChevronUp } from 'lucide-react';
 import { ChatChannel, ChatMessage, User, ToastType, Profile, MessageReaction } from '../types';
 import { getChatResponse } from '../services/geminiService';
 import { storeEchoConversation, buildConversationContext } from '../services/echoMemory';
-import { fetchChatMessages, sendChatMessage, clearChatHistory, uploadFile, fetchChannels, createChannel, deleteChannel, fetchProfiles, getOrCreateDMChannel, createNotification, editChatMessage, fetchMessageReactions, addMessageReaction, removeMessageReaction, fetchChannelMembers, addChannelMember, removeChannelMember, deleteChatMessage, isChannelMember, searchChatMessages, SearchResult, pinMessage, unpinMessage, fetchPinnedMessages } from '../services/databaseService';
+import { fetchChatMessages, sendChatMessage, clearChatHistory, uploadFile, fetchChannels, createChannel, deleteChannel, fetchProfiles, getOrCreateDMChannel, createNotification, editChatMessage, fetchMessageReactions, addMessageReaction, removeMessageReaction, fetchChannelMembers, addChannelMember, removeChannelMember, deleteChatMessage, isChannelMember, searchChatMessages, SearchResult, pinMessage, unpinMessage, fetchPinnedMessages, sendReplyMessage, fetchThreadReplies } from '../services/databaseService';
 import { fetchAllPartners, fetchPartnerMessages, sendPartnerMessage, markPartnerMessagesRead } from '../services/clientPortalService';
 import { PartnerWithStats, PartnerMessage } from '../types-portal';
 import { supabase } from '../lib/supabaseClient';
@@ -91,6 +91,12 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
   // Pinned messages state
   const [pinnedMessages, setPinnedMessages] = useState<ChatMessage[]>([]);
   const [showPinnedMessages, setShowPinnedMessages] = useState(false);
+
+  // Threading/Reply state
+  const [replyingToMessage, setReplyingToMessage] = useState<ChatMessage | null>(null);
+  const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
+  const [threadReplies, setThreadReplies] = useState<Record<string, ChatMessage[]>>({});
+  const [loadingThreads, setLoadingThreads] = useState<Set<string>>(new Set());
 
   // Chat background state - per channel
   const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
@@ -753,20 +759,48 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
           editedAt: newMsg.edited_at,
           taskLink: newMsg.task_link,
           callRoomId: newMsg.call_room_id,
-          callType: newMsg.call_type
+          callType: newMsg.call_type,
+          parentMessageId: newMsg.parent_message_id,
+          replyCount: newMsg.reply_count || 0
         };
 
         // Only update if message is for current channel
         if (newMsg.channel_id === activeChannelRef.current) {
-          setMessages(prev => {
-            // Simple duplicate check by ID only
-            if (prev.some(m => m.id === newMsg.id)) {
-              console.log('[TeamChat] Message already exists, skipping');
+          // Check if this is a thread reply
+          if (newMsg.parent_message_id) {
+            console.log('[TeamChat] New reply received for parent:', newMsg.parent_message_id);
+            // Update parent's reply count
+            setMessages(prev => prev.map(m =>
+              m.id === newMsg.parent_message_id
+                ? { ...m, replyCount: (m.replyCount || 0) + 1 }
+                : m
+            ));
+            // Add to threadReplies if thread is expanded
+            setThreadReplies(prev => {
+              if (prev[newMsg.parent_message_id]) {
+                // Check for duplicate
+                if (prev[newMsg.parent_message_id].some(r => r.id === newMsg.id)) {
+                  return prev;
+                }
+                return {
+                  ...prev,
+                  [newMsg.parent_message_id]: [...prev[newMsg.parent_message_id], formattedMsg]
+                };
+              }
               return prev;
-            }
-            console.log('[TeamChat] Adding message to current channel');
-            return [...prev, formattedMsg];
-          });
+            });
+          } else {
+            // Regular message (not a reply)
+            setMessages(prev => {
+              // Simple duplicate check by ID only
+              if (prev.some(m => m.id === newMsg.id)) {
+                console.log('[TeamChat] Message already exists, skipping');
+                return prev;
+              }
+              console.log('[TeamChat] Adding message to current channel');
+              return [...prev, formattedMsg];
+            });
+          }
           scrollToBottom();
         } else {
           // Message is for different channel - update unread count
@@ -812,9 +846,25 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
               ...m,
               text: updatedMsg.text,
               isEdited: updatedMsg.is_edited,
-              editedAt: updatedMsg.edited_at
+              editedAt: updatedMsg.edited_at,
+              replyCount: updatedMsg.reply_count || m.replyCount
             } : m
           ));
+          // Also update in thread replies if applicable
+          setThreadReplies(prev => {
+            const newReplies = { ...prev };
+            for (const parentId in newReplies) {
+              newReplies[parentId] = newReplies[parentId].map(r =>
+                r.id === updatedMsg.id ? {
+                  ...r,
+                  text: updatedMsg.text,
+                  isEdited: updatedMsg.is_edited,
+                  editedAt: updatedMsg.edited_at
+                } : r
+              );
+            }
+            return newReplies;
+          });
         }
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'chat_messages' }, async (payload) => {
@@ -869,10 +919,13 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       console.log('[TeamChat] Switching to channel:', currentChannelId);
       console.log('[TeamChat] Fetching fresh messages from database');
 
-      // Clear current messages and reactions immediately
+      // Clear current messages, reactions, and thread state immediately
       setMessages([]);
       setMessageReactions({});
       setHasMoreMessages(false);
+      setReplyingToMessage(null);
+      setExpandedThreads(new Set());
+      setThreadReplies({});
 
       // Fetch fresh from database (last 100 messages)
       const msgs = await fetchChatMessages(currentChannelId);
@@ -921,6 +974,40 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
   const scrollToBottom = () => {
     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+  };
+
+  // Toggle thread expansion and load replies if needed
+  const toggleThreadExpansion = async (messageId: string) => {
+    const isCurrentlyExpanded = expandedThreads.has(messageId);
+
+    if (isCurrentlyExpanded) {
+      // Collapse thread
+      setExpandedThreads(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(messageId);
+        return newSet;
+      });
+    } else {
+      // Expand thread and load replies if not already loaded
+      setExpandedThreads(prev => new Set(prev).add(messageId));
+
+      if (!threadReplies[messageId]) {
+        setLoadingThreads(prev => new Set(prev).add(messageId));
+        try {
+          const replies = await fetchThreadReplies(messageId);
+          setThreadReplies(prev => ({ ...prev, [messageId]: replies }));
+        } catch (error) {
+          console.error('[toggleThreadExpansion] Error loading replies:', error);
+          addToast('error', 'Failed to load replies');
+        } finally {
+          setLoadingThreads(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(messageId);
+            return newSet;
+          });
+        }
+      }
+    }
   };
 
   // Load older messages (pagination)
@@ -1284,6 +1371,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     console.log('[handleSendMessage] Message text:', message);
     console.log('[handleSendMessage] Active channel ID:', activeChannelId);
     console.log('[handleSendMessage] Staged attachment:', stagedAttachment);
+    console.log('[handleSendMessage] Replying to:', replyingToMessage?.id);
 
     // Allow sending if there's a message OR a staged attachment
     if (!message.trim() && !stagedAttachment) {
@@ -1322,44 +1410,87 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     const mentions = detectMentions(message.trim());
     const messageText = message;
     const savedStagedAttachment = stagedAttachment;
+    const savedReplyingTo = replyingToMessage;
     setMessage('');
     setStagedAttachment(null);
     setMentionDropdown(null);
+    setReplyingToMessage(null); // Clear reply state
 
     // Send to database - realtime listener will add it to UI
     console.log('[handleSendMessage] Calling sendChatMessage...');
     try {
-      const result = await sendChatMessage(userMsg);
-      console.log('[handleSendMessage] Message sent successfully:', result);
+      let result;
 
-      // TEMPORARY WORKAROUND: Manually add message to UI since realtime might not be working
-      console.log('[handleSendMessage] Adding message to UI manually...');
-      const insertedMsg: ChatMessage = {
-        id: result.id,
-        channelId: result.channel_id,
-        sender: result.sender,
-        senderId: result.sender_id,
-        text: result.text,
-        timestamp: result.created_at,
-        isAi: result.is_ai,
-        avatar: result.avatar,
-        attachmentUrl: result.attachment_url,
-        attachmentType: result.attachment_type,
-        attachmentName: result.attachment_name,
-        isEdited: result.is_edited,
-        editedAt: result.edited_at,
-        taskLink: result.task_link
-      };
+      // Check if this is a reply to another message
+      if (savedReplyingTo) {
+        console.log('[handleSendMessage] Sending as reply to:', savedReplyingTo.id);
+        result = await sendReplyMessage(userMsg, savedReplyingTo.id);
 
-      setMessages(prev => {
-        // Check if already exists (in case realtime DID work)
-        if (prev.some(m => m.id === insertedMsg.id)) {
-          console.log('[handleSendMessage] Message already in UI (realtime worked!)');
-          return prev;
+        // Update parent message's reply count in local state
+        setMessages(prev => prev.map(m =>
+          m.id === savedReplyingTo.id
+            ? { ...m, replyCount: (m.replyCount || 0) + 1 }
+            : m
+        ));
+
+        // Add reply to threadReplies if thread is expanded
+        if (expandedThreads.has(savedReplyingTo.id)) {
+          const insertedReply: ChatMessage = {
+            id: result.id,
+            channelId: result.channel_id,
+            sender: result.sender,
+            senderId: result.sender_id,
+            text: result.text,
+            timestamp: result.created_at,
+            isAi: result.is_ai,
+            avatar: result.avatar,
+            attachmentUrl: result.attachment_url,
+            attachmentType: result.attachment_type,
+            attachmentName: result.attachment_name,
+            isEdited: result.is_edited,
+            editedAt: result.edited_at,
+            taskLink: result.task_link,
+            parentMessageId: result.parent_message_id
+          };
+          setThreadReplies(prev => ({
+            ...prev,
+            [savedReplyingTo.id]: [...(prev[savedReplyingTo.id] || []), insertedReply]
+          }));
         }
-        console.log('[handleSendMessage] Adding message to UI manually');
-        return [...prev, insertedMsg];
-      });
+      } else {
+        result = await sendChatMessage(userMsg);
+        console.log('[handleSendMessage] Message sent successfully:', result);
+
+        // TEMPORARY WORKAROUND: Manually add message to UI since realtime might not be working
+        console.log('[handleSendMessage] Adding message to UI manually...');
+        const insertedMsg: ChatMessage = {
+          id: result.id,
+          channelId: result.channel_id,
+          sender: result.sender,
+          senderId: result.sender_id,
+          text: result.text,
+          timestamp: result.created_at,
+          isAi: result.is_ai,
+          avatar: result.avatar,
+          attachmentUrl: result.attachment_url,
+          attachmentType: result.attachment_type,
+          attachmentName: result.attachment_name,
+          isEdited: result.is_edited,
+          editedAt: result.edited_at,
+          taskLink: result.task_link,
+          replyCount: 0
+        };
+
+        setMessages(prev => {
+          // Check if already exists (in case realtime DID work)
+          if (prev.some(m => m.id === insertedMsg.id)) {
+            console.log('[handleSendMessage] Message already in UI (realtime worked!)');
+            return prev;
+          }
+          console.log('[handleSendMessage] Adding message to UI manually');
+          return [...prev, insertedMsg];
+        });
+      }
       scrollToBottom();
     } catch (error: any) {
       console.error('[handleSendMessage] Failed to send message:', error);
@@ -1369,6 +1500,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       addToast('error', `Failed to send message: ${errorMsg}`);
       setMessage(messageText); // Restore message on error
       setStagedAttachment(savedStagedAttachment); // Restore attachment on error
+      setReplyingToMessage(savedReplyingTo); // Restore reply state on error
       return;
     }
 
@@ -2423,6 +2555,15 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                           {msg.isPinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
                         </button>
                       )}
+                      {!msg.isAi && editingMessageId !== msg.id && (
+                        <button
+                          onClick={() => setReplyingToMessage(msg)}
+                          className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-brand-600 transition-opacity inline-flex items-center align-middle"
+                          title="Reply to message"
+                        >
+                          <Reply className="w-4 h-4" />
+                        </button>
+                      )}
                       {msg.isPinned && (
                         <span className="text-amber-500 ml-1" title="Pinned message">
                           <Pin className="w-3 h-3 inline" />
@@ -2478,6 +2619,87 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                     </div>
                   )}
                 </div>
+
+                {/* Thread Replies Indicator & Expansion */}
+                {msg.replyCount && msg.replyCount > 0 && (
+                  <div className="mt-2">
+                    <button
+                      onClick={() => toggleThreadExpansion(msg.id)}
+                      className="flex items-center gap-2 text-sm text-brand-600 hover:text-brand-700 transition-colors"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      <span className="font-medium">
+                        {msg.replyCount} {msg.replyCount === 1 ? 'reply' : 'replies'}
+                      </span>
+                      {expandedThreads.has(msg.id) ? (
+                        <ChevronUp className="w-4 h-4" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4" />
+                      )}
+                    </button>
+
+                    {/* Expanded Thread Replies */}
+                    {expandedThreads.has(msg.id) && (
+                      <div className="mt-3 ml-4 pl-4 border-l-2 border-brand-200 space-y-3">
+                        {loadingThreads.has(msg.id) ? (
+                          <div className="flex items-center gap-2 text-sm text-slate-500">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Loading replies...
+                          </div>
+                        ) : (
+                          <>
+                            {(threadReplies[msg.id] || []).map((reply) => (
+                              <div key={reply.id} className="flex gap-2">
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${reply.isAi ? 'bg-brand-500' : 'bg-slate-200'}`}>
+                                  {reply.isAi ? (
+                                    <Bot className="w-3 h-3 text-white" />
+                                  ) : reply.avatar && reply.avatar !== 'user' && reply.avatar.startsWith('http') ? (
+                                    <img src={reply.avatar} alt="" className="w-full h-full rounded-full object-cover" />
+                                  ) : (
+                                    <UserIcon className="w-3 h-3 text-slate-500" />
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-baseline gap-2">
+                                    <span className={`font-semibold text-sm ${isDarkBackground() ? 'text-white' : 'text-slate-900'}`}>{reply.sender}</span>
+                                    <span className={`text-[10px] ${isDarkBackground() ? 'text-slate-400' : 'text-slate-400'}`}>
+                                      {formatMessageTime(reply.timestamp)}
+                                      {reply.isEdited && <span className="ml-1 italic">(edited)</span>}
+                                    </span>
+                                  </div>
+                                  {reply.attachmentUrl && (
+                                    <div className="mt-1 mb-1">
+                                      {reply.attachmentType === 'image' ? (
+                                        <a href={reply.attachmentUrl} target="_blank" rel="noopener noreferrer">
+                                          <img src={reply.attachmentUrl} alt="Attachment" className="max-h-32 rounded-lg border border-slate-200" />
+                                        </a>
+                                      ) : (
+                                        <a href={reply.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-brand-600 hover:underline">
+                                          {reply.attachmentName || 'Attachment'}
+                                        </a>
+                                      )}
+                                    </div>
+                                  )}
+                                  <p className={`text-sm whitespace-pre-wrap ${isDarkBackground() ? 'text-slate-200' : 'text-slate-700'}`}>
+                                    {renderTextWithMentions(reply.text)}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                            {/* Reply in thread button */}
+                            <button
+                              onClick={() => setReplyingToMessage(msg)}
+                              className="flex items-center gap-1 text-xs text-slate-500 hover:text-brand-600 transition-colors"
+                            >
+                              <Reply className="w-3 h-3" />
+                              Reply
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -2559,6 +2781,28 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
               </div>
               );
             })()}
+
+            {/* Reply banner - shows when replying to a message */}
+            {replyingToMessage && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-brand-50 border-b border-brand-200">
+                <Reply className="w-4 h-4 text-brand-600 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm text-brand-600">
+                    Replying to <span className="font-semibold">{replyingToMessage.sender}</span>
+                  </span>
+                  <p className="text-xs text-slate-500 truncate">
+                    {replyingToMessage.text.substring(0, 60)}{replyingToMessage.text.length > 60 ? '...' : ''}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setReplyingToMessage(null)}
+                  className="p-1 text-slate-400 hover:text-slate-600 transition-colors"
+                  title="Cancel reply"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
 
             {/* Staged attachment preview */}
             {stagedAttachment && (

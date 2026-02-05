@@ -440,6 +440,7 @@ export const fetchChatMessages = async (
     .from('chat_messages')
     .select('*')
     .eq('channel_id', channelId)
+    .is('parent_message_id', null) // Only fetch top-level messages (not thread replies)
     .order('created_at', { ascending: false }) // Get newest first for pagination
     .limit(limit);
 
@@ -475,7 +476,9 @@ export const fetchChatMessages = async (
     pinnedBy: row.pinned_by,
     taskLink: row.task_link,
     callRoomId: row.call_room_id,
-    callType: row.call_type
+    callType: row.call_type,
+    parentMessageId: row.parent_message_id,
+    replyCount: row.reply_count || 0
   }));
 };
 
@@ -521,6 +524,105 @@ export const sendChatMessage = async (msg: ChatMessage) => {
   }
 
   return data;
+};
+
+// --- Message Threading/Replies ---
+
+export const sendReplyMessage = async (msg: ChatMessage, parentMessageId: string) => {
+  // Ensure sender profile exists before inserting message
+  if (msg.senderId) {
+    await ensureProfileExists(msg.senderId, undefined, msg.sender);
+  }
+
+  const insertData: Record<string, any> = {
+    channel_id: msg.channelId,
+    sender: msg.sender,
+    sender_id: msg.senderId,
+    text: msg.text,
+    is_ai: msg.isAi || false,
+    avatar: msg.avatar,
+    created_at: msg.timestamp,
+    attachment_url: msg.attachmentUrl,
+    attachment_type: msg.attachmentType,
+    attachment_name: msg.attachmentName,
+    parent_message_id: parentMessageId
+  };
+
+  // Include task link data if present
+  if (msg.taskLink) {
+    insertData.task_link = msg.taskLink;
+  }
+
+  // Start a transaction: insert message and increment parent's reply_count
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .insert(insertData)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('[sendReplyMessage] Error inserting reply:', error.message);
+    throw error;
+  }
+
+  // Increment parent message's reply_count
+  const { error: updateError } = await supabase.rpc('increment_reply_count', {
+    message_id: parentMessageId
+  });
+
+  // If RPC doesn't exist, fall back to manual update
+  if (updateError) {
+    console.log('[sendReplyMessage] RPC not available, using manual update');
+    // Get current count and update
+    const { data: parentMsg } = await supabase
+      .from('chat_messages')
+      .select('reply_count')
+      .eq('id', parentMessageId)
+      .single();
+
+    const currentCount = parentMsg?.reply_count || 0;
+    await supabase
+      .from('chat_messages')
+      .update({ reply_count: currentCount + 1 })
+      .eq('id', parentMessageId);
+  }
+
+  return data;
+};
+
+export const fetchThreadReplies = async (parentMessageId: string): Promise<ChatMessage[]> => {
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .select('*')
+    .eq('parent_message_id', parentMessageId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('[fetchThreadReplies] Error:', error.message);
+    return [];
+  }
+
+  return data.map((row: any) => ({
+    id: row.id,
+    channelId: row.channel_id,
+    sender: row.sender,
+    senderId: row.sender_id,
+    text: row.text,
+    timestamp: row.created_at,
+    isAi: row.is_ai,
+    avatar: row.avatar,
+    attachmentUrl: row.attachment_url,
+    attachmentType: row.attachment_type,
+    attachmentName: row.attachment_name,
+    isEdited: row.is_edited,
+    editedAt: row.edited_at,
+    isPinned: row.is_pinned,
+    pinnedAt: row.pinned_at,
+    pinnedBy: row.pinned_by,
+    taskLink: row.task_link,
+    parentMessageId: row.parent_message_id,
+    replyCount: row.reply_count
+  }));
 };
 
 export const editChatMessage = async (messageId: string, newText: string) => {

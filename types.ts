@@ -172,6 +172,10 @@ export interface ChatMessage {
     dueDate: string;
     assignedTo?: string[];
   };
+  // Threading/Reply fields
+  parentMessageId?: string; // ID of parent message being replied to
+  replyCount?: number; // Number of replies to this message
+  parentMessage?: { id: string; sender: string; text: string }; // Preview of parent for inline display
 }
 
 export interface ChatChannel {
