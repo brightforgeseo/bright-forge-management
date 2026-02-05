@@ -63,6 +63,7 @@ export enum ToolView {
   KEYWORD_RESEARCH = 'KEYWORD_RESEARCH',
   CONTENT_GENERATOR = 'CONTENT_GENERATOR',
   SITE_AUDIT = 'SITE_AUDIT',
+  QA_CHECKER = 'QA_CHECKER',
   TASKS = 'TASKS',
   MY_WORK = 'MY_WORK',
   TEAM_CHAT = 'TEAM_CHAT',
@@ -91,6 +92,11 @@ export interface ContentResult {
   title: string;
   content: string;
   metaDescription: string;
+}
+
+export interface QACorrection {
+  find: string;
+  replace: string;
 }
 
 export interface TaskComment {

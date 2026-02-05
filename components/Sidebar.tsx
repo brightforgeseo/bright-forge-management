@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Search, PenTool, BarChart, Settings, TableProperties, MessageSquare, Hexagon, LogOut, UserPlus, MoreVertical, Bell, X, Check, CheckSquare, Menu } from 'lucide-react';
+import { LayoutDashboard, Search, PenTool, BarChart, Settings, TableProperties, MessageSquare, Hexagon, LogOut, UserPlus, MoreVertical, Bell, X, Check, CheckSquare, Menu, FileCheck } from 'lucide-react';
 import { ToolView, BrandingConfig, User, AppNotification } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { fetchNotifications, markNotificationRead, markAllNotificationsRead, deleteAllNotifications, deleteNotification } from '../services/databaseService';
@@ -305,6 +305,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: ToolView.KEYWORD_RESEARCH, label: 'Keyword Research', icon: Search },
     { id: ToolView.CONTENT_GENERATOR, label: 'Content Generator', icon: PenTool },
     { id: ToolView.SITE_AUDIT, label: 'SEO Audit', icon: BarChart },
+    { id: ToolView.QA_CHECKER, label: 'QA Checker', icon: FileCheck },
     { id: ToolView.TASKS, label: 'Project Tasks', icon: TableProperties },
     { id: ToolView.MY_WORK, label: 'My Work', icon: CheckSquare },
     { id: ToolView.TEAM_CHAT, label: 'Team Chat', icon: MessageSquare },

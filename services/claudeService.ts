@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { KeywordResult, AuditResult, ContentResult, Task } from '../types';
+import { KeywordResult, AuditResult, ContentResult, Task, QACorrection } from '../types';
 import { EmailGenerationContext, GeneratedEmail } from '../types-portal';
 import { getChatSystemPrompt, getSEOSystemPrompt } from './skillsLoader';
 import { loadBusinessContext, formatBusinessContextForPrompt, getClientContext } from './businessContextLoader';
@@ -587,6 +587,62 @@ Return ONLY valid JSON:
     throw new Error('Failed to parse email response');
   } catch (error) {
     console.error('Claude email generation failed:', error);
+    throw error;
+  }
+};
+
+/**
+ * QA Content Checker using Claude 4.5 Sonnet
+ * Checks content based on custom user rules and returns specific corrections
+ */
+export const checkContentQA = async (
+  content: string,
+  qaRules: string
+): Promise<QACorrection[]> => {
+  const client = getClaudeClient();
+
+  try {
+    const systemPrompt = `You are a meticulous QA editor. FOLLOW THE USER'S INSTRUCTIONS EXACTLY.
+
+Read the ENTIRE document. Check every paragraph based on the user's rules.
+
+Return corrections for TEXT ONLY (no HTML tags).
+
+OUTPUT: ONLY a valid JSON array. No markdown, no code blocks, no explanation.
+Format: [{"find": "exact text to find", "replace": "corrected text"}, ...]
+If no issues found: []
+
+The "find" text must match EXACTLY what appears in the document.`;
+
+    const userMessage = `MY QA RULES - FOLLOW EXACTLY:
+${qaRules}
+
+DOCUMENT TO CHECK:
+${content}
+
+Return ONLY a JSON array of text corrections:`;
+
+    const response = await client.messages.create({
+      model: CLAUDE_SONNET,
+      max_tokens: 8192,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userMessage }]
+    });
+
+    const text = response.content[0].type === 'text' ? response.content[0].text : '';
+
+    // Strip markdown code blocks and extract JSON array
+    let jsonStr = text.trim().replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+
+    const start = jsonStr.indexOf('[');
+    const end = jsonStr.lastIndexOf(']');
+    if (start !== -1 && end > start) {
+      return JSON.parse(jsonStr.substring(start, end + 1)) as QACorrection[];
+    }
+
+    return JSON.parse(jsonStr) as QACorrection[];
+  } catch (error) {
+    console.error('QA check failed:', error);
     throw error;
   }
 };
