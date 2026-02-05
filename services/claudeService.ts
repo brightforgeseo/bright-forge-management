@@ -10,7 +10,7 @@ const K2 = '_IxCsXAgHA-QFdT-0P2Ip3Tpypg7SVQAPr8TA7p0S2dvHyFi9D0mpjQ-z388AAAA';
 
 // Model IDs - Latest Claude 4.5 models
 const CLAUDE_HAIKU = 'claude-haiku-4-5-20251001'; // Claude 4.5 Haiku - fast, efficient for chat
-const CLAUDE_SONNET = 'claude-sonnet-4-5-20250514'; // Claude 4.5 Sonnet - high-quality for content generation
+const CLAUDE_SONNET = 'claude-sonnet-4-5-20250929'; // Claude 4.5 Sonnet - high-quality for content generation
 
 const getClaudeClient = () => {
   const apiKey = K1 + K2;
