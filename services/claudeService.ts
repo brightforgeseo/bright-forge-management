@@ -602,25 +602,36 @@ export const checkContentQA = async (
   const client = getClaudeClient();
 
   try {
-    const systemPrompt = `You are a meticulous QA editor. FOLLOW THE USER'S INSTRUCTIONS EXACTLY.
+    const systemPrompt = `You are a QA editor. Your ONLY job is to apply the user's rules to find issues in their document.
 
-Read the ENTIRE document. Check every paragraph based on the user's rules.
+CRITICAL INSTRUCTIONS:
+1. READ each rule the user provides
+2. SCAN the entire document for violations of EACH rule
+3. For EVERY violation found, add it to the corrections list
+4. The "find" field must contain the EXACT text from the document (copy it exactly)
+5. The "replace" field must contain the corrected version
 
-Return corrections for TEXT ONLY (no HTML tags).
+EXAMPLES:
+- If user says "Change 'perth' to 'Perth'" and document contains "perth" → {"find": "perth", "replace": "Perth"}
+- If user says "Fix spelling errors" and document has "teh" → {"find": "teh", "replace": "the"}
+- If user says "Capitalise company names" and document has "indigo pool care" → {"find": "indigo pool care", "replace": "Indigo Pool Care"}
 
-OUTPUT: ONLY a valid JSON array. No markdown, no code blocks, no explanation.
-Format: [{"find": "exact text to find", "replace": "corrected text"}, ...]
-If no issues found: []
+OUTPUT FORMAT: A JSON array only. No markdown. No explanation. No code blocks.
+[{"find": "exact wrong text", "replace": "corrected text"}]
 
-The "find" text must match EXACTLY what appears in the document.`;
+If nothing violates the rules: []`;
 
-    const userMessage = `MY QA RULES - FOLLOW EXACTLY:
+    const userMessage = `HERE ARE MY RULES - APPLY EACH ONE:
 ${qaRules}
 
-DOCUMENT TO CHECK:
+---
+
+HERE IS MY DOCUMENT - SCAN IT FOR ISSUES:
 ${content}
 
-Return ONLY a JSON array of text corrections:`;
+---
+
+Find ALL violations of my rules above. Return JSON array only:`;
 
     const response = await client.messages.create({
       model: CLAUDE_SONNET,
