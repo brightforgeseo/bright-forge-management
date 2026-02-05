@@ -55,9 +55,31 @@ const QAChecker: React.FC = () => {
     setCorrections([]);
   };
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     if (!editorRef.current) return;
-    navigator.clipboard.writeText(editorRef.current.innerHTML);
+
+    const html = editorRef.current.innerHTML;
+    const text = editorRef.current.innerText;
+
+    try {
+      // Copy as rich text (HTML) so it pastes with formatting into Google Docs/Word
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html': new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([text], { type: 'text/plain' })
+        })
+      ]);
+    } catch {
+      // Fallback for older browsers - select and copy
+      const selection = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(editorRef.current);
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+      document.execCommand('copy');
+      selection?.removeAllRanges();
+    }
+
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -83,7 +105,7 @@ const QAChecker: React.FC = () => {
                 className="flex items-center gap-1 text-sm text-slate-600 hover:text-brand-600"
               >
                 {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                {copied ? 'Copied!' : 'Copy HTML'}
+                {copied ? 'Copied!' : 'Copy'}
               </button>
             </div>
             <div
