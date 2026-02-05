@@ -2621,7 +2621,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                 </div>
 
                 {/* Thread Replies Indicator & Expansion */}
-                {msg.replyCount && msg.replyCount > 0 && (
+                {(msg.replyCount ?? 0) > 0 && (
                   <div className="mt-2">
                     <button
                       onClick={() => toggleThreadExpansion(msg.id)}
