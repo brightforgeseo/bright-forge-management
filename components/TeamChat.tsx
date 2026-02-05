@@ -1474,10 +1474,17 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
             taskLink: result.task_link,
             parentMessageId: result.parent_message_id
           };
-          setThreadReplies(prev => ({
-            ...prev,
-            [savedReplyingTo.id]: [...(prev[savedReplyingTo.id] || []), insertedReply]
-          }));
+          setThreadReplies(prev => {
+            const existing = prev[savedReplyingTo.id] || [];
+            // Check for duplicate
+            if (existing.some(r => r.id === result.id)) {
+              return prev;
+            }
+            return {
+              ...prev,
+              [savedReplyingTo.id]: [...existing, insertedReply]
+            };
+          });
         }
       } else {
         result = await sendChatMessage(userMsg);
