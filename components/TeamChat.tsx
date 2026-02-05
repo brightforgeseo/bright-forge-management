@@ -850,21 +850,24 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
               replyCount: updatedMsg.reply_count || m.replyCount
             } : m
           ));
-          // Also update in thread replies if applicable
-          setThreadReplies(prev => {
-            const newReplies = { ...prev };
-            for (const parentId in newReplies) {
-              newReplies[parentId] = newReplies[parentId].map(r =>
-                r.id === updatedMsg.id ? {
-                  ...r,
-                  text: updatedMsg.text,
-                  isEdited: updatedMsg.is_edited,
-                  editedAt: updatedMsg.edited_at
-                } : r
-              );
-            }
-            return newReplies;
-          });
+          // Update in thread replies only if it's a reply (has parent_message_id)
+          if (updatedMsg.parent_message_id) {
+            setThreadReplies(prev => {
+              const parentReplies = prev[updatedMsg.parent_message_id];
+              if (!parentReplies) return prev;
+              return {
+                ...prev,
+                [updatedMsg.parent_message_id]: parentReplies.map(r =>
+                  r.id === updatedMsg.id ? {
+                    ...r,
+                    text: updatedMsg.text,
+                    isEdited: updatedMsg.is_edited,
+                    editedAt: updatedMsg.edited_at
+                  } : r
+                )
+              };
+            });
+          }
         }
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'chat_messages' }, async (payload) => {
@@ -873,7 +876,26 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
         // Remove from UI if it's in the current channel
         if (deletedMsg.channel_id === activeChannelRef.current) {
+          // Remove from main messages
           setMessages(prev => prev.filter(m => m.id !== deletedMsg.id));
+
+          // Remove from thread replies if it was a reply
+          if (deletedMsg.parent_message_id) {
+            setThreadReplies(prev => {
+              const parentReplies = prev[deletedMsg.parent_message_id];
+              if (!parentReplies) return prev;
+              return {
+                ...prev,
+                [deletedMsg.parent_message_id]: parentReplies.filter(r => r.id !== deletedMsg.id)
+              };
+            });
+            // Decrement parent's reply count
+            setMessages(prev => prev.map(m =>
+              m.id === deletedMsg.parent_message_id
+                ? { ...m, replyCount: Math.max(0, (m.replyCount || 0) - 1) }
+                : m
+            ));
+          }
         }
       })
       .subscribe((status) => {
