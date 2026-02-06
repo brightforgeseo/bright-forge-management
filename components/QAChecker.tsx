@@ -39,19 +39,39 @@ const QAChecker: React.FC = () => {
   const applyCorrections = () => {
     if (!editorRef.current || corrections.length === 0) return;
 
-    let html = editorRef.current.innerHTML;
-
     // Sort by length (longest first) to avoid partial matches
     const sorted = [...corrections].sort((a, b) => b.find.length - a.find.length);
 
     sorted.forEach(c => {
-      if (c.find && c.replace) {
+      if (!c.find || !c.replace) return;
+
+      const isHtmlReplace = /<[a-z][a-z0-9]*[\s>]/i.test(c.replace);
+
+      if (isHtmlReplace) {
+        // For HTML replacements (like adding links), we must use innerHTML
         const escaped = c.find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        html = html.replace(new RegExp(escaped, 'g'), c.replace);
+        editorRef.current!.innerHTML = editorRef.current!.innerHTML.replace(new RegExp(escaped, 'g'), c.replace);
+      } else {
+        // For text-only corrections, replace inside text nodes to preserve formatting
+        const walker = document.createTreeWalker(
+          editorRef.current!,
+          NodeFilter.SHOW_TEXT
+        );
+
+        const textNodes: Text[] = [];
+        let node;
+        while ((node = walker.nextNode())) {
+          textNodes.push(node as Text);
+        }
+
+        textNodes.forEach(textNode => {
+          if (textNode.textContent && textNode.textContent.includes(c.find)) {
+            textNode.textContent = textNode.textContent.split(c.find).join(c.replace);
+          }
+        });
       }
     });
 
-    editorRef.current.innerHTML = html;
     setCorrections([]);
   };
 

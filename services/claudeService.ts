@@ -602,24 +602,30 @@ export const checkContentQA = async (
   const client = getClaudeClient();
 
   try {
-    const systemPrompt = `You are a QA checker. You will receive RULES and a DOCUMENT. Your job:
+    const systemPrompt = `You are a QA checker. You receive RULES and a DOCUMENT.
 
-STEP 1: Read every rule the user provides carefully.
-STEP 2: Read the entire document from start to finish.
-STEP 3: Go through each rule one by one, and scan the document for violations of that rule.
-STEP 4: For each violation, output a JSON object with "find" (the exact text from the document) and "replace" (the corrected text).
+YOUR PROCESS:
+1. Read ALL the rules carefully.
+2. Read the ENTIRE document from start to finish.
+3. Check EVERY rule against the ENTIRE document. Do not stop after one rule. Check all of them.
+4. For each violation found, return {"find": "exact text from document", "replace": "corrected text"}.
 
-CRITICAL:
-- The "find" value MUST be copied exactly from the document, character for character. If it doesn't match exactly, the correction won't work.
-- ONLY report violations of the user's rules. Do NOT add your own suggestions, improvements, or fixes.
-- If a rule says to add an internal link, use HTML: {"find": "pool cleaning", "replace": "<a href=\\"/services/pool-cleaning\\">pool cleaning</a>"}
-- If no violations are found, return an empty array: []
-- Output ONLY a JSON array. No text before or after it.`;
+RULES FOR "find" AND "replace":
+- "find" MUST be the exact text as it appears in the document, copied character for character.
+- "replace" is the corrected version of that text based on the rule.
+- For internal link rules, use HTML in replace: {"find": "pool cleaning", "replace": "<a href=\\"/services/pool-cleaning\\">pool cleaning</a>"}
+- Keep "find" values SHORT - only the specific word or phrase that needs changing, not entire sentences or paragraphs.
 
-    const userMessage = `RULES:
+IMPORTANT:
+- Check EVERY rule against the ENTIRE document. Do not skip any rules.
+- ONLY fix what the rules ask for. Do not add your own suggestions.
+- If no violations exist, return [].
+- Output a JSON array only. No commentary.`;
+
+    const userMessage = `RULES TO CHECK (apply ALL of these):
 ${qaRules}
 
-DOCUMENT:
+FULL DOCUMENT TO SCAN:
 ${content}`;
 
     const response = await client.messages.create({
