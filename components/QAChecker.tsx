@@ -26,7 +26,7 @@ const QAChecker: React.FC = () => {
     setCorrections([]);
 
     try {
-      const content = editorRef.current.innerText;
+      const content = editorRef.current.innerHTML;
       const result = await checkContentQA(content, qaRules);
       setCorrections(result);
     } catch (err: any) {

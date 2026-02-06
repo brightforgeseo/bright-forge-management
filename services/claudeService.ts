@@ -602,40 +602,55 @@ export const checkContentQA = async (
   const client = getClaudeClient();
 
   try {
-    const systemPrompt = `You are a QA editor. Your ONLY job is to apply the user's rules to find issues in their document.
+    const systemPrompt = `You are a strict QA editor. You follow the user's rules EXACTLY and make NO other changes.
 
-CRITICAL INSTRUCTIONS:
-1. READ each rule the user provides
-2. SCAN the entire document for violations of EACH rule
-3. For EVERY violation found, add it to the corrections list
-4. The "find" field must contain the EXACT text from the document (copy it exactly)
-5. The "replace" field must contain the corrected version
+ABSOLUTE RULES:
+1. ONLY fix what the user's rules tell you to fix. Do NOT add your own suggestions.
+2. Do NOT fix grammar, spelling, punctuation, or style UNLESS the user explicitly asks for it.
+3. Do NOT rewrite sentences, change tone, or "improve" anything the user didn't ask about.
+4. If the user gives you 3 rules, you check ONLY those 3 things. Nothing else.
+5. The "find" field MUST be the EXACT text copied from the document (character-for-character match).
+6. The "replace" field is the corrected version following the user's rule.
+
+INTERNAL LINKS:
+- If the user asks you to add internal links, wrap the anchor text in an HTML link tag.
+- Example: If user says "Link 'pool cleaning' to /services/pool-cleaning"
+  → {"find": "pool cleaning", "replace": "<a href=\\"/services/pool-cleaning\\">pool cleaning</a>"}
+- If user provides a list of URLs/pages and says to add internal links, find relevant anchor text in the document and link it.
+- Only add links where the text naturally exists in the document. Do NOT invent new text.
 
 EXAMPLES:
-- If user says "Change 'perth' to 'Perth'" and document contains "perth" → {"find": "perth", "replace": "Perth"}
-- If user says "Fix spelling errors" and document has "teh" → {"find": "teh", "replace": "the"}
-- If user says "Capitalise company names" and document has "indigo pool care" → {"find": "indigo pool care", "replace": "Indigo Pool Care"}
+- Rule: "Change 'perth' to 'Perth'" → Find every instance of "perth" → {"find": "perth", "replace": "Perth"}
+- Rule: "Capitalise 'indigo pool care'" → {"find": "indigo pool care", "replace": "Indigo Pool Care"}
+- Rule: "Link 'pool pumps' to /pool-pumps" → {"find": "pool pumps", "replace": "<a href=\\"/pool-pumps\\">pool pumps</a>"}
 
-OUTPUT FORMAT: A JSON array only. No markdown. No explanation. No code blocks.
-[{"find": "exact wrong text", "replace": "corrected text"}]
+WHAT YOU MUST NEVER DO:
+- Do NOT suggest changes the user didn't ask for
+- Do NOT add corrections for things not covered by the user's rules
+- Do NOT change wording, sentence structure, or content beyond what the rules require
+- Do NOT hallucinate text that isn't in the document
+
+OUTPUT: A JSON array ONLY. No markdown. No explanation. No code blocks. No commentary.
+[{"find": "exact text from document", "replace": "corrected text"}]
 
 If nothing violates the rules: []`;
 
-    const userMessage = `HERE ARE MY RULES - APPLY EACH ONE:
+    const userMessage = `MY RULES (ONLY apply these, nothing else):
 ${qaRules}
 
 ---
 
-HERE IS MY DOCUMENT - SCAN IT FOR ISSUES:
+DOCUMENT TO CHECK:
 ${content}
 
 ---
 
-Find ALL violations of my rules above. Return JSON array only:`;
+Apply ONLY my rules above. Return JSON array only. Do NOT add any suggestions beyond my rules:`;
 
     const response = await client.messages.create({
       model: CLAUDE_SONNET,
       max_tokens: 8192,
+      temperature: 0,
       system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }]
     });
