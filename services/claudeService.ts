@@ -602,44 +602,33 @@ export const checkContentQA = async (
   const client = getClaudeClient();
 
   try {
-    const systemPrompt = `You are a QA checker. You receive RULES and a DOCUMENT.
+    const systemPrompt = `You are a QA content checker. The user gives you rules and a document. You read the rules, then read the whole document top to bottom, and find every place in the document that violates any of the rules. You return a JSON array of corrections.
 
-YOUR PROCESS:
-1. Read ALL the rules carefully.
-2. Read the ENTIRE document from start to finish.
-3. Check EVERY rule against the ENTIRE document. Do not stop after one rule. Check all of them.
-4. For each violation found, return {"find": "exact text from document", "replace": "corrected text"}.
+Each correction is: {"find": "exact text from the document", "replace": "the corrected version"}
 
-RULES FOR "find" AND "replace":
-- "find" MUST be the exact text as it appears in the document, copied character for character.
-- "replace" is the corrected version of that text based on the rule.
-- For internal link rules, use HTML in replace: {"find": "pool cleaning", "replace": "<a href=\\"/services/pool-cleaning\\">pool cleaning</a>"}
-- Keep "find" values SHORT - only the specific word or phrase that needs changing, not entire sentences or paragraphs.
+The "find" value must be copied exactly from the document so it can be matched. Keep it to the specific word or short phrase that needs fixing.
 
-IMPORTANT:
-- Check EVERY rule against the ENTIRE document. Do not skip any rules.
-- ONLY fix what the rules ask for. Do not add your own suggestions.
-- If no violations exist, return [].
-- Output a JSON array only. No commentary.`;
+For link rules, put HTML in replace: {"find": "pool cleaning", "replace": "<a href=\\"/pool-cleaning\\">pool cleaning</a>"}
 
-    const userMessage = `RULES TO CHECK (apply ALL of these):
+Only fix what the rules say. Do not add extra suggestions. Return [] if nothing needs fixing. Return ONLY the JSON array, no other text.`;
+
+    const userMessage = `Here are my QA rules:
 ${qaRules}
 
-FULL DOCUMENT TO SCAN:
-${content}`;
+Here is the full document to check against those rules:
+${content}
+
+Check the entire document against all of my rules and return the JSON array of corrections:`;
 
     const response = await client.messages.create({
       model: CLAUDE_SONNET,
-      max_tokens: 8192,
+      max_tokens: 16384,
       temperature: 0,
       system: systemPrompt,
-      messages: [
-        { role: 'user', content: userMessage },
-        { role: 'assistant', content: '[' }
-      ]
+      messages: [{ role: 'user', content: userMessage }]
     });
 
-    const text = '[' + (response.content[0].type === 'text' ? response.content[0].text : '');
+    const text = response.content[0].type === 'text' ? response.content[0].text : '';
 
     // Strip markdown code blocks and extract JSON array
     let jsonStr = text.trim().replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
