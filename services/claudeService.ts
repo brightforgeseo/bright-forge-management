@@ -602,60 +602,38 @@ export const checkContentQA = async (
   const client = getClaudeClient();
 
   try {
-    const systemPrompt = `You are a strict QA editor. You follow the user's rules EXACTLY and make NO other changes.
+    const systemPrompt = `You are a QA checker. You will receive RULES and a DOCUMENT. Your job:
 
-ABSOLUTE RULES:
-1. ONLY fix what the user's rules tell you to fix. Do NOT add your own suggestions.
-2. Do NOT fix grammar, spelling, punctuation, or style UNLESS the user explicitly asks for it.
-3. Do NOT rewrite sentences, change tone, or "improve" anything the user didn't ask about.
-4. If the user gives you 3 rules, you check ONLY those 3 things. Nothing else.
-5. The "find" field MUST be the EXACT text copied from the document (character-for-character match).
-6. The "replace" field is the corrected version following the user's rule.
+STEP 1: Read every rule the user provides carefully.
+STEP 2: Read the entire document from start to finish.
+STEP 3: Go through each rule one by one, and scan the document for violations of that rule.
+STEP 4: For each violation, output a JSON object with "find" (the exact text from the document) and "replace" (the corrected text).
 
-INTERNAL LINKS:
-- If the user asks you to add internal links, wrap the anchor text in an HTML link tag.
-- Example: If user says "Link 'pool cleaning' to /services/pool-cleaning"
-  → {"find": "pool cleaning", "replace": "<a href=\\"/services/pool-cleaning\\">pool cleaning</a>"}
-- If user provides a list of URLs/pages and says to add internal links, find relevant anchor text in the document and link it.
-- Only add links where the text naturally exists in the document. Do NOT invent new text.
+CRITICAL:
+- The "find" value MUST be copied exactly from the document, character for character. If it doesn't match exactly, the correction won't work.
+- ONLY report violations of the user's rules. Do NOT add your own suggestions, improvements, or fixes.
+- If a rule says to add an internal link, use HTML: {"find": "pool cleaning", "replace": "<a href=\\"/services/pool-cleaning\\">pool cleaning</a>"}
+- If no violations are found, return an empty array: []
+- Output ONLY a JSON array. No text before or after it.`;
 
-EXAMPLES:
-- Rule: "Change 'perth' to 'Perth'" → Find every instance of "perth" → {"find": "perth", "replace": "Perth"}
-- Rule: "Capitalise 'indigo pool care'" → {"find": "indigo pool care", "replace": "Indigo Pool Care"}
-- Rule: "Link 'pool pumps' to /pool-pumps" → {"find": "pool pumps", "replace": "<a href=\\"/pool-pumps\\">pool pumps</a>"}
-
-WHAT YOU MUST NEVER DO:
-- Do NOT suggest changes the user didn't ask for
-- Do NOT add corrections for things not covered by the user's rules
-- Do NOT change wording, sentence structure, or content beyond what the rules require
-- Do NOT hallucinate text that isn't in the document
-
-OUTPUT: A JSON array ONLY. No markdown. No explanation. No code blocks. No commentary.
-[{"find": "exact text from document", "replace": "corrected text"}]
-
-If nothing violates the rules: []`;
-
-    const userMessage = `MY RULES (ONLY apply these, nothing else):
+    const userMessage = `RULES:
 ${qaRules}
 
----
-
-DOCUMENT TO CHECK:
-${content}
-
----
-
-Apply ONLY my rules above. Return JSON array only. Do NOT add any suggestions beyond my rules:`;
+DOCUMENT:
+${content}`;
 
     const response = await client.messages.create({
       model: CLAUDE_SONNET,
       max_tokens: 8192,
       temperature: 0,
       system: systemPrompt,
-      messages: [{ role: 'user', content: userMessage }]
+      messages: [
+        { role: 'user', content: userMessage },
+        { role: 'assistant', content: '[' }
+      ]
     });
 
-    const text = response.content[0].type === 'text' ? response.content[0].text : '';
+    const text = '[' + (response.content[0].type === 'text' ? response.content[0].text : '');
 
     // Strip markdown code blocks and extract JSON array
     let jsonStr = text.trim().replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
