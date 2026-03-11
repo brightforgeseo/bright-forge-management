@@ -252,9 +252,20 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
 
       const newTaskId = `task-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 
-      // Hardcode status to "Working on it"
-      const defaultStatus = 'Working on it';
-      const defaultPriority = 'Medium';
+      // Use the STATUS ID (not label) - TaskBoard stores statusDef.id, not label
+      // Find "Working on it" or "To Do", fall back to last status def (TaskBoard default)
+      const workingStatusDef = boardData.statusDefs?.find(s =>
+        s.label.toLowerCase() === 'working on it'
+      ) || boardData.statusDefs?.find(s =>
+        s.label.toLowerCase() === 'to do'
+      ) || boardData.statusDefs?.[boardData.statusDefs.length - 1];
+
+      const mediumPriorityDef = boardData.priorityDefs?.find(s =>
+        s.label.toLowerCase() === 'medium'
+      ) || boardData.priorityDefs?.[boardData.priorityDefs.length - 1];
+
+      const defaultStatus = workingStatusDef?.id || 'Working on it';
+      const defaultPriority = mediumPriorityDef?.id || 'Medium';
 
       const description = todoData.notes
         ? `${todoData.notes}\n\n— Created from chat reminder by ${todoData.created_by_name}`
@@ -311,18 +322,18 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
 
       const boardData = JSON.parse(JSON.stringify(row.board_data)) as ClientBoard;
 
-      // Find the last status def (usually "Done" or "Completed")
-      const doneStatus = boardData.statusDefs?.find(s =>
+      // Find "Done" status def - use ID not label
+      const doneStatusDef = boardData.statusDefs?.find(s =>
         s.label.toLowerCase().includes('done') ||
         s.label.toLowerCase().includes('complete')
-      ) || boardData.statusDefs?.[boardData.statusDefs.length - 1];
+      ) || boardData.statusDefs?.[0];
 
       // Find the task by board_task_id and update its status
       let found = false;
       for (const group of boardData.groups) {
         const task = group.tasks.find(t => t.id === todo.board_task_id);
         if (task) {
-          task.status = doneStatus?.label || 'Done';
+          task.status = doneStatusDef?.id || 'Done';
           found = true;
           break;
         }
