@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Plus, Check, Trash2, ChevronDown, Loader2, ListTodo, ArrowRight } from 'lucide-react';
+import { X, Plus, Check, Trash2, ChevronDown, Loader2, ListTodo, ArrowRight, FileText, ChevronUp } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { ClientBoard, User, ToastType } from '../types';
 import { fetchClientBoards, saveClientBoard } from '../services/databaseService';
@@ -13,6 +13,7 @@ export interface ChatTodo {
   created_by: string;
   created_by_name: string;
   assigned_to: string | null;
+  notes: string | null;
   is_completed: boolean;
   completed_at: string | null;
   completed_by: string | null;
@@ -28,12 +29,15 @@ interface ChatTodoListProps {
 const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onClose }) => {
   const [todos, setTodos] = useState<ChatTodo[]>([]);
   const [newTodoText, setNewTodoText] = useState('');
+  const [newTodoNotes, setNewTodoNotes] = useState('');
+  const [showNotesInput, setShowNotesInput] = useState(false);
   const [selectedBoardId, setSelectedBoardId] = useState<string>('');
   const [clientBoards, setClientBoards] = useState<ClientBoard[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [filter, setFilter] = useState<'active' | 'completed'>('active');
   const [completingIds, setCompletingIds] = useState<Set<string>>(new Set());
+  const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -96,6 +100,7 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
       .from('chat_todos')
       .insert({
         text,
+        notes: newTodoNotes.trim() || null,
         client_board_id: selectedBoardId || null,
         client_board_name: board?.name || null,
         created_by: currentUser.id,
@@ -108,6 +113,8 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
       addToast('error', 'Failed to add reminder');
     } else {
       setNewTodoText('');
+      setNewTodoNotes('');
+      setShowNotesInput(false);
       addToast('success', 'Reminder added');
     }
     setAdding(false);
@@ -171,10 +178,14 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
       const defaultStatus = board.statusDefs?.[0]?.label || 'Not Started';
       const defaultPriority = board.priorityDefs?.[0]?.label || 'Medium';
 
+      const description = todo.notes
+        ? `${todo.notes}\n\n— Created from chat reminder by ${todo.created_by_name}`
+        : `Created from chat reminder by ${todo.created_by_name}`;
+
       const newTask = {
         id: newTaskId,
         title: todo.text,
-        description: `Created from chat reminder by ${todo.created_by_name}`,
+        description,
         status: defaultStatus,
         priority: defaultPriority,
         dueDate: '',
@@ -278,6 +289,27 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
               Add
             </button>
           </div>
+          {/* Notes toggle + textarea */}
+          <div className="flex items-center gap-2 mb-2">
+            <button
+              onClick={() => setShowNotesInput(!showNotesInput)}
+              className={`flex items-center gap-1 px-2 py-1 text-xs rounded-lg transition-colors ${
+                showNotesInput ? 'bg-violet-100 text-violet-700' : 'text-slate-500 hover:bg-slate-200'
+              }`}
+            >
+              <FileText className="w-3 h-3" />
+              {showNotesInput ? 'Hide notes' : 'Add notes'}
+            </button>
+          </div>
+          {showNotesInput && (
+            <textarea
+              value={newTodoNotes}
+              onChange={e => setNewTodoNotes(e.target.value)}
+              placeholder="Add notes (will become the task description)..."
+              rows={3}
+              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-300 focus:border-violet-400 resize-none mb-2"
+            />
+          )}
           {/* Client board selector */}
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-500 whitespace-nowrap">Client:</span>
@@ -365,6 +397,27 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
                   <p className={`text-sm ${todo.is_completed ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
                     {todo.text}
                   </p>
+                  {todo.notes && (
+                    <div className="mt-1">
+                      <button
+                        onClick={() => setExpandedNotes(prev => {
+                          const next = new Set(prev);
+                          next.has(todo.id) ? next.delete(todo.id) : next.add(todo.id);
+                          return next;
+                        })}
+                        className="flex items-center gap-1 text-[11px] text-violet-500 hover:text-violet-700 transition-colors"
+                      >
+                        <FileText className="w-3 h-3" />
+                        {expandedNotes.has(todo.id) ? 'Hide notes' : 'View notes'}
+                        {expandedNotes.has(todo.id) ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                      </button>
+                      {expandedNotes.has(todo.id) && (
+                        <p className="mt-1 text-xs text-slate-500 bg-slate-50 rounded-lg p-2 whitespace-pre-wrap">
+                          {todo.notes}
+                        </p>
+                      )}
+                    </div>
+                  )}
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
                     <span className="text-[11px] text-slate-400">
                       {todo.created_by_name} · {formatDate(todo.created_at)}
