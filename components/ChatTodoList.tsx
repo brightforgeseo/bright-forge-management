@@ -252,9 +252,12 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
 
       const newTaskId = `task-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 
-      // Hardcode status to "Working on it" - this matches the status label used across all boards
+      // Hardcode status to "Working on it"
       const defaultStatus = 'Working on it';
       const defaultPriority = 'Medium';
+
+      // DEBUG: Remove this alert after confirming the right code is running
+      alert('Creating task with status: ' + defaultStatus + ' | priority: ' + defaultPriority);
 
       const description = todoData.notes
         ? `${todoData.notes}\n\n— Created from chat reminder by ${todoData.created_by_name}`
