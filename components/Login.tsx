@@ -187,7 +187,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, branding }) => {
       <div className="w-full max-w-md relative z-10">
         {/* Logo and Title */}
         <div className="text-center mb-8">
-          <img src="https://brightforge.com.ph/images/logo.png" alt="BrightForge" className="h-12 mx-auto mb-4" />
+          <img src="/brightforge-logo.webp" alt="BrightForge" className="h-12 mx-auto mb-4" />
           <p className="text-portal-soft">
             {mode === 'login' && 'Sign in to access your team portal'}
             {mode === 'signup' && 'Create your team account'}

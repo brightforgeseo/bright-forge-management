@@ -37,15 +37,15 @@ const ContentTool: React.FC = () => {
       {/* Input Column */}
       <div className="lg:col-span-1 space-y-6">
         <div className="space-y-2">
-          <h2 className="text-3xl font-bold text-slate-900">Content Generator</h2>
-          <p className="text-slate-500">Create SEO-optimized articles in seconds.</p>
+          <h2 className="text-3xl font-bold text-white">Content Generator</h2>
+          <p className="text-portal-soft">Create SEO-optimized articles in seconds.</p>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+        <div className="bg-portal-surface p-6 rounded-2xl shadow-lg shadow-black/20 border border-white/[0.07] space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Topic / Title</label>
+            <label className="block text-sm font-medium text-portal-text mb-2">Topic / Title</label>
             <input
-              className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none"
+              className="w-full p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none"
               placeholder="e.g. Benefits of Remote Work"
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
@@ -53,9 +53,9 @@ const ContentTool: React.FC = () => {
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Target Keywords</label>
+            <label className="block text-sm font-medium text-portal-text mb-2">Target Keywords</label>
             <input
-              className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none"
+              className="w-full p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none"
               placeholder="productivity, work-life balance"
               value={keywords}
               onChange={(e) => setKeywords(e.target.value)}
@@ -63,9 +63,9 @@ const ContentTool: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Tone of Voice</label>
+            <label className="block text-sm font-medium text-portal-text mb-2">Tone of Voice</label>
             <select
-              className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none bg-white"
+              className="w-full p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none bg-portal-surface"
               value={tone}
               onChange={(e) => setTone(e.target.value)}
             >
@@ -91,9 +91,9 @@ const ContentTool: React.FC = () => {
       {/* Output Column */}
       <div className="lg:col-span-2">
         {result ? (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden h-full flex flex-col">
-             <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-               <span className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Preview</span>
+          <div className="bg-portal-surface rounded-2xl shadow-lg shadow-black/20 border border-white/[0.07] overflow-hidden h-full flex flex-col">
+             <div className="p-4 border-b border-white/[0.07] flex justify-between items-center bg-portal-dark">
+               <span className="text-sm font-semibold text-portal-soft uppercase tracking-wide">Preview</span>
                <button 
                  onClick={handleCopy}
                  className="flex items-center gap-2 text-sm font-medium text-brand-600 hover:bg-brand-50 px-3 py-1.5 rounded-lg transition-colors"
@@ -103,17 +103,17 @@ const ContentTool: React.FC = () => {
                </button>
              </div>
              <div className="p-8 overflow-y-auto max-h-[800px] prose prose-slate max-w-none">
-                <h1 className="text-3xl font-bold text-slate-900 mb-2">{result.title}</h1>
+                <h1 className="text-3xl font-bold text-white mb-2">{result.title}</h1>
                 <div className="bg-yellow-50 border border-yellow-100 p-4 rounded-lg mb-6 text-sm text-yellow-800">
                    <strong>Meta Description:</strong> {result.metaDescription}
                 </div>
-                <div className="whitespace-pre-wrap text-slate-700 leading-relaxed">
+                <div className="whitespace-pre-wrap text-portal-text leading-relaxed">
                   {result.content}
                 </div>
              </div>
           </div>
         ) : (
-          <div className="h-full min-h-[400px] flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+          <div className="h-full min-h-[400px] flex flex-col items-center justify-center text-portal-soft border-2 border-dashed border-white/[0.07] rounded-2xl bg-portal-dark/50">
              <PenTool className="w-12 h-12 mb-4 opacity-50" />
              <p className="text-lg font-medium">Your content will appear here</p>
              <p className="text-sm">Fill in the details on the left to get started</p>

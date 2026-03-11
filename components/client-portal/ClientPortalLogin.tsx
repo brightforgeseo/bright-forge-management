@@ -71,7 +71,7 @@ const ClientPortalLogin: React.FC<ClientPortalLoginProps> = ({ onLoginSuccess, a
         {/* Logo and Title */}
         <div className="text-center mb-8">
           <img
-            src="https://brightforge.com.ph/images/logo.png"
+            src="/brightforge-logo.webp"
             alt="BrightForge"
             className="h-12 mx-auto mb-4"
           />

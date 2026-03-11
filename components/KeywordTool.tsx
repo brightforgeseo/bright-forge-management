@@ -27,22 +27,22 @@ const KeywordTool: React.FC = () => {
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8">
       <div className="space-y-2">
-        <h2 className="text-3xl font-bold text-slate-900">Keyword Research</h2>
-        <p className="text-slate-500">Discover high-potential keywords with AI-driven competition analysis.</p>
+        <h2 className="text-3xl font-bold text-white">Keyword Research</h2>
+        <p className="text-portal-soft">Discover high-potential keywords with AI-driven competition analysis.</p>
       </div>
 
       {/* Input Section */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row gap-4 items-end md:items-center">
+      <div className="bg-portal-surface p-6 rounded-2xl shadow-lg shadow-black/20 border border-white/[0.07] flex flex-col md:flex-row gap-4 items-end md:items-center">
         <div className="flex-1 w-full">
-          <label className="block text-sm font-medium text-slate-700 mb-2">Target Keyword</label>
+          <label className="block text-sm font-medium text-portal-text mb-2">Target Keyword</label>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-portal-soft w-5 h-5" />
             <input
               type="text"
               value={seed}
               onChange={(e) => setSeed(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleAnalyze()}
-              className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none transition-all"
+              className="w-full pl-10 pr-4 py-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none transition-all"
               placeholder="e.g. vintage coffee machines"
             />
           </div>
@@ -74,43 +74,43 @@ const KeywordTool: React.FC = () => {
         <div className="grid grid-cols-1 gap-6">
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                <p className="text-sm text-slate-500 mb-1">Top Opportunity</p>
-                <h3 className="text-xl font-bold text-slate-900">{results[0].keyword}</h3>
+             <div className="bg-portal-surface p-6 rounded-2xl shadow-lg shadow-black/20 border border-white/[0.07]">
+                <p className="text-sm text-portal-soft mb-1">Top Opportunity</p>
+                <h3 className="text-xl font-bold text-white">{results[0].keyword}</h3>
                 <span className="inline-block mt-2 px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-medium">
                   Low Difficulty
                 </span>
              </div>
-             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                <p className="text-sm text-slate-500 mb-1">Avg Search Volume</p>
-                <h3 className="text-xl font-bold text-slate-900">
+             <div className="bg-portal-surface p-6 rounded-2xl shadow-lg shadow-black/20 border border-white/[0.07]">
+                <p className="text-sm text-portal-soft mb-1">Avg Search Volume</p>
+                <h3 className="text-xl font-bold text-white">
                   {(results.reduce((acc, curr) => acc + curr.searchVolume, 0) / results.length).toLocaleString()}
                 </h3>
              </div>
-             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                <p className="text-sm text-slate-500 mb-1">Potential Traffic</p>
-                <h3 className="text-xl font-bold text-slate-900">High</h3>
+             <div className="bg-portal-surface p-6 rounded-2xl shadow-lg shadow-black/20 border border-white/[0.07]">
+                <p className="text-sm text-portal-soft mb-1">Potential Traffic</p>
+                <h3 className="text-xl font-bold text-white">High</h3>
              </div>
           </div>
 
           {/* Table & Chart */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="bg-portal-surface rounded-2xl shadow-lg shadow-black/20 border border-white/[0.07] overflow-hidden">
             <div className="overflow-y-auto">
               <table className="w-full table-fixed text-left">
-                <thead className="bg-slate-50 border-b border-slate-100">
+                <thead className="bg-portal-dark border-b border-white/[0.07]">
                   <tr>
-                    <th className="px-2 lg:px-4 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-[30%]">Keyword</th>
-                    <th className="px-2 lg:px-4 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-[15%]">Volume</th>
-                    <th className="px-2 lg:px-4 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-[15%]">Diff</th>
-                    <th className="px-2 lg:px-4 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-[15%]">Comp</th>
-                    <th className="px-2 lg:px-4 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-[25%]">6 Month Trend</th>
+                    <th className="px-2 lg:px-4 py-4 text-xs font-semibold text-portal-soft uppercase tracking-wider w-[30%]">Keyword</th>
+                    <th className="px-2 lg:px-4 py-4 text-xs font-semibold text-portal-soft uppercase tracking-wider w-[15%]">Volume</th>
+                    <th className="px-2 lg:px-4 py-4 text-xs font-semibold text-portal-soft uppercase tracking-wider w-[15%]">Diff</th>
+                    <th className="px-2 lg:px-4 py-4 text-xs font-semibold text-portal-soft uppercase tracking-wider w-[15%]">Comp</th>
+                    <th className="px-2 lg:px-4 py-4 text-xs font-semibold text-portal-soft uppercase tracking-wider w-[25%]">6 Month Trend</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {results.map((row, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-2 lg:px-4 py-4 font-medium text-slate-900 truncate">{row.keyword}</td>
-                      <td className="px-2 lg:px-4 py-4 text-slate-600">{row.searchVolume.toLocaleString()}</td>
+                    <tr key={idx} className="hover:bg-portal-dark transition-colors">
+                      <td className="px-2 lg:px-4 py-4 font-medium text-white truncate">{row.keyword}</td>
+                      <td className="px-2 lg:px-4 py-4 text-portal-soft">{row.searchVolume.toLocaleString()}</td>
                       <td className="px-2 lg:px-4 py-4">
                         <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
                           row.difficulty === 'High' ? 'bg-red-100 text-red-700' :
@@ -120,8 +120,8 @@ const KeywordTool: React.FC = () => {
                           {row.difficulty}
                         </span>
                       </td>
-                      <td className="px-2 lg:px-4 py-4 text-slate-600">
-                        <div className="w-full bg-slate-200 rounded-full h-1.5">
+                      <td className="px-2 lg:px-4 py-4 text-portal-soft">
+                        <div className="w-full bg-portal-surface2 rounded-full h-1.5">
                           <div
                             className="bg-brand-600 h-1.5 rounded-full"
                             style={{ width: `${row.competition}%` }}

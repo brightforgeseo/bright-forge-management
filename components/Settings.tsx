@@ -317,32 +317,32 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
   return (
     <div className="p-8 max-w-3xl mx-auto space-y-8">
       <div className="space-y-2">
-        <h2 className="text-3xl font-bold text-slate-900">Settings</h2>
-        <p className="text-slate-500">Manage your profile and platform settings.</p>
+        <h2 className="text-3xl font-bold text-white">Settings</h2>
+        <p className="text-portal-soft">Manage your profile and platform settings.</p>
       </div>
 
       {/* Profile Settings */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-center gap-3">
-          <UserIcon className="w-5 h-5 text-slate-500" />
-          <h3 className="font-semibold text-slate-900">Profile Settings</h3>
+      <div className="bg-portal-surface rounded-2xl shadow-lg shadow-black/20 border border-white/[0.07] overflow-hidden">
+        <div className="p-6 border-b border-white/[0.07] bg-portal-dark flex items-center gap-3">
+          <UserIcon className="w-5 h-5 text-portal-soft" />
+          <h3 className="font-semibold text-white">Profile Settings</h3>
         </div>
 
         <div className="p-8 space-y-6">
           {/* Avatar Upload */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-3">Profile Picture</label>
+            <label className="block text-sm font-medium text-portal-text mb-3">Profile Picture</label>
             <div className="flex items-center gap-6">
               <div className="relative group">
                 {avatarUrl ? (
                   <img
                     src={avatarUrl}
                     alt="Profile"
-                    className="w-24 h-24 rounded-full object-cover border-4 border-slate-100"
+                    className="w-24 h-24 rounded-full object-cover border-4 border-white/[0.07]"
                   />
                 ) : (
-                  <div className="w-24 h-24 rounded-full bg-slate-200 flex items-center justify-center border-4 border-slate-100">
-                    <UserIcon className="w-12 h-12 text-slate-400" />
+                  <div className="w-24 h-24 rounded-full bg-portal-surface2 flex items-center justify-center border-4 border-white/[0.07]">
+                    <UserIcon className="w-12 h-12 text-portal-soft" />
                   </div>
                 )}
                 {isUploadingAvatar && (
@@ -362,48 +362,48 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isUploadingAvatar}
-                  className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors disabled:opacity-50"
+                  className="flex items-center gap-2 px-4 py-2 bg-portal-surface2 hover:bg-portal-surface2 text-portal-text rounded-lg font-medium transition-colors disabled:opacity-50"
                 >
                   <Upload className="w-4 h-4" />
                   {isUploadingAvatar ? 'Uploading...' : 'Upload Photo'}
                 </button>
-                <p className="text-xs text-slate-500 mt-2">JPG, PNG or GIF. Max 5MB.</p>
+                <p className="text-xs text-portal-soft mt-2">JPG, PNG or GIF. Max 5MB.</p>
               </div>
             </div>
           </div>
 
           {/* Full Name */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Full Name</label>
+            <label className="block text-sm font-medium text-portal-text mb-2">Full Name</label>
             <input
               type="text"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none"
+              className="w-full p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none"
               placeholder="Enter your full name"
             />
           </div>
 
           {/* Email (read-only) */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Email</label>
+            <label className="block text-sm font-medium text-portal-text mb-2">Email</label>
             <input
               type="email"
               value={currentUser.email || ''}
               disabled
-              className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 cursor-not-allowed"
+              className="w-full p-3 rounded-xl border border-white/[0.07] bg-portal-dark text-portal-soft cursor-not-allowed"
             />
-            <p className="text-xs text-slate-400 mt-2">Email cannot be changed.</p>
+            <p className="text-xs text-portal-soft mt-2">Email cannot be changed.</p>
           </div>
 
           {/* Role (read-only) */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Role</label>
+            <label className="block text-sm font-medium text-portal-text mb-2">Role</label>
             <input
               type="text"
               value={currentUser.role}
               disabled
-              className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 cursor-not-allowed"
+              className="w-full p-3 rounded-xl border border-white/[0.07] bg-portal-dark text-portal-soft cursor-not-allowed"
             />
           </div>
 
@@ -421,26 +421,26 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
 
       {/* Platform Branding - Only visible to Owners */}
       {currentUser.role === 'Owner' && (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-center gap-3">
-            <Monitor className="w-5 h-5 text-slate-500" />
-            <h3 className="font-semibold text-slate-900">Branding Configuration</h3>
+        <div className="bg-portal-surface rounded-2xl shadow-lg shadow-black/20 border border-white/[0.07] overflow-hidden">
+          <div className="p-6 border-b border-white/[0.07] bg-portal-dark flex items-center gap-3">
+            <Monitor className="w-5 h-5 text-portal-soft" />
+            <h3 className="font-semibold text-white">Branding Configuration</h3>
           </div>
 
           <div className="p-8 space-y-6">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Platform Name</label>
+              <label className="block text-sm font-medium text-portal-text mb-2">Platform Name</label>
               <input
                 type="text"
                 value={localConfig.companyName}
                 onChange={(e) => setLocalConfig({ ...localConfig, companyName: e.target.value })}
-                className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none"
+                className="w-full p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none"
               />
-              <p className="text-xs text-slate-400 mt-2">This name will appear in the sidebar and browser tab.</p>
+              <p className="text-xs text-portal-soft mt-2">This name will appear in the sidebar and browser tab.</p>
             </div>
 
             <div className="flex items-center gap-4 p-4 bg-brand-50 rounded-xl border border-brand-100 text-brand-800">
-               <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm">
+               <div className="w-10 h-10 bg-portal-surface rounded-lg flex items-center justify-center shadow-lg shadow-black/20">
                   <span className="font-bold text-lg text-brand-600">{localConfig.companyName.charAt(0)}</span>
                </div>
                <div className="flex-1">
@@ -464,11 +464,11 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
 
       {/* User Management - Only visible to Owners */}
       {currentUser.role === 'Owner' && (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+        <div className="bg-portal-surface rounded-2xl shadow-lg shadow-black/20 border border-white/[0.07] overflow-hidden">
+          <div className="p-6 border-b border-white/[0.07] bg-portal-dark flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Users className="w-5 h-5 text-slate-500" />
-              <h3 className="font-semibold text-slate-900">User Management</h3>
+              <Users className="w-5 h-5 text-portal-soft" />
+              <h3 className="font-semibold text-white">User Management</h3>
             </div>
             <button
               onClick={loadUsers}
@@ -482,23 +482,23 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
           <div className="p-6">
             {loadingUsers ? (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                <Loader2 className="w-6 h-6 animate-spin text-portal-soft" />
               </div>
             ) : authUsers.length === 0 ? (
-              <p className="text-slate-500 text-center py-8">No users found</p>
+              <p className="text-portal-soft text-center py-8">No users found</p>
             ) : (
               <div className="space-y-3">
                 {authUsers.map(user => (
                   <div
                     key={user.id}
-                    className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100"
+                    className="flex items-center justify-between p-4 bg-portal-dark rounded-xl border border-white/[0.07]"
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-slate-900 truncate">
+                      <p className="font-medium text-white truncate">
                         {user.user_metadata?.full_name || user.email.split('@')[0]}
                       </p>
-                      <p className="text-sm text-slate-500 truncate">{user.email}</p>
-                      <p className="text-xs text-slate-400 mt-1">
+                      <p className="text-sm text-portal-soft truncate">{user.email}</p>
+                      <p className="text-xs text-portal-soft mt-1">
                         Last login: {user.last_sign_in_at
                           ? new Date(user.last_sign_in_at).toLocaleDateString()
                           : 'Never'}
@@ -531,11 +531,11 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
 
       {/* Partner Management - Only visible to Owners */}
       {currentUser.role === 'Owner' && (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+        <div className="bg-portal-surface rounded-2xl shadow-lg shadow-black/20 border border-white/[0.07] overflow-hidden">
+          <div className="p-6 border-b border-white/[0.07] bg-portal-dark flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Building2 className="w-5 h-5 text-slate-500" />
-              <h3 className="font-semibold text-slate-900">Partner Management</h3>
+              <Building2 className="w-5 h-5 text-portal-soft" />
+              <h3 className="font-semibold text-white">Partner Management</h3>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -558,30 +558,30 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
           <div className="p-6">
             {loadingPartners ? (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                <Loader2 className="w-6 h-6 animate-spin text-portal-soft" />
               </div>
             ) : partners.length === 0 ? (
               <div className="text-center py-8">
-                <Building2 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                <p className="text-slate-500">No partner accounts yet</p>
-                <p className="text-sm text-slate-400 mt-1">Create a partner account to give agencies access to their clients</p>
+                <Building2 className="w-12 h-12 text-portal-text mx-auto mb-3" />
+                <p className="text-portal-soft">No partner accounts yet</p>
+                <p className="text-sm text-portal-soft mt-1">Create a partner account to give agencies access to their clients</p>
               </div>
             ) : (
               <div className="space-y-3">
                 {partners.map(partner => (
                   <div
                     key={partner.id}
-                    className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100"
+                    className="flex items-center justify-between p-4 bg-portal-dark rounded-xl border border-white/[0.07]"
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="font-medium text-slate-900 truncate">{partner.company_name}</p>
+                        <p className="font-medium text-white truncate">{partner.company_name}</p>
                         {!partner.is_active && (
                           <span className="px-2 py-0.5 text-xs bg-red-100 text-red-600 rounded-full">Inactive</span>
                         )}
                       </div>
-                      <p className="text-sm text-slate-500 truncate">{partner.full_name} - {partner.email}</p>
-                      <div className="flex items-center gap-4 mt-1 text-xs text-slate-400">
+                      <p className="text-sm text-portal-soft truncate">{partner.full_name} - {partner.email}</p>
+                      <div className="flex items-center gap-4 mt-1 text-xs text-portal-soft">
                         <span>{partner.clientCount} clients</span>
                         <span>{partner.taskCount} tasks</span>
                         {partner.unreadMessages > 0 && (
@@ -632,37 +632,37 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
       {/* Reset Password Modal */}
       {resetPasswordModal.open && resetPasswordModal.user && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+          <div className="bg-portal-surface rounded-2xl shadow-xl max-w-md w-full">
+            <div className="p-6 border-b border-white/[0.07] flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Key className="w-5 h-5 text-amber-600" />
-                <h3 className="font-semibold text-slate-900">Reset Password</h3>
+                <h3 className="font-semibold text-white">Reset Password</h3>
               </div>
               <button
                 onClick={() => { setResetPasswordModal({ open: false, user: null }); setNewPassword(''); }}
-                className="p-2 hover:bg-slate-100 rounded-lg"
+                className="p-2 hover:bg-portal-surface2 rounded-lg"
               >
-                <X className="w-5 h-5 text-slate-500" />
+                <X className="w-5 h-5 text-portal-soft" />
               </button>
             </div>
             <div className="p-6 space-y-4">
-              <p className="text-slate-600">
+              <p className="text-portal-soft">
                 Set a new password for <strong>{resetPasswordModal.user.email}</strong>
               </p>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">New Password</label>
+                <label className="block text-sm font-medium text-portal-text mb-2">New Password</label>
                 <input
                   type="text"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Enter new password"
-                  className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none"
+                  className="w-full p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none"
                 />
               </div>
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={() => { setResetPasswordModal({ open: false, user: null }); setNewPassword(''); }}
-                  className="flex-1 px-4 py-3 border border-slate-200 text-slate-700 rounded-xl font-medium hover:bg-slate-50"
+                  className="flex-1 px-4 py-3 border border-white/[0.07] text-portal-text rounded-xl font-medium hover:bg-portal-dark"
                 >
                   Cancel
                 </button>
@@ -683,17 +683,17 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
       {/* Delete User Modal */}
       {deleteModal.open && deleteModal.user && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+          <div className="bg-portal-surface rounded-2xl shadow-xl max-w-md w-full">
+            <div className="p-6 border-b border-white/[0.07] flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Trash2 className="w-5 h-5 text-red-600" />
-                <h3 className="font-semibold text-slate-900">Delete User</h3>
+                <h3 className="font-semibold text-white">Delete User</h3>
               </div>
               <button
                 onClick={() => setDeleteModal({ open: false, user: null })}
-                className="p-2 hover:bg-slate-100 rounded-lg"
+                className="p-2 hover:bg-portal-surface2 rounded-lg"
               >
-                <X className="w-5 h-5 text-slate-500" />
+                <X className="w-5 h-5 text-portal-soft" />
               </button>
             </div>
             <div className="p-6 space-y-4">
@@ -706,7 +706,7 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={() => setDeleteModal({ open: false, user: null })}
-                  className="flex-1 px-4 py-3 border border-slate-200 text-slate-700 rounded-xl font-medium hover:bg-slate-50"
+                  className="flex-1 px-4 py-3 border border-white/[0.07] text-portal-text rounded-xl font-medium hover:bg-portal-dark"
                 >
                   Cancel
                 </button>
@@ -727,19 +727,19 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
       {/* Create Partner Modal */}
       {showCreatePartnerModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+          <div className="bg-portal-surface rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-white/[0.07] flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Building2 className="w-5 h-5 text-brand-600" />
-                <h3 className="font-semibold text-slate-900">
+                <h3 className="font-semibold text-white">
                   {createdPartnerCreds ? 'Partner Created' : 'Create Partner Account'}
                 </h3>
               </div>
               <button
                 onClick={resetCreatePartnerModal}
-                className="p-2 hover:bg-slate-100 rounded-lg"
+                className="p-2 hover:bg-portal-surface2 rounded-lg"
               >
-                <X className="w-5 h-5 text-slate-500" />
+                <X className="w-5 h-5 text-portal-soft" />
               </button>
             </div>
             <div className="p-6 space-y-4">
@@ -753,37 +753,37 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
                     <p className="text-sm text-green-700">Share these login credentials with the partner:</p>
                   </div>
                   <div className="space-y-3">
-                    <div className="p-3 bg-slate-50 rounded-lg">
-                      <p className="text-xs text-slate-500 mb-1">Portal URL</p>
+                    <div className="p-3 bg-portal-dark rounded-lg">
+                      <p className="text-xs text-portal-soft mb-1">Portal URL</p>
                       <div className="flex items-center justify-between">
-                        <p className="text-sm font-mono text-slate-700">{getPartnerPortalUrl()}</p>
+                        <p className="text-sm font-mono text-portal-text">{getPartnerPortalUrl()}</p>
                         <button
                           onClick={() => { navigator.clipboard.writeText(getPartnerPortalUrl()); addToast('success', 'Copied!'); }}
-                          className="p-1 text-slate-400 hover:text-slate-600"
+                          className="p-1 text-portal-soft hover:text-portal-soft"
                         >
                           <Copy className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
-                    <div className="p-3 bg-slate-50 rounded-lg">
-                      <p className="text-xs text-slate-500 mb-1">Email</p>
+                    <div className="p-3 bg-portal-dark rounded-lg">
+                      <p className="text-xs text-portal-soft mb-1">Email</p>
                       <div className="flex items-center justify-between">
-                        <p className="text-sm font-mono text-slate-700">{createdPartnerCreds.email}</p>
+                        <p className="text-sm font-mono text-portal-text">{createdPartnerCreds.email}</p>
                         <button
                           onClick={() => { navigator.clipboard.writeText(createdPartnerCreds.email); addToast('success', 'Copied!'); }}
-                          className="p-1 text-slate-400 hover:text-slate-600"
+                          className="p-1 text-portal-soft hover:text-portal-soft"
                         >
                           <Copy className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
-                    <div className="p-3 bg-slate-50 rounded-lg">
-                      <p className="text-xs text-slate-500 mb-1">Password</p>
+                    <div className="p-3 bg-portal-dark rounded-lg">
+                      <p className="text-xs text-portal-soft mb-1">Password</p>
                       <div className="flex items-center justify-between">
-                        <p className="text-sm font-mono text-slate-700">{createdPartnerCreds.password}</p>
+                        <p className="text-sm font-mono text-portal-text">{createdPartnerCreds.password}</p>
                         <button
                           onClick={() => { navigator.clipboard.writeText(createdPartnerCreds.password); addToast('success', 'Copied!'); }}
-                          className="p-1 text-slate-400 hover:text-slate-600"
+                          className="p-1 text-portal-soft hover:text-portal-soft"
                         >
                           <Copy className="w-4 h-4" />
                         </button>
@@ -800,48 +800,48 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
               ) : (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Company Name</label>
+                    <label className="block text-sm font-medium text-portal-text mb-2">Company Name</label>
                     <input
                       type="text"
                       value={newPartner.companyName}
                       onChange={(e) => setNewPartner({ ...newPartner, companyName: e.target.value })}
                       placeholder="e.g., 10XR Agency"
-                      className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none"
+                      className="w-full p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Contact Name</label>
+                    <label className="block text-sm font-medium text-portal-text mb-2">Contact Name</label>
                     <input
                       type="text"
                       value={newPartner.fullName}
                       onChange={(e) => setNewPartner({ ...newPartner, fullName: e.target.value })}
                       placeholder="e.g., John Smith"
-                      className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none"
+                      className="w-full p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Email</label>
+                    <label className="block text-sm font-medium text-portal-text mb-2">Email</label>
                     <input
                       type="email"
                       value={newPartner.email}
                       onChange={(e) => setNewPartner({ ...newPartner, email: e.target.value })}
                       placeholder="partner@company.com"
-                      className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none"
+                      className="w-full p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Password</label>
+                    <label className="block text-sm font-medium text-portal-text mb-2">Password</label>
                     <div className="flex gap-2">
                       <input
                         type="text"
                         value={newPartner.password}
                         onChange={(e) => setNewPartner({ ...newPartner, password: e.target.value })}
                         placeholder="Enter password"
-                        className="flex-1 p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none"
+                        className="flex-1 p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none"
                       />
                       <button
                         onClick={generatePartnerPassword}
-                        className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-medium text-sm"
+                        className="px-3 py-2 bg-portal-surface2 hover:bg-portal-surface2 text-portal-text rounded-xl font-medium text-sm"
                       >
                         Generate
                       </button>
@@ -850,7 +850,7 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
                   <div className="flex gap-3 pt-2">
                     <button
                       onClick={resetCreatePartnerModal}
-                      className="flex-1 px-4 py-3 border border-slate-200 text-slate-700 rounded-xl font-medium hover:bg-slate-50"
+                      className="flex-1 px-4 py-3 border border-white/[0.07] text-portal-text rounded-xl font-medium hover:bg-portal-dark"
                     >
                       Cancel
                     </button>
@@ -873,25 +873,25 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
       {/* Assign Clients Modal */}
       {showAssignClientsModal.open && showAssignClientsModal.partner && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+          <div className="bg-portal-surface rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-white/[0.07] flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <UserPlus className="w-5 h-5 text-blue-600" />
                 <div>
-                  <h3 className="font-semibold text-slate-900">Assign Clients</h3>
-                  <p className="text-sm text-slate-500">{showAssignClientsModal.partner.company_name}</p>
+                  <h3 className="font-semibold text-white">Assign Clients</h3>
+                  <p className="text-sm text-portal-soft">{showAssignClientsModal.partner.company_name}</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowAssignClientsModal({ open: false, partner: null })}
-                className="p-2 hover:bg-slate-100 rounded-lg"
+                className="p-2 hover:bg-portal-surface2 rounded-lg"
               >
-                <X className="w-5 h-5 text-slate-500" />
+                <X className="w-5 h-5 text-portal-soft" />
               </button>
             </div>
             <div className="p-6">
               {clients.length === 0 ? (
-                <p className="text-slate-500 text-center py-4">No clients available</p>
+                <p className="text-portal-soft text-center py-4">No clients available</p>
               ) : (
                 <div className="space-y-2">
                   {clients.map(client => (
@@ -901,7 +901,7 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
                       className={`w-full flex items-center justify-between p-3 rounded-xl border transition-colors ${
                         partnerClientIds.includes(client.id)
                           ? 'bg-blue-50 border-blue-200'
-                          : 'bg-slate-50 border-slate-100 hover:bg-slate-100'
+                          : 'bg-portal-dark border-white/[0.07] hover:bg-portal-surface2'
                       }`}
                     >
                       <div className="flex items-center gap-3">
@@ -911,7 +911,7 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
                         >
                           {client.initials}
                         </div>
-                        <span className="font-medium text-slate-700">{client.name}</span>
+                        <span className="font-medium text-portal-text">{client.name}</span>
                       </div>
                       {partnerClientIds.includes(client.id) && (
                         <Check className="w-5 h-5 text-blue-600" />
@@ -928,17 +928,17 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
       {/* Delete Partner Modal */}
       {showDeletePartnerModal.open && showDeletePartnerModal.partner && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+          <div className="bg-portal-surface rounded-2xl shadow-xl max-w-md w-full">
+            <div className="p-6 border-b border-white/[0.07] flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Trash2 className="w-5 h-5 text-red-600" />
-                <h3 className="font-semibold text-slate-900">Delete Partner</h3>
+                <h3 className="font-semibold text-white">Delete Partner</h3>
               </div>
               <button
                 onClick={() => setShowDeletePartnerModal({ open: false, partner: null })}
-                className="p-2 hover:bg-slate-100 rounded-lg"
+                className="p-2 hover:bg-portal-surface2 rounded-lg"
               >
-                <X className="w-5 h-5 text-slate-500" />
+                <X className="w-5 h-5 text-portal-soft" />
               </button>
             </div>
             <div className="p-6 space-y-4">
@@ -951,7 +951,7 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={() => setShowDeletePartnerModal({ open: false, partner: null })}
-                  className="flex-1 px-4 py-3 border border-slate-200 text-slate-700 rounded-xl font-medium hover:bg-slate-50"
+                  className="flex-1 px-4 py-3 border border-white/[0.07] text-portal-text rounded-xl font-medium hover:bg-portal-dark"
                 >
                   Cancel
                 </button>

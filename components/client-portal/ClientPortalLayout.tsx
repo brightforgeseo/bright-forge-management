@@ -65,7 +65,7 @@ const ClientPortalLayout: React.FC<ClientPortalLayoutProps> = ({
           <Menu className="w-6 h-6" />
         </button>
         <div className="flex items-center gap-2">
-          <img src="https://brightforge.com.ph/images/logo.png" alt="BrightForge" className="h-7" />
+          <img src="/brightforge-logo.webp" alt="BrightForge" className="h-7" />
         </div>
         <div className="w-10" /> {/* Spacer for centering */}
       </div>
@@ -88,7 +88,7 @@ const ClientPortalLayout: React.FC<ClientPortalLayoutProps> = ({
         <div className="p-6 border-b border-white/[0.07]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <img src="https://brightforge.com.ph/images/logo.png" alt="BrightForge" className="h-8" />
+              <img src="/brightforge-logo.webp" alt="BrightForge" className="h-8" />
             </div>
             <button
               onClick={() => setIsMobileSidebarOpen(false)}

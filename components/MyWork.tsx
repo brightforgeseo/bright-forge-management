@@ -583,19 +583,19 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-slate-400">Loading tasks...</div>
+        <div className="text-portal-soft">Loading tasks...</div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full bg-slate-50">
+    <div className="flex flex-col h-full bg-portal-dark">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-3 lg:px-8 py-3 lg:py-6">
+      <div className="bg-portal-surface border-b border-white/[0.07] px-3 lg:px-8 py-3 lg:py-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 lg:gap-4">
           <div>
-            <h1 className="text-xl lg:text-3xl font-bold text-slate-900">My Work</h1>
-            <p className="text-xs lg:text-sm text-slate-500 mt-0.5 lg:mt-1">
+            <h1 className="text-xl lg:text-3xl font-bold text-white">My Work</h1>
+            <p className="text-xs lg:text-sm text-portal-soft mt-0.5 lg:mt-1">
               {filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''} assigned to {getSelectedUserName()}
             </p>
           </div>
@@ -606,19 +606,19 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
               <select
                 value={selectedUserId}
                 onChange={(e) => setSelectedUserId(e.target.value)}
-                className="appearance-none w-full sm:w-auto bg-white border border-slate-300 rounded-xl lg:rounded-lg pl-9 lg:pl-10 pr-7 lg:pr-8 py-2.5 text-xs lg:text-sm font-medium text-slate-700 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent cursor-pointer"
+                className="appearance-none w-full sm:w-auto bg-portal-surface border border-white/[0.07] rounded-xl lg:rounded-lg pl-9 lg:pl-10 pr-7 lg:pr-8 py-2.5 text-xs lg:text-sm font-medium text-portal-text hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent cursor-pointer"
               >
                 <option value={currentUser.id}>My Tasks</option>
                 <option value="all">All Team Tasks</option>
-                <option disabled className="text-slate-400">───────────</option>
+                <option disabled className="text-portal-soft">───────────</option>
                 {teamProfiles.map(profile => (
                   <option key={profile.id} value={profile.id}>
                     {profile.full_name || profile.email || 'Unknown'}
                   </option>
                 ))}
               </select>
-              <Users className="absolute left-2.5 lg:left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-              <ChevronRight className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none rotate-90" />
+              <Users className="absolute left-2.5 lg:left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-portal-soft pointer-events-none" />
+              <ChevronRight className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-portal-soft pointer-events-none rotate-90" />
             </div>
 
             {/* Status Filter Dropdown */}
@@ -626,7 +626,7 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
               <select
                 value={selectedStatusId}
                 onChange={(e) => setSelectedStatusId(e.target.value)}
-                className="appearance-none w-full sm:w-auto bg-white border border-slate-300 rounded-xl lg:rounded-lg pl-9 lg:pl-10 pr-7 lg:pr-8 py-2.5 text-xs lg:text-sm font-medium text-slate-700 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent cursor-pointer"
+                className="appearance-none w-full sm:w-auto bg-portal-surface border border-white/[0.07] rounded-xl lg:rounded-lg pl-9 lg:pl-10 pr-7 lg:pr-8 py-2.5 text-xs lg:text-sm font-medium text-portal-text hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent cursor-pointer"
               >
                 <option value="all">All Statuses</option>
                 {allStatuses.map(status => (
@@ -635,8 +635,8 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
                   </option>
                 ))}
               </select>
-              <Filter className="absolute left-2.5 lg:left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-              <ChevronRight className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none rotate-90" />
+              <Filter className="absolute left-2.5 lg:left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-portal-soft pointer-events-none" />
+              <ChevronRight className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-portal-soft pointer-events-none rotate-90" />
             </div>
 
             {/* Hide Done Toggle */}
@@ -645,7 +645,7 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
               className={`px-2.5 lg:px-3 py-2.5 rounded-xl lg:rounded-lg text-xs lg:text-sm font-medium transition-all flex items-center gap-1.5 lg:gap-2 border active:scale-95 ${
                 hideDone
                   ? 'bg-brand-50 text-brand-700 border-brand-300'
-                  : 'bg-white text-slate-600 border-slate-300 hover:border-slate-400'
+                  : 'bg-portal-surface text-portal-soft border-white/[0.07] hover:border-slate-400'
               }`}
             >
               <CheckCircle2 className="w-4 h-4" />
@@ -658,7 +658,7 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
               className={`px-2.5 lg:px-3 py-2.5 rounded-xl lg:rounded-lg text-xs lg:text-sm font-medium transition-all flex items-center gap-1.5 lg:gap-2 border active:scale-95 ${
                 hideSentToClient
                   ? 'bg-brand-50 text-brand-700 border-brand-300'
-                  : 'bg-white text-slate-600 border-slate-300 hover:border-slate-400'
+                  : 'bg-portal-surface text-portal-soft border-white/[0.07] hover:border-slate-400'
               }`}
             >
               <Send className="w-4 h-4" />
@@ -666,11 +666,11 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
             </button>
 
             {/* View Toggle */}
-            <div className="flex gap-1 bg-slate-100 p-1 rounded-xl lg:rounded-lg">
+            <div className="flex gap-1 bg-portal-surface2 p-1 rounded-xl lg:rounded-lg">
               <button
                 onClick={() => setViewMode('table')}
                 className={`px-2.5 lg:px-4 py-2 rounded-lg lg:rounded-md font-medium text-xs lg:text-sm transition-all flex items-center gap-1.5 lg:gap-2 active:scale-95 ${
-                  viewMode === 'table' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                  viewMode === 'table' ? 'bg-portal-surface text-white shadow-lg shadow-black/20' : 'text-portal-soft hover:text-white'
                 }`}
               >
                 <TableIcon className="w-4 h-4" />
@@ -679,7 +679,7 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
               <button
                 onClick={() => setViewMode('calendar')}
                 className={`px-2.5 lg:px-4 py-2 rounded-lg lg:rounded-md font-medium text-xs lg:text-sm transition-all flex items-center gap-1.5 lg:gap-2 active:scale-95 ${
-                  viewMode === 'calendar' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                  viewMode === 'calendar' ? 'bg-portal-surface text-white shadow-lg shadow-black/20' : 'text-portal-soft hover:text-white'
                 }`}
               >
                 <Calendar className="w-4 h-4" />
@@ -718,23 +718,23 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
       {/* Content */}
       <div className="flex-1 overflow-hidden p-4 lg:p-8 flex flex-col">
         {viewMode === 'table' ? (
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden">
+          <div className="bg-portal-surface rounded-xl shadow-lg shadow-black/20 border border-white/[0.07] flex-1 flex flex-col overflow-hidden">
             <div className="overflow-y-auto flex-1">
               <table className="w-full table-fixed">
-                <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
+                <thead className="bg-portal-dark border-b border-white/[0.07] sticky top-0 z-10">
                   <tr>
-                    <th className="text-left py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase w-[25%]">Task</th>
-                    <th className="text-left py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase w-[15%]">Group</th>
-                    <th className="text-left py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase w-[20%]">Board</th>
-                    <th className="text-center py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase w-[12%]">Date</th>
-                    <th className="text-center py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase w-[14%]">Status</th>
-                    <th className="text-center py-3 px-2 lg:px-4 text-xs font-semibold text-slate-500 uppercase w-[14%]">Priority</th>
+                    <th className="text-left py-3 px-2 lg:px-4 text-xs font-semibold text-portal-soft uppercase w-[25%]">Task</th>
+                    <th className="text-left py-3 px-2 lg:px-4 text-xs font-semibold text-portal-soft uppercase w-[15%]">Group</th>
+                    <th className="text-left py-3 px-2 lg:px-4 text-xs font-semibold text-portal-soft uppercase w-[20%]">Board</th>
+                    <th className="text-center py-3 px-2 lg:px-4 text-xs font-semibold text-portal-soft uppercase w-[12%]">Date</th>
+                    <th className="text-center py-3 px-2 lg:px-4 text-xs font-semibold text-portal-soft uppercase w-[14%]">Status</th>
+                    <th className="text-center py-3 px-2 lg:px-4 text-xs font-semibold text-portal-soft uppercase w-[14%]">Priority</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredTasks.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-12 text-center text-slate-400">
+                      <td colSpan={6} className="py-12 text-center text-portal-soft">
                         <CheckCircle2 className="w-12 h-12 mx-auto mb-3 opacity-20" />
                         <p>No tasks found</p>
                       </td>
@@ -747,27 +747,27 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
                         return (
                           <tr
                             key={`${task.clientId}-${task.groupId}-${task.id}-${index}`}
-                            className="hover:bg-slate-50 transition-colors cursor-pointer"
+                            className="hover:bg-portal-dark transition-colors cursor-pointer"
                             onClick={() => handleTaskClick(task)}
                           >
                             <td className="py-3 px-2 lg:px-4">
                               <div className="flex items-center gap-2">
                                 <div className="w-1 h-8 rounded-full flex-shrink-0" style={{ backgroundColor: task.groupColor }}></div>
-                                <span className="text-sm font-medium text-slate-700 truncate">{task.title}</span>
+                                <span className="text-sm font-medium text-portal-text truncate">{task.title}</span>
                               </div>
                             </td>
                             <td className="py-3 px-2 lg:px-4">
-                              <span className="text-sm text-slate-600 truncate block">{task.groupTitle}</span>
+                              <span className="text-sm text-portal-soft truncate block">{task.groupTitle}</span>
                             </td>
                             <td className="py-3 px-2 lg:px-4">
-                              <span className="text-sm text-slate-600 truncate block">{task.clientName}</span>
+                              <span className="text-sm text-portal-soft truncate block">{task.clientName}</span>
                             </td>
                             <td className="py-3 px-2 lg:px-4 text-center">
                               <span className={`text-sm font-medium whitespace-nowrap ${
                                 status === 'overdue' ? 'text-red-600' :
                                 status === 'today' ? 'text-blue-600' :
                                 status === 'upcoming' ? 'text-green-600' :
-                                'text-slate-500'
+                                'text-portal-soft'
                               }`}>
                                 {new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                               </span>
@@ -818,24 +818,24 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
           </div>
         ) : (
           // Calendar View
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="bg-portal-surface rounded-xl shadow-lg shadow-black/20 border border-white/[0.07] overflow-hidden">
             {/* Calendar Header */}
-            <div className="flex items-center justify-between p-4 lg:p-6 border-b border-slate-200">
-              <h2 className="text-lg lg:text-xl font-bold text-slate-900">
+            <div className="flex items-center justify-between p-4 lg:p-6 border-b border-white/[0.07]">
+              <h2 className="text-lg lg:text-xl font-bold text-white">
                 {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
               </h2>
               <div className="flex gap-2">
                 <button
                   onClick={prevMonth}
-                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                  className="p-2 hover:bg-portal-surface2 rounded-lg transition-colors"
                 >
-                  <ChevronLeft className="w-5 h-5 text-slate-600" />
+                  <ChevronLeft className="w-5 h-5 text-portal-soft" />
                 </button>
                 <button
                   onClick={nextMonth}
-                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                  className="p-2 hover:bg-portal-surface2 rounded-lg transition-colors"
                 >
-                  <ChevronRight className="w-5 h-5 text-slate-600" />
+                  <ChevronRight className="w-5 h-5 text-portal-soft" />
                 </button>
               </div>
             </div>
@@ -844,7 +844,7 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
             <div className="p-2 lg:p-4">
               <div className="grid grid-cols-7 gap-1 lg:gap-2">
                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                  <div key={day} className="text-center py-2 text-xs font-semibold text-slate-500 uppercase">
+                  <div key={day} className="text-center py-2 text-xs font-semibold text-portal-soft uppercase">
                     {day}
                   </div>
                 ))}
@@ -867,11 +867,11 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
                     <div
                       key={day}
                       className={`aspect-square border rounded-lg p-1 lg:p-2 ${
-                        isToday ? 'border-brand-500 bg-brand-50' : 'border-slate-200 hover:border-slate-300'
+                        isToday ? 'border-brand-500 bg-brand-50' : 'border-white/[0.07] hover:border-white/[0.07]'
                       } transition-colors`}
                     >
                       <div className={`text-xs lg:text-sm font-semibold mb-1 ${
-                        isToday ? 'text-brand-700' : 'text-slate-700'
+                        isToday ? 'text-brand-700' : 'text-portal-text'
                       }`}>
                         {day}
                       </div>
@@ -889,7 +889,7 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
                           </div>
                         ))}
                         {tasksForDay.length > 3 && (
-                          <div className="text-[9px] lg:text-[10px] text-slate-500 px-1">
+                          <div className="text-[9px] lg:text-[10px] text-portal-soft px-1">
                             +{tasksForDay.length - 3} more
                           </div>
                         )}
@@ -906,22 +906,22 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
       {/* Task Modal - Full editing modal */}
       {isTaskModalOpen && selectedTask && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => { setIsTaskModalOpen(false); setShowStatusPicker(false); setShowPriorityPicker(false); }}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-portal-surface rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             {/* Modal Header */}
-            <div className="p-6 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white rounded-t-2xl">
+            <div className="p-6 border-b border-white/[0.07] bg-gradient-to-r from-slate-50 to-white rounded-t-2xl">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="w-1 h-8 rounded-full" style={{ backgroundColor: selectedTask.groupColor }}></div>
-                    <h2 className="text-xl font-bold text-slate-900">{selectedTask.title}</h2>
+                    <h2 className="text-xl font-bold text-white">{selectedTask.title}</h2>
                   </div>
-                  <p className="text-sm text-slate-500">{selectedTask.clientName} → {selectedTask.groupTitle}</p>
+                  <p className="text-sm text-portal-soft">{selectedTask.clientName} → {selectedTask.groupTitle}</p>
                 </div>
                 <button
                   onClick={() => { setIsTaskModalOpen(false); setShowStatusPicker(false); setShowPriorityPicker(false); }}
-                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                  className="p-2 hover:bg-portal-surface2 rounded-lg transition-colors"
                 >
-                  <X className="w-5 h-5 text-slate-400" />
+                  <X className="w-5 h-5 text-portal-soft" />
                 </button>
               </div>
             </div>
@@ -932,18 +932,18 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
               <div className="grid grid-cols-2 gap-4">
                 {/* Status - Clickable */}
                 <div className="relative">
-                  <label className="text-xs font-semibold text-slate-500 uppercase block mb-2">Status</label>
+                  <label className="text-xs font-semibold text-portal-soft uppercase block mb-2">Status</label>
                   <button
                     onClick={() => { setShowStatusPicker(!showStatusPicker); setShowPriorityPicker(false); }}
                     disabled={isSaving}
-                    className="w-full py-2.5 px-3 text-sm font-bold text-white rounded-lg shadow-sm hover:opacity-90 transition-opacity flex items-center gap-2 disabled:opacity-50"
+                    className="w-full py-2.5 px-3 text-sm font-bold text-white rounded-lg shadow-lg shadow-black/20 hover:opacity-90 transition-opacity flex items-center gap-2 disabled:opacity-50"
                     style={{ backgroundColor: selectedTask.boardData.statusDefs.find(s => s.id === selectedTask.status)?.color || '#94a3b8' }}
                   >
-                    <div className="w-3 h-3 rounded-full bg-white/30"></div>
+                    <div className="w-3 h-3 rounded-full bg-portal-surface/30"></div>
                     {selectedTask.boardData.statusDefs.find(s => s.id === selectedTask.status)?.label || selectedTask.status}
                   </button>
                   {showStatusPicker && (
-                    <div className="absolute top-full left-0 mt-2 w-full bg-white rounded-lg shadow-xl border border-slate-200 z-10 overflow-hidden">
+                    <div className="absolute top-full left-0 mt-2 w-full bg-portal-surface rounded-lg shadow-xl border border-white/[0.07] z-10 overflow-hidden">
                       {selectedTask.boardData.statusDefs.map(def => (
                         <button
                           key={def.id}
@@ -951,7 +951,7 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
                             updateTaskInBoard(selectedTask, 'status', def.id);
                             setShowStatusPicker(false);
                           }}
-                          className="w-full text-left px-3 py-2 text-sm font-medium hover:bg-slate-50 flex items-center gap-2"
+                          className="w-full text-left px-3 py-2 text-sm font-medium hover:bg-portal-dark flex items-center gap-2"
                         >
                           <div className="w-3 h-3 rounded-full" style={{ backgroundColor: def.color }}></div>
                           {def.label}
@@ -963,18 +963,18 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
 
                 {/* Priority - Clickable */}
                 <div className="relative">
-                  <label className="text-xs font-semibold text-slate-500 uppercase block mb-2">Priority</label>
+                  <label className="text-xs font-semibold text-portal-soft uppercase block mb-2">Priority</label>
                   <button
                     onClick={() => { setShowPriorityPicker(!showPriorityPicker); setShowStatusPicker(false); }}
                     disabled={isSaving}
-                    className="w-full py-2.5 px-3 text-sm font-bold text-white rounded-lg shadow-sm hover:opacity-90 transition-opacity flex items-center gap-2 disabled:opacity-50"
+                    className="w-full py-2.5 px-3 text-sm font-bold text-white rounded-lg shadow-lg shadow-black/20 hover:opacity-90 transition-opacity flex items-center gap-2 disabled:opacity-50"
                     style={{ backgroundColor: selectedTask.boardData.priorityDefs.find(p => p.id === selectedTask.priority)?.color || '#94a3b8' }}
                   >
-                    <div className="w-3 h-3 rounded-full bg-white/30"></div>
+                    <div className="w-3 h-3 rounded-full bg-portal-surface/30"></div>
                     {selectedTask.boardData.priorityDefs.find(p => p.id === selectedTask.priority)?.label || selectedTask.priority}
                   </button>
                   {showPriorityPicker && (
-                    <div className="absolute top-full left-0 mt-2 w-full bg-white rounded-lg shadow-xl border border-slate-200 z-10 overflow-hidden">
+                    <div className="absolute top-full left-0 mt-2 w-full bg-portal-surface rounded-lg shadow-xl border border-white/[0.07] z-10 overflow-hidden">
                       {selectedTask.boardData.priorityDefs.map(def => (
                         <button
                           key={def.id}
@@ -982,7 +982,7 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
                             updateTaskInBoard(selectedTask, 'priority', def.id);
                             setShowPriorityPicker(false);
                           }}
-                          className="w-full text-left px-3 py-2 text-sm font-medium hover:bg-slate-50 flex items-center gap-2"
+                          className="w-full text-left px-3 py-2 text-sm font-medium hover:bg-portal-dark flex items-center gap-2"
                         >
                           <div className="w-3 h-3 rounded-full" style={{ backgroundColor: def.color }}></div>
                           {def.label}
@@ -994,7 +994,7 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
 
                 {/* Due Date - Editable */}
                 <div>
-                  <label className="text-xs font-semibold text-slate-500 uppercase block mb-2">Due Date</label>
+                  <label className="text-xs font-semibold text-portal-soft uppercase block mb-2">Due Date</label>
                   <input
                     type="date"
                     value={selectedTask.dueDate || ''}
@@ -1003,28 +1003,28 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
                       updateTaskInBoard(selectedTask, 'dueDate', e.target.value);
                     }}
                     disabled={isSaving}
-                    className="w-full p-2.5 text-sm text-slate-700 font-medium bg-slate-50 border border-slate-200 rounded-lg outline-none hover:border-brand-500 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 cursor-pointer disabled:opacity-50"
+                    className="w-full p-2.5 text-sm text-portal-text font-medium bg-portal-dark border border-white/[0.07] rounded-lg outline-none hover:border-brand-500 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 cursor-pointer disabled:opacity-50"
                   />
                 </div>
 
                 {/* Assigned To - Display only */}
                 <div>
-                  <label className="text-xs font-semibold text-slate-500 uppercase block mb-2">Assigned To</label>
-                  <div className="flex flex-wrap items-center gap-2 min-h-[2.75rem] p-2 bg-slate-50 border border-slate-200 rounded-lg">
+                  <label className="text-xs font-semibold text-portal-soft uppercase block mb-2">Assigned To</label>
+                  <div className="flex flex-wrap items-center gap-2 min-h-[2.75rem] p-2 bg-portal-dark border border-white/[0.07] rounded-lg">
                     {(() => {
                       const assignedIds = Array.isArray(selectedTask.assignedTo)
                         ? selectedTask.assignedTo
                         : selectedTask.assignedTo ? [selectedTask.assignedTo] : [];
 
                       if (assignedIds.length === 0) {
-                        return <span className="text-sm text-slate-400">Unassigned</span>;
+                        return <span className="text-sm text-portal-soft">Unassigned</span>;
                       }
 
                       return assignedIds.map(userId => {
                         const profile = teamProfiles.find(p => p.id === userId);
                         const userName = profile?.full_name || profile?.email || 'Unknown User';
                         return (
-                          <div key={userId} className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-md border border-slate-200">
+                          <div key={userId} className="flex items-center gap-1.5 bg-portal-surface px-2 py-1 rounded-md border border-white/[0.07]">
                             {profile?.avatar_url ? (
                               <img src={profile.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover" />
                             ) : (
@@ -1032,7 +1032,7 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
                                 {userName.charAt(0).toUpperCase()}
                               </div>
                             )}
-                            <span className="text-xs font-medium text-slate-700">{userName}</span>
+                            <span className="text-xs font-medium text-portal-text">{userName}</span>
                           </div>
                         );
                       });
@@ -1042,18 +1042,18 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
               </div>
 
               {/* Comments Section */}
-              <div className="border-t border-slate-200 pt-6">
+              <div className="border-t border-white/[0.07] pt-6">
                 <div className="flex items-center gap-2 mb-4">
-                  <MessageCircle className="w-5 h-5 text-slate-600" />
-                  <h4 className="font-bold text-slate-900">Comments</h4>
-                  <span className="text-xs text-slate-400">({selectedTask.comments?.length || 0})</span>
+                  <MessageCircle className="w-5 h-5 text-portal-soft" />
+                  <h4 className="font-bold text-white">Comments</h4>
+                  <span className="text-xs text-portal-soft">({selectedTask.comments?.length || 0})</span>
                 </div>
 
                 {/* Comments List */}
                 <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
                   {selectedTask.comments && selectedTask.comments.length > 0 ? (
                     selectedTask.comments.map(comment => (
-                      <div key={comment.id} className="flex gap-3 p-3 bg-slate-50 rounded-lg">
+                      <div key={comment.id} className="flex gap-3 p-3 bg-portal-dark rounded-lg">
                         {comment.avatar ? (
                           <img src={comment.avatar} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
                         ) : (
@@ -1063,8 +1063,8 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
                         )}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-sm font-bold text-slate-900">{comment.author}</span>
-                            <span className="text-xs text-slate-400">
+                            <span className="text-sm font-bold text-white">{comment.author}</span>
+                            <span className="text-xs text-portal-soft">
                               {new Date(comment.timestamp).toLocaleString('en-US', {
                                 month: 'short',
                                 day: 'numeric',
@@ -1073,12 +1073,12 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
                               })}
                             </span>
                           </div>
-                          <p className="text-sm text-slate-700 whitespace-pre-wrap break-words">{comment.text}</p>
+                          <p className="text-sm text-portal-text whitespace-pre-wrap break-words">{comment.text}</p>
                         </div>
                       </div>
                     ))
                   ) : (
-                    <div className="text-center py-6 text-slate-400 text-sm">
+                    <div className="text-center py-6 text-portal-soft text-sm">
                       No comments yet. Be the first to comment!
                     </div>
                   )}
@@ -1130,14 +1130,14 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
                       onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}
                       placeholder="Add a comment... (Use @name to mention)"
                       disabled={isSaving}
-                      className="flex-1 p-2.5 border border-slate-300 rounded-lg outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 text-sm disabled:opacity-50"
+                      className="flex-1 p-2.5 border border-white/[0.07] rounded-lg outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 text-sm disabled:opacity-50"
                     />
 
                     {/* Mention Dropdown */}
                     {mentionDropdown?.show && (
-                      <div className="absolute bottom-full left-0 mb-2 w-64 bg-white rounded-lg shadow-xl border border-slate-200 overflow-hidden z-[100]">
-                        <div className="p-2 bg-slate-50 border-b border-slate-200">
-                          <p className="text-xs font-bold text-slate-500 uppercase">Mention Someone</p>
+                      <div className="absolute bottom-full left-0 mb-2 w-64 bg-portal-surface rounded-lg shadow-xl border border-white/[0.07] overflow-hidden z-[100]">
+                        <div className="p-2 bg-portal-dark border-b border-white/[0.07]">
+                          <p className="text-xs font-bold text-portal-soft uppercase">Mention Someone</p>
                         </div>
                         <div className="max-h-48 overflow-y-auto">
                           {/* @everyone option */}
@@ -1150,8 +1150,8 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
                                 ALL
                               </div>
                               <div>
-                                <p className="font-medium text-slate-900">@everyone</p>
-                                <p className="text-xs text-slate-500">Notify all team members</p>
+                                <p className="font-medium text-white">@everyone</p>
+                                <p className="text-xs text-portal-soft">Notify all team members</p>
                               </div>
                             </button>
                           )}
@@ -1177,8 +1177,8 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
                                   </div>
                                 )}
                                 <div>
-                                  <p className="font-medium text-slate-900">{profile.full_name || 'Unknown'}</p>
-                                  <p className="text-xs text-slate-500">@{profile.full_name?.split(' ')[0] || 'user'}</p>
+                                  <p className="font-medium text-white">{profile.full_name || 'Unknown'}</p>
+                                  <p className="text-xs text-portal-soft">@{profile.full_name?.split(' ')[0] || 'user'}</p>
                                 </div>
                               </button>
                             ))}
@@ -1198,7 +1198,7 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
               </div>
 
               {/* Open in Project Tasks button */}
-              <div className="pt-4 border-t border-slate-200">
+              <div className="pt-4 border-t border-white/[0.07]">
                 <button
                   onClick={() => {
                     localStorage.setItem('openTaskModal', JSON.stringify({
@@ -1211,7 +1211,7 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
                       onNavigateToTasks();
                     }
                   }}
-                  className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors text-sm"
+                  className="w-full py-2.5 px-4 bg-portal-surface2 hover:bg-portal-surface2 text-portal-text rounded-lg font-medium transition-colors text-sm"
                 >
                   Open in Project Tasks for More Options
                 </button>

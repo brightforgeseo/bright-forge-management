@@ -37,7 +37,7 @@ const ACTION_COLORS: Record<string, string> = {
   group_create: 'bg-cyan-100 text-cyan-700',
   group_delete: 'bg-orange-100 text-orange-700',
   comment_add: 'bg-sky-100 text-sky-700',
-  comment_delete: 'bg-slate-100 text-slate-700',
+  comment_delete: 'bg-portal-surface2 text-portal-text',
 };
 
 const ActivityLog: React.FC<ActivityLogProps> = ({ onError }) => {
@@ -119,7 +119,7 @@ const ActivityLog: React.FC<ActivityLogProps> = ({ onError }) => {
           </span>
         )}
         {activity.oldValue && activity.newValue && (
-          <ArrowRight className="w-3 h-3 text-slate-400" />
+          <ArrowRight className="w-3 h-3 text-portal-soft" />
         )}
         {activity.newValue && (
           <span className="px-2 py-0.5 bg-green-50 text-green-600 rounded">
@@ -131,13 +131,13 @@ const ActivityLog: React.FC<ActivityLogProps> = ({ onError }) => {
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-      <div className="p-6 border-b border-slate-100 bg-slate-50">
+    <div className="bg-portal-surface rounded-2xl shadow-lg shadow-black/20 border border-white/[0.07] overflow-hidden">
+      <div className="p-6 border-b border-white/[0.07] bg-portal-dark">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Activity className="w-5 h-5 text-slate-500" />
-            <h3 className="font-semibold text-slate-900">Activity Log</h3>
-            <span className="text-sm text-slate-500">
+            <Activity className="w-5 h-5 text-portal-soft" />
+            <h3 className="font-semibold text-white">Activity Log</h3>
+            <span className="text-sm text-portal-soft">
               ({filteredActivities.length} entries)
             </span>
           </div>
@@ -145,7 +145,7 @@ const ActivityLog: React.FC<ActivityLogProps> = ({ onError }) => {
             <button
               onClick={() => setFiltersOpen(!filtersOpen)}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                filtersOpen ? 'bg-brand-100 text-brand-700' : 'hover:bg-slate-100 text-slate-600'
+                filtersOpen ? 'bg-brand-100 text-brand-700' : 'hover:bg-portal-surface2 text-portal-soft'
               }`}
             >
               <Filter className="w-4 h-4" />
@@ -165,26 +165,26 @@ const ActivityLog: React.FC<ActivityLogProps> = ({ onError }) => {
 
         {/* Search Bar */}
         <div className="mt-4 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-portal-soft" />
           <input
             type="text"
             placeholder="Search by task, user, board..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none"
+            className="w-full pl-10 pr-4 py-2 rounded-lg border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none"
           />
         </div>
 
         {/* Filters Panel */}
         {filtersOpen && (
-          <div className="mt-4 p-4 bg-white rounded-xl border border-slate-200 space-y-4">
+          <div className="mt-4 p-4 bg-portal-surface rounded-xl border border-white/[0.07] space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Action Type</label>
+                <label className="block text-sm font-medium text-portal-text mb-1">Action Type</label>
                 <select
                   value={actionFilter}
                   onChange={(e) => setActionFilter(e.target.value)}
-                  className="w-full p-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none"
+                  className="w-full p-2 rounded-lg border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none"
                 >
                   <option value="">All Actions</option>
                   <option value="status_change">Status Changes</option>
@@ -198,11 +198,11 @@ const ActivityLog: React.FC<ActivityLogProps> = ({ onError }) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Entity Type</label>
+                <label className="block text-sm font-medium text-portal-text mb-1">Entity Type</label>
                 <select
                   value={entityFilter}
                   onChange={(e) => setEntityFilter(e.target.value)}
-                  className="w-full p-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none"
+                  className="w-full p-2 rounded-lg border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none"
                 >
                   <option value="">All Types</option>
                   <option value="task">Tasks</option>
@@ -212,19 +212,19 @@ const ActivityLog: React.FC<ActivityLogProps> = ({ onError }) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Date Range</label>
+                <label className="block text-sm font-medium text-portal-text mb-1">Date Range</label>
                 <div className="flex gap-2">
                   <input
                     type="date"
                     value={dateRange.start}
                     onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-                    className="flex-1 p-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none text-sm"
+                    className="flex-1 p-2 rounded-lg border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none text-sm"
                   />
                   <input
                     type="date"
                     value={dateRange.end}
                     onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-                    className="flex-1 p-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none text-sm"
+                    className="flex-1 p-2 rounded-lg border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none text-sm"
                   />
                 </div>
               </div>
@@ -249,47 +249,47 @@ const ActivityLog: React.FC<ActivityLogProps> = ({ onError }) => {
       {/* Activity List */}
       <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto">
         {loading ? (
-          <div className="p-8 text-center text-slate-500">
+          <div className="p-8 text-center text-portal-soft">
             <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2" />
             Loading activity log...
           </div>
         ) : filteredActivities.length === 0 ? (
-          <div className="p-8 text-center text-slate-500">
-            <Activity className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+          <div className="p-8 text-center text-portal-soft">
+            <Activity className="w-8 h-8 mx-auto mb-2 text-portal-text" />
             <p>No activities found</p>
             <p className="text-sm mt-1">Activity will appear here as changes are made</p>
           </div>
         ) : (
           filteredActivities.map((activity) => (
-            <div key={activity.id} className="p-4 hover:bg-slate-50 transition-colors">
+            <div key={activity.id} className="p-4 hover:bg-portal-dark transition-colors">
               <div className="flex items-start gap-4">
                 {/* User Avatar */}
-                <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center flex-shrink-0">
-                  <UserIcon className="w-5 h-5 text-slate-500" />
+                <div className="w-10 h-10 rounded-full bg-portal-surface2 flex items-center justify-center flex-shrink-0">
+                  <UserIcon className="w-5 h-5 text-portal-soft" />
                 </div>
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-slate-900">
+                    <span className="font-medium text-white">
                       {activity.userName || activity.userEmail.split('@')[0]}
                     </span>
                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                      ACTION_COLORS[activity.action] || 'bg-slate-100 text-slate-700'
+                      ACTION_COLORS[activity.action] || 'bg-portal-surface2 text-portal-text'
                     }`}>
                       {ACTION_LABELS[activity.action] || activity.action}
                     </span>
                   </div>
 
-                  <div className="mt-1 text-sm text-slate-600">
+                  <div className="mt-1 text-sm text-portal-soft">
                     {activity.entityName && (
-                      <span className="font-medium text-slate-800">"{activity.entityName}"</span>
+                      <span className="font-medium text-portal-text">"{activity.entityName}"</span>
                     )}
                     {activity.boardName && (
-                      <span className="text-slate-500"> on {activity.boardName}</span>
+                      <span className="text-portal-soft"> on {activity.boardName}</span>
                     )}
                     {activity.groupName && (
-                      <span className="text-slate-400"> ({activity.groupName})</span>
+                      <span className="text-portal-soft"> ({activity.groupName})</span>
                     )}
                   </div>
 
@@ -297,7 +297,7 @@ const ActivityLog: React.FC<ActivityLogProps> = ({ onError }) => {
                 </div>
 
                 {/* Timestamp */}
-                <div className="flex items-center gap-1 text-xs text-slate-400 flex-shrink-0">
+                <div className="flex items-center gap-1 text-xs text-portal-soft flex-shrink-0">
                   <Calendar className="w-3 h-3" />
                   {formatDate(activity.createdAt)}
                 </div>

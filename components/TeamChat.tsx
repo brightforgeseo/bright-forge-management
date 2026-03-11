@@ -132,15 +132,15 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
   const bgInputRef = useRef<HTMLInputElement>(null);
 
   const chatBackgrounds = [
-    { id: 'default', name: 'Default', style: 'bg-white', dark: false },
+    { id: 'default', name: 'Default', style: 'bg-portal-surface', dark: false },
     { id: 'dark', name: 'Dark', style: 'bg-slate-900', dark: true },
     { id: 'gradient-blue', name: 'Ocean', style: 'bg-gradient-to-br from-blue-100 via-blue-50 to-cyan-100', dark: false },
     { id: 'gradient-purple', name: 'Purple', style: 'bg-gradient-to-br from-purple-100 via-pink-50 to-indigo-100', dark: false },
     { id: 'gradient-green', name: 'Forest', style: 'bg-gradient-to-br from-green-100 via-emerald-50 to-teal-100', dark: false },
     { id: 'gradient-sunset', name: 'Sunset', style: 'bg-gradient-to-br from-orange-100 via-red-50 to-pink-100', dark: false },
     { id: 'gradient-night', name: 'Night', style: 'bg-gradient-to-br from-slate-800 via-slate-900 to-indigo-900', dark: true },
-    { id: 'pattern-dots', name: 'Dots', style: 'bg-white bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px]', dark: false },
-    { id: 'pattern-grid', name: 'Grid', style: 'bg-white bg-[linear-gradient(to_right,#f0f0f0_1px,transparent_1px),linear-gradient(to_bottom,#f0f0f0_1px,transparent_1px)] [background-size:24px_24px]', dark: false },
+    { id: 'pattern-dots', name: 'Dots', style: 'bg-portal-surface bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px]', dark: false },
+    { id: 'pattern-grid', name: 'Grid', style: 'bg-portal-surface bg-[linear-gradient(to_right,#f0f0f0_1px,transparent_1px),linear-gradient(to_bottom,#f0f0f0_1px,transparent_1px)] [background-size:24px_24px]', dark: false },
   ];
 
   // Preset image backgrounds (free stock photos)
@@ -216,7 +216,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       return ''; // Will use inline style instead
     }
     const bg = chatBackgrounds.find(b => b.id === bgId);
-    return bg?.style || 'bg-white';
+    return bg?.style || 'bg-portal-surface';
   };
 
   const getCurrentBackgroundImage = () => {
@@ -410,7 +410,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     return (
       <button
         onClick={() => handleTaskLinkClick(taskLink)}
-        className="mt-2 w-full max-w-sm bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:border-brand-300 transition-all text-left group"
+        className="mt-2 w-full max-w-sm bg-portal-surface border border-white/[0.07] rounded-xl shadow-sm hover:shadow-md hover:border-brand-300 transition-all text-left group"
       >
         <div className="p-3">
           <div className="flex items-start gap-3">
@@ -420,12 +420,12 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
             ></div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <ClipboardList className="w-4 h-4 text-slate-400" />
-                <span className="text-xs text-slate-500 font-medium">{taskLink.boardName}</span>
-                <span className="text-xs text-slate-300">•</span>
-                <span className="text-xs text-slate-500">{taskLink.groupTitle}</span>
+                <ClipboardList className="w-4 h-4 text-portal-soft" />
+                <span className="text-xs text-portal-soft font-medium">{taskLink.boardName}</span>
+                <span className="text-xs text-portal-text">•</span>
+                <span className="text-xs text-portal-soft">{taskLink.groupTitle}</span>
               </div>
-              <p className="font-semibold text-slate-900 truncate group-hover:text-brand-600 transition-colors">
+              <p className="font-semibold text-white truncate group-hover:text-brand-600 transition-colors">
                 {taskLink.title}
               </p>
               <div className="flex items-center gap-2 mt-2 flex-wrap">
@@ -441,13 +441,13 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                 >
                   {taskLink.priority}
                 </span>
-                <span className={`text-xs flex items-center gap-1 ${isOverdue ? 'text-red-500' : 'text-slate-500'}`}>
+                <span className={`text-xs flex items-center gap-1 ${isOverdue ? 'text-red-500' : 'text-portal-soft'}`}>
                   <Calendar className="w-3 h-3" />
                   {dueDate.toLocaleDateString()}
                 </span>
               </div>
             </div>
-            <ArrowRight className="w-5 h-5 text-slate-300 group-hover:text-brand-500 transition-colors flex-shrink-0 mt-2" />
+            <ArrowRight className="w-5 h-5 text-portal-text group-hover:text-brand-500 transition-colors flex-shrink-0 mt-2" />
           </div>
         </div>
       </button>
@@ -1766,7 +1766,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
   const dmChannels = allDmChannels.filter(c => !isEchoAIChannel(c));
 
   return (
-    <div className="flex h-full overflow-hidden bg-slate-50">
+    <div className="flex h-full overflow-hidden bg-portal-dark">
       {/* Mobile Sidebar Overlay */}
       {isMobileSidebarOpen && (
         <div
@@ -1777,22 +1777,22 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
       {/* Channels Sidebar */}
       <div className={`
-        w-72 md:w-64 bg-[#3F0E40] flex flex-col flex-shrink-0
+        w-72 md:w-64 bg-portal-surface flex flex-col flex-shrink-0
         fixed md:relative inset-y-0 left-0 z-50
         transform transition-transform duration-300 ease-out
         ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
       `}>
-        <div className="h-14 md:h-11 px-3 flex items-center justify-between border-b border-[#5d2c5d] flex-shrink-0 safe-area-inset-top">
+        <div className="h-14 md:h-11 px-3 flex items-center justify-between border-b border-white/[0.07] flex-shrink-0 safe-area-inset-top">
           <h2 className="font-bold text-white truncate text-base md:text-sm">Bright Forge</h2>
           <div className="flex items-center gap-2 md:gap-1">
             {currentUser.role === 'Owner' && (
-              <button onClick={() => setShowCreateChannel(true)} className="p-2 md:p-1 text-slate-300 hover:text-white hover:bg-[#5d2c5d] rounded-lg md:rounded transition-colors active:bg-[#4d1c4d]" title="New Channel">
+              <button onClick={() => setShowCreateChannel(true)} className="p-2 md:p-1 text-portal-text hover:text-white hover:bg-portal-surface2 rounded-lg md:rounded transition-colors active:bg-portal-surface2" title="New Channel">
                 <Plus className="w-5 h-5 md:w-4 md:h-4" />
               </button>
             )}
             <button
               onClick={() => setIsMobileSidebarOpen(false)}
-              className="md:hidden p-2 text-slate-300 hover:text-white hover:bg-[#5d2c5d] rounded-lg transition-colors active:bg-[#4d1c4d]"
+              className="md:hidden p-2 text-portal-text hover:text-white hover:bg-portal-surface2 rounded-lg transition-colors active:bg-portal-surface2"
               title="Close"
             >
               <X className="w-5 h-5" />
@@ -1801,16 +1801,16 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
         </div>
 
         {showCreateChannel && (
-          <div className="p-2 bg-[#350d36] border-b border-[#5d2c5d]">
+          <div className="p-2 bg-portal-surface2 border-b border-white/[0.07]">
             <input
               autoFocus
-              className="w-full text-xs p-1 rounded text-slate-900 outline-none mb-1"
+              className="w-full text-xs p-1 rounded text-white outline-none mb-1"
               placeholder="channel-name"
               value={newChannelName}
               onChange={e => setNewChannelName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleCreateChannel()}
             />
-            <label className="flex items-center text-xs text-[#bcabbc] mb-1 cursor-pointer">
+            <label className="flex items-center text-xs text-portal-soft mb-1 cursor-pointer">
               <input
                 type="checkbox"
                 checked={isPrivateChannel}
@@ -1829,7 +1829,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
         <div className="flex-1 overflow-y-auto custom-scrollbar py-2 space-y-3 min-h-0">
           {/* AI Assistant Section */}
           <div>
-            <div className="px-3 flex items-center justify-between group text-[#bcabbc] mb-1">
+            <div className="px-3 flex items-center justify-between group text-portal-soft mb-1">
               <span className="text-[10px] font-semibold uppercase tracking-wider">AI Assistant</span>
             </div>
             <ul>
@@ -1837,7 +1837,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                 <li
                   key={echoAIChannel.id}
                   onClick={() => setActiveChannelId(echoAIChannel.id)}
-                  className={`px-3 py-2.5 md:py-1.5 flex items-center justify-between cursor-pointer mx-1.5 rounded-lg md:rounded group active:opacity-80 ${activeChannelId === echoAIChannel.id ? 'bg-[#1164A3] text-white' : 'text-[#bcabbc] hover:bg-[#350d36]'}`}
+                  className={`px-3 py-2.5 md:py-1.5 flex items-center justify-between cursor-pointer mx-1.5 rounded-lg md:rounded group active:opacity-80 ${activeChannelId === echoAIChannel.id ? 'bg-portal-accent text-white' : 'text-portal-soft hover:bg-portal-surface2'}`}
                 >
                   <div className="flex items-center gap-2 md:gap-1.5 truncate">
                     <Bot className="w-4 h-4 md:w-3.5 md:h-3.5 text-brand-400" />
@@ -1849,7 +1849,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
               ) : (
                 <li
                   onClick={handleStartEchoAI}
-                  className="px-3 py-2.5 md:py-1.5 flex items-center gap-2 md:gap-1.5 mx-1.5 rounded-lg md:rounded text-[#bcabbc] hover:bg-[#350d36] cursor-pointer active:opacity-80"
+                  className="px-3 py-2.5 md:py-1.5 flex items-center gap-2 md:gap-1.5 mx-1.5 rounded-lg md:rounded text-portal-soft hover:bg-portal-surface2 cursor-pointer active:opacity-80"
                 >
                   <Bot className="w-4 h-4 md:w-3.5 md:h-3.5 text-brand-400" />
                   <span className="truncate text-base md:text-sm">Start Echo AI Chat</span>
@@ -1860,7 +1860,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
           {/* Public Channels */}
           <div>
-            <div className="px-3 flex items-center justify-between group text-[#bcabbc] mb-1">
+            <div className="px-3 flex items-center justify-between group text-portal-soft mb-1">
               <span className="text-[10px] font-semibold uppercase tracking-wider">Channels</span>
             </div>
             <ul>
@@ -1868,7 +1868,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                 <li
                   key={channel.id}
                   onClick={() => setActiveChannelId(channel.id)}
-                  className={`px-3 py-2.5 md:py-1.5 flex items-center justify-between cursor-pointer mx-1.5 rounded-lg md:rounded group active:opacity-80 ${activeChannelId === channel.id ? 'bg-[#1164A3] text-white' : 'text-[#bcabbc] hover:bg-[#350d36]'}`}
+                  className={`px-3 py-2.5 md:py-1.5 flex items-center justify-between cursor-pointer mx-1.5 rounded-lg md:rounded group active:opacity-80 ${activeChannelId === channel.id ? 'bg-portal-accent text-white' : 'text-portal-soft hover:bg-portal-surface2'}`}
                 >
                   <div className="flex items-center truncate">
                     {channel.is_private ? (
@@ -1888,7 +1888,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                           setShowMembersModal(true);
                           loadChannelMembers(channel.id);
                         }}
-                        className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-400"
+                        className="opacity-0 group-hover:opacity-100 text-portal-soft hover:text-blue-400"
                         title="Manage members"
                       >
                         <UserPlus className="w-4 h-4" />
@@ -1902,7 +1902,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                             handleDeleteChannel(channel.id);
                           }
                         }}
-                        className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-400"
+                        className="opacity-0 group-hover:opacity-100 text-portal-soft hover:text-red-400"
                       title="Delete channel"
                     >
                       <Trash2 className="w-3 h-3" />
@@ -1916,7 +1916,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
           {/* Direct Messages List */}
           <div>
-            <div className="px-3 flex items-center justify-between group text-[#bcabbc] mb-1">
+            <div className="px-3 flex items-center justify-between group text-portal-soft mb-1">
               <span className="text-[10px] font-semibold uppercase tracking-wider">Direct Messages</span>
               <button onClick={refreshData} title="Refresh List" className={`${isRefreshing ? 'animate-spin' : ''} hover:text-white`}>
                 <RefreshCw className="w-2.5 h-2.5" />
@@ -1929,7 +1929,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                   <li
                     key={channel.id}
                     onClick={() => setActiveChannelId(channel.id)}
-                    className={`px-3 py-2.5 md:py-1.5 flex items-center gap-2 md:gap-1.5 mx-1.5 rounded-lg md:rounded group cursor-pointer active:opacity-80 ${activeChannelId === channel.id ? 'bg-[#1164A3] text-white' : 'text-[#bcabbc] hover:bg-[#350d36]'}`}
+                    className={`px-3 py-2.5 md:py-1.5 flex items-center gap-2 md:gap-1.5 mx-1.5 rounded-lg md:rounded group cursor-pointer active:opacity-80 ${activeChannelId === channel.id ? 'bg-portal-accent text-white' : 'text-portal-soft hover:bg-portal-surface2'}`}
                   >
                     <div className="relative w-5 h-5 md:w-4 md:h-4 flex-shrink-0">
                       {avatar ? (
@@ -1956,7 +1956,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                           handleDeleteChannel(channel.id);
                         }
                       }}
-                      className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-400 flex-shrink-0 p-1"
+                      className="opacity-0 group-hover:opacity-100 text-portal-soft hover:text-red-400 flex-shrink-0 p-1"
                       title="Delete conversation"
                     >
                       <Trash2 className="w-4 h-4 md:w-3 md:h-3" />
@@ -1964,14 +1964,14 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                   </li>
                 );
               })}
-              {dmChannels.length === 0 && <li className="px-3 text-[10px] text-slate-500 italic">No active chats</li>}
+              {dmChannels.length === 0 && <li className="px-3 text-[10px] text-portal-soft italic">No active chats</li>}
             </ul>
           </div>
 
           {/* Partner Chats - Only visible to Owners and Admins */}
           {partners.length > 0 && (currentUser.role === 'Owner' || currentUser.role === 'Admin') && (
             <div>
-              <div className="px-3 flex items-center justify-between group text-[#bcabbc] mb-1">
+              <div className="px-3 flex items-center justify-between group text-portal-soft mb-1">
                 <span className="text-[10px] font-semibold uppercase tracking-wider">Partner Chats</span>
                 <Users className="w-2.5 h-2.5 text-purple-400" />
               </div>
@@ -1980,7 +1980,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                   <li
                     key={partner.id}
                     onClick={() => handleSelectPartner(partner.id)}
-                    className={`px-3 py-2.5 md:py-1.5 flex items-center gap-2 md:gap-1.5 mx-1.5 rounded-lg md:rounded group cursor-pointer active:opacity-80 ${activePartnerId === partner.id ? 'bg-purple-600 text-white' : 'text-[#bcabbc] hover:bg-[#350d36]'}`}
+                    className={`px-3 py-2.5 md:py-1.5 flex items-center gap-2 md:gap-1.5 mx-1.5 rounded-lg md:rounded group cursor-pointer active:opacity-80 ${activePartnerId === partner.id ? 'bg-purple-600 text-white' : 'text-portal-soft hover:bg-portal-surface2'}`}
                   >
                     <div className="relative w-5 h-5 md:w-4 md:h-4 flex-shrink-0">
                       {partner.avatar_url ? (
@@ -1998,7 +1998,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                       <span className={`truncate text-base md:text-sm block ${partner.unreadMessages > 0 ? 'font-bold text-white' : ''}`}>
                         {partner.company_name}
                       </span>
-                      <span className="text-[10px] text-slate-400 truncate block">{partner.full_name}</span>
+                      <span className="text-[10px] text-portal-soft truncate block">{partner.full_name}</span>
                     </div>
                     {partner.unreadMessages > 0 && (
                       <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
@@ -2013,7 +2013,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
           {/* All Team Members */}
           <div>
-            <div className="px-3 flex items-center justify-between group text-[#bcabbc] mb-1">
+            <div className="px-3 flex items-center justify-between group text-portal-soft mb-1">
               <span className="text-[10px] font-semibold uppercase tracking-wider">Team</span>
               <Users className="w-2.5 h-2.5" />
             </div>
@@ -2022,13 +2022,13 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                 <li
                   key={p.id}
                   onClick={() => handleStartDM(p.id)}
-                  className="px-3 py-2.5 md:py-1.5 flex items-center gap-2 md:gap-1.5 mx-1.5 text-[#bcabbc] hover:bg-[#350d36] rounded-lg md:rounded cursor-pointer transition-colors active:opacity-80"
+                  className="px-3 py-2.5 md:py-1.5 flex items-center gap-2 md:gap-1.5 mx-1.5 text-portal-soft hover:bg-portal-surface2 rounded-lg md:rounded cursor-pointer transition-colors active:opacity-80"
                 >
                   <div className="relative">
                     {p.avatar_url ? (
                       <img src={p.avatar_url} alt="" className="w-5 h-5 md:w-3.5 md:h-3.5 rounded-full object-cover" />
                     ) : (
-                      <div className="w-5 h-5 md:w-3.5 md:h-3.5 rounded-full bg-slate-500 flex items-center justify-center text-[9px] md:text-[7px] text-white font-bold">
+                      <div className="w-5 h-5 md:w-3.5 md:h-3.5 rounded-full bg-portal-dark0 flex items-center justify-center text-[9px] md:text-[7px] text-white font-bold">
                         {p.full_name?.charAt(0) || '?'}
                       </div>
                     )}
@@ -2054,20 +2054,20 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       </div>
 
       {/* Main Chat */}
-      <div className="flex-1 flex flex-col min-w-0 bg-white h-full">
+      <div className="flex-1 flex flex-col min-w-0 bg-portal-surface h-full">
         {/* Partner Chat View */}
         {activePartnerId ? (
           <>
             {/* Partner Chat Header */}
-            <div className="h-14 md:h-16 border-b border-slate-200 flex items-center justify-between px-2 md:px-6 flex-shrink-0 bg-gradient-to-r from-purple-50 to-white safe-area-inset-top">
+            <div className="h-14 md:h-16 border-b border-white/[0.07] flex items-center justify-between px-2 md:px-6 flex-shrink-0 bg-gradient-to-r from-purple-50 to-white safe-area-inset-top">
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <button
                   onClick={() => setIsMobileSidebarOpen(true)}
-                  className="md:hidden p-2.5 hover:bg-slate-100 rounded-xl flex-shrink-0 active:bg-slate-200 transition-colors"
+                  className="md:hidden p-2.5 hover:bg-portal-surface2 rounded-xl flex-shrink-0 active:bg-portal-surface2 transition-colors"
                   title="Open menu"
                   aria-label="Open channel list"
                 >
-                  <Menu className="w-6 h-6 text-slate-600" />
+                  <Menu className="w-6 h-6 text-portal-soft" />
                 </button>
                 {(() => {
                   const activePartner = partners.find(p => p.id === activePartnerId);
@@ -2081,8 +2081,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                         </div>
                       )}
                       <div>
-                        <h3 className="font-bold text-slate-900 text-sm md:text-base">{activePartner.company_name}</h3>
-                        <p className="text-xs text-slate-500">{activePartner.full_name} - Partner</p>
+                        <h3 className="font-bold text-white text-sm md:text-base">{activePartner.company_name}</h3>
+                        <p className="text-xs text-portal-soft">{activePartner.full_name} - Partner</p>
                       </div>
                     </div>
                   ) : null;
@@ -2093,7 +2093,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                   setActivePartnerId(null);
                   setPartnerMessages([]);
                 }}
-                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-2 text-portal-soft hover:text-portal-soft hover:bg-portal-surface2 rounded-lg transition-colors"
                 title="Close partner chat"
               >
                 <X className="w-5 h-5" />
@@ -2101,13 +2101,13 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
             </div>
 
             {/* Partner Chat Messages */}
-            <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-slate-50">
+            <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-portal-dark">
               {loadingPartnerMessages ? (
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="w-6 h-6 text-purple-500 animate-spin" />
                 </div>
               ) : partnerMessages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                <div className="flex flex-col items-center justify-center py-12 text-portal-soft">
                   <MessageSquare className="w-12 h-12 mb-3 opacity-30" />
                   <p className="font-medium">No messages yet</p>
                   <p className="text-sm mt-1">Start a conversation with this partner</p>
@@ -2127,11 +2127,11 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                       className={`max-w-[70%] rounded-2xl px-4 py-2.5 ${
                         msg.sender_type === 'team'
                           ? 'bg-purple-600 text-white rounded-br-md'
-                          : 'bg-white border border-slate-200 text-slate-900 rounded-bl-md'
+                          : 'bg-portal-surface border border-white/[0.07] text-white rounded-bl-md'
                       }`}
                     >
                       <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                      <p className={`text-[10px] mt-1 ${msg.sender_type === 'team' ? 'text-purple-200' : 'text-slate-400'}`}>
+                      <p className={`text-[10px] mt-1 ${msg.sender_type === 'team' ? 'text-purple-200' : 'text-portal-soft'}`}>
                         {formatMessageTime(msg.created_at)}
                       </p>
                     </div>
@@ -2146,7 +2146,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
             </div>
 
             {/* Partner Chat Input */}
-            <div className="p-4 bg-white border-t border-slate-200">
+            <div className="p-4 bg-portal-surface border-t border-white/[0.07]">
               <div className="flex items-center gap-2">
                 <input
                   type="text"
@@ -2154,7 +2154,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                   onChange={(e) => setPartnerMessage(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendPartnerMessage()}
                   placeholder="Type a message to partner..."
-                  className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-purple-400 focus:bg-white transition-colors"
+                  className="flex-1 px-4 py-3 bg-portal-dark border border-white/[0.07] rounded-xl text-white placeholder-portal-soft focus:outline-none focus:border-purple-400 focus:bg-portal-surface transition-colors"
                 />
                 <button
                   onClick={handleSendPartnerMessage}
@@ -2169,15 +2169,15 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
         ) : (
         <>
         {/* Regular Channel Chat Header */}
-        <div className="h-14 md:h-16 border-b border-slate-200 flex items-center justify-between px-2 md:px-6 flex-shrink-0 bg-white safe-area-inset-top">
+        <div className="h-14 md:h-16 border-b border-white/[0.07] flex items-center justify-between px-2 md:px-6 flex-shrink-0 bg-portal-surface safe-area-inset-top">
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <button
               onClick={() => setIsMobileSidebarOpen(true)}
-              className="md:hidden p-2.5 hover:bg-slate-100 rounded-xl flex-shrink-0 active:bg-slate-200 transition-colors"
+              className="md:hidden p-2.5 hover:bg-portal-surface2 rounded-xl flex-shrink-0 active:bg-portal-surface2 transition-colors"
               title="Open menu"
               aria-label="Open channel list"
             >
-              <Menu className="w-6 h-6 text-slate-600" />
+              <Menu className="w-6 h-6 text-portal-soft" />
             </button>
             {activeChannel?.type === 'dm' ? (
               <div className="flex items-center gap-2">
@@ -2186,25 +2186,25 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                     <div className="w-6 h-6 rounded-full bg-brand-500 flex items-center justify-center">
                       <Bot className="w-4 h-4 text-white" />
                     </div>
-                    <h3 className="font-bold text-slate-900 truncate text-sm md:text-base">Echo AI</h3>
+                    <h3 className="font-bold text-white truncate text-sm md:text-base">Echo AI</h3>
                     <span className="hidden sm:inline px-2 py-0.5 bg-brand-100 text-brand-700 text-xs rounded-full font-medium">AI Assistant</span>
                   </>
                 ) : getDMInfo(activeChannel!).avatar && getDMInfo(activeChannel!).avatar !== 'bot' ? (
                   <>
                     <img src={getDMInfo(activeChannel!).avatar!} alt="" className="w-6 h-6 rounded-full object-cover" />
-                    <h3 className="font-bold text-slate-900 truncate text-sm md:text-base">{getDMInfo(activeChannel!).name}</h3>
+                    <h3 className="font-bold text-white truncate text-sm md:text-base">{getDMInfo(activeChannel!).name}</h3>
                   </>
                 ) : (
                   <>
-                    <UserIcon className="w-5 h-5 text-slate-400" />
-                    <h3 className="font-bold text-slate-900 truncate text-sm md:text-base">{getDMInfo(activeChannel!).name}</h3>
+                    <UserIcon className="w-5 h-5 text-portal-soft" />
+                    <h3 className="font-bold text-white truncate text-sm md:text-base">{getDMInfo(activeChannel!).name}</h3>
                   </>
                 )}
               </div>
             ) : (
               <div className="flex items-center gap-2 min-w-0">
-                <Hash className="w-4 h-4 md:w-5 md:h-5 text-slate-400 flex-shrink-0" />
-                <h3 className="font-bold text-slate-900 truncate text-sm md:text-base">{activeChannel?.name}</h3>
+                <Hash className="w-4 h-4 md:w-5 md:h-5 text-portal-soft flex-shrink-0" />
+                <h3 className="font-bold text-white truncate text-sm md:text-base">{activeChannel?.name}</h3>
               </div>
             )}
           </div>
@@ -2216,7 +2216,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                 className={`p-1.5 md:p-2 hover:bg-amber-50 rounded-lg transition-colors group relative ${showPinnedMessages ? 'bg-amber-50' : ''}`}
                 title={`${pinnedMessages.length} Pinned Message${pinnedMessages.length > 1 ? 's' : ''}`}
               >
-                <Pin className={`w-4 h-4 md:w-5 md:h-5 ${showPinnedMessages ? 'text-amber-600' : 'text-slate-400 group-hover:text-amber-600'}`} />
+                <Pin className={`w-4 h-4 md:w-5 md:h-5 ${showPinnedMessages ? 'text-amber-600' : 'text-portal-soft group-hover:text-amber-600'}`} />
                 <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
                   {pinnedMessages.length}
                 </span>
@@ -2228,7 +2228,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
               className="p-1.5 md:p-2 hover:bg-violet-50 rounded-lg transition-colors group"
               title="Team Reminders"
             >
-              <ListTodo className="w-4 h-4 md:w-5 md:h-5 text-slate-400 group-hover:text-violet-600" />
+              <ListTodo className="w-4 h-4 md:w-5 md:h-5 text-portal-soft group-hover:text-violet-600" />
             </button>
             {/* Search Button */}
             <button
@@ -2241,7 +2241,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
               className={`p-1.5 md:p-2 hover:bg-blue-50 rounded-lg transition-colors group ${showSearch ? 'bg-blue-50' : ''}`}
               title="Search Messages"
             >
-              <Search className={`w-4 h-4 md:w-5 md:h-5 ${showSearch ? 'text-blue-600' : 'text-slate-400 group-hover:text-blue-600'}`} />
+              <Search className={`w-4 h-4 md:w-5 md:h-5 ${showSearch ? 'text-blue-600' : 'text-portal-soft group-hover:text-blue-600'}`} />
             </button>
             {activeChannelId && (
               <button
@@ -2249,7 +2249,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                 className="p-1.5 md:p-2 hover:bg-green-50 rounded-lg transition-colors group"
                 title="Start Video Call"
               >
-                <Video className="w-4 h-4 md:w-5 md:h-5 text-slate-400 group-hover:text-green-600" />
+                <Video className="w-4 h-4 md:w-5 md:h-5 text-portal-soft group-hover:text-green-600" />
               </button>
             )}
             {/* Background Picker */}
@@ -2259,17 +2259,17 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                 className="p-1.5 md:p-2 hover:bg-purple-50 rounded-lg transition-colors group"
                 title="Change Background"
               >
-                <Palette className="w-4 h-4 md:w-5 md:h-5 text-slate-400 group-hover:text-purple-600" />
+                <Palette className="w-4 h-4 md:w-5 md:h-5 text-portal-soft group-hover:text-purple-600" />
               </button>
               {showBackgroundPicker && (
-                <div className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-xl border border-slate-200 p-4 z-50 w-80 max-h-[70vh] overflow-y-auto">
-                  <h4 className="text-sm font-semibold text-slate-700 mb-2">Colors & Patterns</h4>
+                <div className="absolute right-0 top-full mt-2 bg-portal-surface rounded-xl shadow-xl border border-white/[0.07] p-4 z-50 w-80 max-h-[70vh] overflow-y-auto">
+                  <h4 className="text-sm font-semibold text-portal-text mb-2">Colors & Patterns</h4>
                   <div className="grid grid-cols-3 gap-2 mb-4">
                     {chatBackgrounds.map(bg => (
                       <button
                         key={bg.id}
                         onClick={() => handleBackgroundChange(bg.id)}
-                        className={`h-12 rounded-lg border-2 transition-all ${bg.style} ${getChannelBackground() === bg.id ? 'border-brand-500 ring-2 ring-brand-200' : 'border-slate-200 hover:border-slate-300'}`}
+                        className={`h-12 rounded-lg border-2 transition-all ${bg.style} ${getChannelBackground() === bg.id ? 'border-brand-500 ring-2 ring-brand-200' : 'border-white/[0.07] hover:border-white/[0.07]'}`}
                         title={bg.name}
                       >
                         <span className="sr-only">{bg.name}</span>
@@ -2277,13 +2277,13 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                     ))}
                   </div>
 
-                  <h4 className="text-sm font-semibold text-slate-700 mb-2">Photo Backgrounds</h4>
+                  <h4 className="text-sm font-semibold text-portal-text mb-2">Photo Backgrounds</h4>
                   <div className="grid grid-cols-3 gap-2 mb-4">
                     {imageBackgrounds.map(bg => (
                       <button
                         key={bg.id}
                         onClick={() => handleBackgroundChange(bg.id)}
-                        className={`h-16 rounded-lg border-2 transition-all bg-cover bg-center ${getChannelBackground() === bg.id ? 'border-brand-500 ring-2 ring-brand-200' : 'border-slate-200 hover:border-slate-300'}`}
+                        className={`h-16 rounded-lg border-2 transition-all bg-cover bg-center ${getChannelBackground() === bg.id ? 'border-brand-500 ring-2 ring-brand-200' : 'border-white/[0.07] hover:border-white/[0.07]'}`}
                         style={{ backgroundImage: `url(${bg.url})` }}
                         title={bg.name}
                       >
@@ -2292,13 +2292,13 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                     ))}
                   </div>
 
-                  <h4 className="text-sm font-semibold text-slate-700 mb-2">Christmas</h4>
+                  <h4 className="text-sm font-semibold text-portal-text mb-2">Christmas</h4>
                   <div className="grid grid-cols-3 gap-2 mb-4">
                     {christmasBackgrounds.map(bg => (
                       <button
                         key={bg.id}
                         onClick={() => handleBackgroundChange(bg.id)}
-                        className={`h-16 rounded-lg border-2 transition-all bg-cover bg-center ${getChannelBackground() === bg.id ? 'border-brand-500 ring-2 ring-brand-200' : 'border-slate-200 hover:border-slate-300'}`}
+                        className={`h-16 rounded-lg border-2 transition-all bg-cover bg-center ${getChannelBackground() === bg.id ? 'border-brand-500 ring-2 ring-brand-200' : 'border-white/[0.07] hover:border-white/[0.07]'}`}
                         style={{ backgroundImage: `url(${bg.url})` }}
                         title={bg.name}
                       >
@@ -2307,7 +2307,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                     ))}
                   </div>
 
-                  <h4 className="text-sm font-semibold text-slate-700 mb-2">Custom Image</h4>
+                  <h4 className="text-sm font-semibold text-portal-text mb-2">Custom Image</h4>
                   <input
                     type="file"
                     ref={bgInputRef}
@@ -2317,7 +2317,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                   />
                   <button
                     onClick={() => bgInputRef.current?.click()}
-                    className={`w-full py-2 px-3 border-2 border-dashed rounded-lg text-sm transition-colors flex items-center justify-center gap-2 ${getChannelBackground() === 'custom' ? 'border-brand-500 text-brand-600 bg-brand-50' : 'border-slate-300 text-slate-600 hover:border-brand-400 hover:text-brand-600'}`}
+                    className={`w-full py-2 px-3 border-2 border-dashed rounded-lg text-sm transition-colors flex items-center justify-center gap-2 ${getChannelBackground() === 'custom' ? 'border-brand-500 text-brand-600 bg-brand-50' : 'border-white/[0.07] text-portal-soft hover:border-brand-400 hover:text-brand-600'}`}
                   >
                     <ImageIcon className="w-4 h-4" />
                     {getChannelBackground() === 'custom' ? 'Custom image active' : 'Upload your own image'}
@@ -2341,7 +2341,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                 title="Clear History"
                 className="hidden sm:block p-1.5 md:p-2 hover:bg-red-50 rounded-lg transition-colors"
               >
-                <Trash2 className="w-4 h-4 text-slate-300 hover:text-red-500" />
+                <Trash2 className="w-4 h-4 text-portal-text hover:text-red-500" />
               </button>
             )}
           </div>
@@ -2349,23 +2349,23 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
         {/* Search Panel */}
         {showSearch && (
-          <div className="border-b border-slate-200 bg-slate-50 p-3">
+          <div className="border-b border-white/[0.07] bg-portal-dark p-3">
             <div className="flex items-center gap-3">
               <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-portal-soft" />
                 <input
                   ref={searchInputRef}
                   type="text"
                   value={searchQuery}
                   onChange={(e) => handleSearch(e.target.value)}
                   placeholder="Search messages..."
-                  className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2 bg-portal-surface border border-white/[0.07] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 />
                 {isSearching && (
-                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 animate-spin" />
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-portal-soft animate-spin" />
                 )}
               </div>
-              <label className="flex items-center gap-2 text-sm text-slate-600 whitespace-nowrap">
+              <label className="flex items-center gap-2 text-sm text-portal-soft whitespace-nowrap">
                 <input
                   type="checkbox"
                   checked={searchInCurrentChannel}
@@ -2373,7 +2373,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                     setSearchInCurrentChannel(e.target.checked);
                     if (searchQuery) handleSearch(searchQuery);
                   }}
-                  className="rounded border-slate-300 text-brand-500 focus:ring-brand-500"
+                  className="rounded border-white/[0.07] text-brand-500 focus:ring-brand-500"
                 />
                 Current channel only
               </label>
@@ -2383,9 +2383,9 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                   setSearchQuery('');
                   setSearchResults([]);
                 }}
-                className="p-1.5 hover:bg-slate-200 rounded-lg transition-colors"
+                className="p-1.5 hover:bg-portal-surface2 rounded-lg transition-colors"
               >
-                <X className="w-4 h-4 text-slate-500" />
+                <X className="w-4 h-4 text-portal-soft" />
               </button>
             </div>
 
@@ -2396,20 +2396,20 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                   <button
                     key={result.message.id}
                     onClick={() => navigateToSearchResult(result)}
-                    className="w-full text-left p-3 bg-white rounded-lg border border-slate-200 hover:border-brand-300 hover:bg-brand-50 transition-colors"
+                    className="w-full text-left p-3 bg-portal-surface rounded-lg border border-white/[0.07] hover:border-brand-300 hover:bg-brand-50 transition-colors"
                   >
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs font-medium text-brand-600">
                         {formatChannelName(result)}
                       </span>
-                      <span className="text-xs text-slate-400">
+                      <span className="text-xs text-portal-soft">
                         {new Date(result.message.timestamp).toLocaleDateString()}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-medium text-slate-700">{result.message.sender}</span>
+                      <span className="text-sm font-medium text-portal-text">{result.message.sender}</span>
                     </div>
-                    <p className="text-sm text-slate-600 line-clamp-2">
+                    <p className="text-sm text-portal-soft line-clamp-2">
                       {result.message.text}
                     </p>
                   </button>
@@ -2419,7 +2419,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
             {/* No results message */}
             {searchQuery && !isSearching && searchResults.length === 0 && (
-              <div className="mt-3 text-center py-4 text-sm text-slate-500">
+              <div className="mt-3 text-center py-4 text-sm text-portal-soft">
                 No messages found for "{searchQuery}"
               </div>
             )}
@@ -2428,24 +2428,24 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
         {/* Pinned Messages Panel */}
         {showPinnedMessages && pinnedMessages.length > 0 && (
-          <div className="border-b border-slate-200 bg-amber-50 p-3">
+          <div className="border-b border-white/[0.07] bg-amber-50 p-3">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Pin className="w-4 h-4 text-amber-600" />
-                <h4 className="font-semibold text-slate-700">Pinned Messages ({pinnedMessages.length})</h4>
+                <h4 className="font-semibold text-portal-text">Pinned Messages ({pinnedMessages.length})</h4>
               </div>
               <button
                 onClick={() => setShowPinnedMessages(false)}
                 className="p-1.5 hover:bg-amber-100 rounded-lg transition-colors"
               >
-                <X className="w-4 h-4 text-slate-500" />
+                <X className="w-4 h-4 text-portal-soft" />
               </button>
             </div>
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {pinnedMessages.map((msg) => (
                 <div
                   key={msg.id}
-                  className="p-3 bg-white rounded-lg border border-amber-200 hover:border-amber-300 transition-colors cursor-pointer"
+                  className="p-3 bg-portal-surface rounded-lg border border-amber-200 hover:border-amber-300 transition-colors cursor-pointer"
                   onClick={async () => {
                     setShowPinnedMessages(false);
 
@@ -2475,20 +2475,20 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                 >
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-slate-700">{msg.sender}</span>
-                      <span className="text-xs text-slate-400">
+                      <span className="text-sm font-medium text-portal-text">{msg.sender}</span>
+                      <span className="text-xs text-portal-soft">
                         {new Date(msg.timestamp).toLocaleDateString()} {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
                     <button
                       onClick={(e) => { e.stopPropagation(); handleUnpinMessage(msg.id); }}
-                      className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-red-500 transition-colors"
+                      className="p-1 hover:bg-portal-surface2 rounded text-portal-soft hover:text-red-500 transition-colors"
                       title="Unpin message"
                     >
                       <PinOff className="w-4 h-4" />
                     </button>
                   </div>
-                  <p className="text-sm text-slate-600 line-clamp-3">{msg.text}</p>
+                  <p className="text-sm text-portal-soft line-clamp-3">{msg.text}</p>
                   {msg.attachmentUrl && (
                     <div className="mt-2">
                       {msg.attachmentType === 'image' ? (
@@ -2517,7 +2517,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
               <button
                 onClick={loadMoreMessages}
                 disabled={loadingMoreMessages}
-                className="px-4 py-2 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors disabled:opacity-50"
+                className="px-4 py-2 text-sm text-portal-soft bg-portal-surface2 hover:bg-portal-surface2 rounded-lg transition-colors disabled:opacity-50"
               >
                 {loadingMoreMessages ? 'Loading...' : 'Load older messages'}
               </button>
@@ -2525,19 +2525,19 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
           )}
           {messages.map((msg) => (
             <div key={msg.id} id={`msg-${msg.id}`} className={`flex gap-2 md:gap-4 group transition-colors duration-500 ${msg.isAi ? 'bg-brand-50/30 -mx-3 md:-mx-6 px-3 md:px-6 py-2' : ''}`}>
-              <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${msg.isAi ? 'bg-brand-500' : 'bg-slate-200'}`}>
+              <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${msg.isAi ? 'bg-brand-500' : 'bg-portal-surface2'}`}>
                 {msg.isAi ? (
                   <Bot className="w-4 h-4 md:w-6 md:h-6 text-white" />
                 ) : msg.avatar && msg.avatar !== 'user' && msg.avatar.startsWith('http') ? (
                   <img src={msg.avatar} alt="" className="w-full h-full rounded-lg object-cover" />
                 ) : (
-                  <UserIcon className="w-4 h-4 md:w-6 md:h-6 text-slate-500" />
+                  <UserIcon className="w-4 h-4 md:w-6 md:h-6 text-portal-soft" />
                 )}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-baseline gap-1 md:gap-2">
-                  <span className={`font-bold text-sm md:text-base ${isDarkBackground() ? 'text-white' : 'text-slate-900'}`}>{msg.sender}</span>
-                  <span className={`text-[10px] md:text-xs ${isDarkBackground() ? 'text-slate-400' : 'text-slate-400'}`}>
+                  <span className={`font-bold text-sm md:text-base ${isDarkBackground() ? 'text-white' : 'text-white'}`}>{msg.sender}</span>
+                  <span className={`text-[10px] md:text-xs ${isDarkBackground() ? 'text-portal-soft' : 'text-portal-soft'}`}>
                     {formatMessageTime(msg.timestamp)}
                     {msg.isEdited && <span className="ml-1 italic">(edited)</span>}
                   </span>
@@ -2546,13 +2546,13 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                   <div className="mt-1 md:mt-2 mb-1">
                     {msg.attachmentType === 'image' ? (
                       <a href={msg.attachmentUrl} target="_blank" rel="noopener noreferrer">
-                        <img src={msg.attachmentUrl} alt="Attachment" className="max-h-48 md:max-h-60 rounded-lg border border-slate-200" />
+                        <img src={msg.attachmentUrl} alt="Attachment" className="max-h-48 md:max-h-60 rounded-lg border border-white/[0.07]" />
                       </a>
                     ) : msg.attachmentType === 'video' ? (
                       <video
                         src={msg.attachmentUrl}
                         controls
-                        className="max-h-64 md:max-h-80 rounded-lg border border-slate-200"
+                        className="max-h-64 md:max-h-80 rounded-lg border border-white/[0.07]"
                         preload="metadata"
                       />
                     ) : (
@@ -2560,18 +2560,18 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                         href={msg.attachmentUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-3 px-4 py-3 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-200 transition-colors group"
+                        className="inline-flex items-center gap-3 px-4 py-3 bg-portal-surface2 hover:bg-portal-surface2 rounded-lg border border-white/[0.07] transition-colors group"
                       >
-                        <div className="p-2 bg-white rounded-lg shadow-sm">
+                        <div className="p-2 bg-portal-surface rounded-lg shadow-sm">
                           <File className="w-5 h-5 text-brand-600" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-slate-800 truncate max-w-[200px]">
+                          <p className="text-sm font-medium text-portal-text truncate max-w-[200px]">
                             {msg.attachmentName || 'File attachment'}
                           </p>
-                          <p className="text-xs text-slate-500">Click to download</p>
+                          <p className="text-xs text-portal-soft">Click to download</p>
                         </div>
-                        <Download className="w-4 h-4 text-slate-400 group-hover:text-brand-600 transition-colors" />
+                        <Download className="w-4 h-4 text-portal-soft group-hover:text-brand-600 transition-colors" />
                       </a>
                     )}
                   </div>
@@ -2581,7 +2581,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                     <textarea
                       value={editingText}
                       onChange={(e) => setEditingText(e.target.value)}
-                      className="w-full p-2 text-xs md:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none resize-none"
+                      className="w-full p-2 text-xs md:text-sm border border-white/[0.07] rounded-lg focus:ring-2 focus:ring-brand-500 outline-none resize-none"
                       rows={3}
                       autoFocus
                       onKeyDown={(e) => {
@@ -2603,19 +2603,19 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                       </button>
                       <button
                         onClick={handleCancelEdit}
-                        className="flex items-center gap-1 px-3 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm rounded-lg transition-colors"
+                        className="flex items-center gap-1 px-3 py-1 bg-portal-surface2 hover:bg-portal-surface2 text-portal-text text-sm rounded-lg transition-colors"
                       >
                         <X className="w-3 h-3" />
                         Cancel
                       </button>
-                      <span className="text-xs text-slate-500 self-center ml-2">
+                      <span className="text-xs text-portal-soft self-center ml-2">
                         Press Enter to save • Esc to cancel
                       </span>
                     </div>
                   </div>
                 ) : (
                   <div className="mt-1">
-                    <span className={`whitespace-pre-wrap text-sm md:text-base ${isDarkBackground() ? 'text-slate-200' : 'text-slate-700'}`}>{renderTextWithMentions(msg.text)}</span>
+                    <span className={`whitespace-pre-wrap text-sm md:text-base ${isDarkBackground() ? 'text-slate-200' : 'text-portal-text'}`}>{renderTextWithMentions(msg.text)}</span>
                     <span className="inline-flex items-center gap-1 ml-2">
                       {!msg.isAi && msg.senderId === currentUser.id && editingMessageId !== msg.id && (
                         <button
@@ -2623,7 +2623,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                             setEditingMessageId(msg.id);
                             setEditingText(msg.text);
                           }}
-                          className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-brand-600 transition-opacity inline-flex items-center align-middle"
+                          className="opacity-0 group-hover:opacity-100 text-portal-soft hover:text-brand-600 transition-opacity inline-flex items-center align-middle"
                           title="Edit message"
                         >
                           <Edit2 className="w-4 h-4" />
@@ -2632,7 +2632,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                       {!msg.isAi && (currentUser.role === 'Owner' || msg.senderId === currentUser.id) && editingMessageId !== msg.id && (
                         <button
                           onClick={() => handleDeleteMessage(msg.id, msg.text)}
-                          className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-600 transition-opacity inline-flex items-center align-middle"
+                          className="opacity-0 group-hover:opacity-100 text-portal-soft hover:text-red-600 transition-opacity inline-flex items-center align-middle"
                           title="Delete message"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -2641,7 +2641,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                       {!msg.isAi && editingMessageId !== msg.id && (
                         <button
                           onClick={() => msg.isPinned ? handleUnpinMessage(msg.id) : handlePinMessage(msg.id)}
-                          className={`opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center align-middle ${msg.isPinned ? 'text-amber-500 hover:text-slate-400' : 'text-slate-400 hover:text-amber-500'}`}
+                          className={`opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center align-middle ${msg.isPinned ? 'text-amber-500 hover:text-portal-soft' : 'text-portal-soft hover:text-amber-500'}`}
                           title={msg.isPinned ? 'Unpin message' : 'Pin message'}
                         >
                           {msg.isPinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
@@ -2650,7 +2650,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                       {!msg.isAi && editingMessageId !== msg.id && (
                         <button
                           onClick={() => setReplyingToMessage(msg)}
-                          className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-brand-600 transition-opacity inline-flex items-center align-middle"
+                          className="opacity-0 group-hover:opacity-100 text-portal-soft hover:text-brand-600 transition-opacity inline-flex items-center align-middle"
                           title="Reply to message"
                         >
                           <Reply className="w-4 h-4" />
@@ -2676,7 +2676,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                       className={`flex items-center gap-1 px-2 py-1 rounded-full text-sm transition-all ${
                         reaction.userIds.includes(currentUser.id)
                           ? 'bg-brand-100 border-brand-300 border-2'
-                          : 'bg-slate-100 border border-slate-300 hover:bg-slate-200'
+                          : 'bg-portal-surface2 border border-white/[0.07] hover:bg-portal-surface2'
                       }`}
                       title={reaction.userIds
                         .map(uid => {
@@ -2687,7 +2687,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                         .join(', ')}
                     >
                       <span>{reaction.emoji}</span>
-                      <span className="text-xs font-medium text-slate-600">
+                      <span className="text-xs font-medium text-portal-soft">
                         {reaction.userIds
                           .map(uid => {
                             if (uid === currentUser.id) return 'You';
@@ -2703,14 +2703,14 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                     <div className="relative">
                       <button
                         onClick={() => setShowReactionPicker(showReactionPicker === msg.id ? null : msg.id)}
-                        className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 transition-opacity"
+                        className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-portal-surface2 hover:bg-portal-surface2 border border-white/[0.07] transition-opacity"
                         title="Add reaction"
                       >
                         <SmilePlus className="w-4 h-4" />
                       </button>
 
                       {showReactionPicker === msg.id && (
-                        <div className="absolute left-0 bottom-full mb-2 bg-white rounded-lg shadow-xl border border-slate-200 p-2 z-50 flex gap-1">
+                        <div className="absolute left-0 bottom-full mb-2 bg-portal-surface rounded-lg shadow-xl border border-white/[0.07] p-2 z-50 flex gap-1">
                           {['👍', '❤️', '😂', '😮', '😢', '👏', '🎉', '🔥'].map((emoji) => (
                             <button
                               key={emoji}
@@ -2748,7 +2748,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                     {expandedThreads.has(msg.id) && (
                       <div className="mt-3 ml-4 pl-4 border-l-2 border-brand-200 space-y-3">
                         {loadingThreads.has(msg.id) ? (
-                          <div className="flex items-center gap-2 text-sm text-slate-500">
+                          <div className="flex items-center gap-2 text-sm text-portal-soft">
                             <Loader2 className="w-4 h-4 animate-spin" />
                             Loading replies...
                           </div>
@@ -2756,19 +2756,19 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                           <>
                             {(threadReplies[msg.id] || []).map((reply) => (
                               <div key={reply.id} className="flex gap-2">
-                                <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${reply.isAi ? 'bg-brand-500' : 'bg-slate-200'}`}>
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${reply.isAi ? 'bg-brand-500' : 'bg-portal-surface2'}`}>
                                   {reply.isAi ? (
                                     <Bot className="w-3 h-3 text-white" />
                                   ) : reply.avatar && reply.avatar !== 'user' && reply.avatar.startsWith('http') ? (
                                     <img src={reply.avatar} alt="" className="w-full h-full rounded-full object-cover" />
                                   ) : (
-                                    <UserIcon className="w-3 h-3 text-slate-500" />
+                                    <UserIcon className="w-3 h-3 text-portal-soft" />
                                   )}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-baseline gap-2">
-                                    <span className={`font-semibold text-sm ${isDarkBackground() ? 'text-white' : 'text-slate-900'}`}>{reply.sender}</span>
-                                    <span className={`text-[10px] ${isDarkBackground() ? 'text-slate-400' : 'text-slate-400'}`}>
+                                    <span className={`font-semibold text-sm ${isDarkBackground() ? 'text-white' : 'text-white'}`}>{reply.sender}</span>
+                                    <span className={`text-[10px] ${isDarkBackground() ? 'text-portal-soft' : 'text-portal-soft'}`}>
                                       {formatMessageTime(reply.timestamp)}
                                       {reply.isEdited && <span className="ml-1 italic">(edited)</span>}
                                     </span>
@@ -2777,7 +2777,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                                     <div className="mt-1 mb-1">
                                       {reply.attachmentType === 'image' ? (
                                         <a href={reply.attachmentUrl} target="_blank" rel="noopener noreferrer">
-                                          <img src={reply.attachmentUrl} alt="Attachment" className="max-h-32 rounded-lg border border-slate-200" />
+                                          <img src={reply.attachmentUrl} alt="Attachment" className="max-h-32 rounded-lg border border-white/[0.07]" />
                                         </a>
                                       ) : (
                                         <a href={reply.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-brand-600 hover:underline">
@@ -2786,7 +2786,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                                       )}
                                     </div>
                                   )}
-                                  <p className={`text-sm whitespace-pre-wrap ${isDarkBackground() ? 'text-slate-200' : 'text-slate-700'}`}>
+                                  <p className={`text-sm whitespace-pre-wrap ${isDarkBackground() ? 'text-slate-200' : 'text-portal-text'}`}>
                                     {renderTextWithMentions(reply.text)}
                                   </p>
                                 </div>
@@ -2795,7 +2795,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                             {/* Reply in thread button */}
                             <button
                               onClick={() => setReplyingToMessage(msg)}
-                              className="flex items-center gap-1 text-xs text-slate-500 hover:text-brand-600 transition-colors"
+                              className="flex items-center gap-1 text-xs text-portal-soft hover:text-brand-600 transition-colors"
                             >
                               <Reply className="w-3 h-3" />
                               Reply
@@ -2809,12 +2809,12 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
               </div>
             </div>
           ))}
-          {loading && <div className="text-sm text-slate-400 italic px-6">Echo is typing...</div>}
+          {loading && <div className="text-sm text-portal-soft italic px-6">Echo is typing...</div>}
           <div ref={messagesEndRef} />
         </div>
 
-        <div className="p-2 md:p-6 md:pt-2 flex-shrink-0 bg-white border-t border-slate-100">
-          <div className="border rounded-lg md:rounded-xl shadow-sm bg-white flex flex-col relative border-slate-300">
+        <div className="p-2 md:p-6 md:pt-2 flex-shrink-0 bg-portal-surface border-t border-white/[0.07]">
+          <div className="border rounded-lg md:rounded-xl shadow-sm bg-portal-surface flex flex-col relative border-white/[0.07]">
             {/* Mention Dropdown */}
             {mentionDropdown?.show && (() => {
               // For private channels, only show members in the dropdown
@@ -2826,9 +2826,9 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                 : profiles;
 
               return (
-              <div className="absolute bottom-full left-0 mb-2 w-64 bg-white rounded-lg shadow-xl border border-slate-200 overflow-hidden z-[100] animate-fadeIn">
-                <div className="p-2 bg-slate-50 border-b border-slate-200">
-                  <p className="text-xs font-bold text-slate-500 uppercase">Mention Someone</p>
+              <div className="absolute bottom-full left-0 mb-2 w-64 bg-portal-surface rounded-lg shadow-xl border border-white/[0.07] overflow-hidden z-[100] animate-fadeIn">
+                <div className="p-2 bg-portal-dark border-b border-white/[0.07]">
+                  <p className="text-xs font-bold text-portal-soft uppercase">Mention Someone</p>
                 </div>
                 <div className="max-h-48 overflow-y-auto">
                   {/* Hide @everyone for private channels - it would leak notifications to non-members */}
@@ -2846,8 +2846,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                         ALL
                       </div>
                       <div>
-                        <p className="font-medium text-slate-900">@everyone</p>
-                        <p className="text-xs text-slate-500">Notify all team members</p>
+                        <p className="font-medium text-white">@everyone</p>
+                        <p className="text-xs text-portal-soft">Notify all team members</p>
                       </div>
                     </button>
                   )}
@@ -2878,8 +2878,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                           </div>
                         )}
                         <div>
-                          <p className="font-medium text-slate-900">{profile.full_name || 'Unknown'}</p>
-                          <p className="text-xs text-slate-500">@{profile.full_name?.split(' ')[0] || 'user'}</p>
+                          <p className="font-medium text-white">{profile.full_name || 'Unknown'}</p>
+                          <p className="text-xs text-portal-soft">@{profile.full_name?.split(' ')[0] || 'user'}</p>
                         </div>
                       </button>
                     ))}
@@ -2896,13 +2896,13 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                   <span className="text-sm text-brand-600">
                     Replying to <span className="font-semibold">{replyingToMessage.sender}</span>
                   </span>
-                  <p className="text-xs text-slate-500 truncate">
+                  <p className="text-xs text-portal-soft truncate">
                     {replyingToMessage.text.substring(0, 60)}{replyingToMessage.text.length > 60 ? '...' : ''}
                   </p>
                 </div>
                 <button
                   onClick={() => setReplyingToMessage(null)}
-                  className="p-1 text-slate-400 hover:text-slate-600 transition-colors"
+                  className="p-1 text-portal-soft hover:text-portal-soft transition-colors"
                   title="Cancel reply"
                 >
                   <X className="w-4 h-4" />
@@ -2912,7 +2912,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
             {/* Staged attachment preview */}
             {stagedAttachment && (
-              <div className="relative p-2 bg-slate-100 border-b border-slate-200">
+              <div className="relative p-2 bg-portal-surface2 border-b border-white/[0.07]">
                 <div className="flex items-start gap-2">
                   {stagedAttachment.type === 'image' ? (
                     <img
@@ -2921,9 +2921,9 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                       className="max-h-32 max-w-[200px] rounded-lg object-contain"
                     />
                   ) : (
-                    <div className="flex items-center gap-2 p-2 bg-white rounded-lg">
-                      <File className="w-5 h-5 text-slate-500" />
-                      <span className="text-sm text-slate-700">{stagedAttachment.name}</span>
+                    <div className="flex items-center gap-2 p-2 bg-portal-surface rounded-lg">
+                      <File className="w-5 h-5 text-portal-soft" />
+                      <span className="text-sm text-portal-text">{stagedAttachment.name}</span>
                     </div>
                   )}
                   <button
@@ -2968,10 +2968,10 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
               }
               className="w-full max-h-40 min-h-[44px] md:min-h-[60px] p-2 md:p-3 text-sm md:text-base outline-none resize-none rounded-t-lg md:rounded-t-xl"
             />
-            <div className="flex justify-between items-center p-1.5 md:p-2 border-t rounded-b-lg md:rounded-b-xl bg-slate-50 border-slate-100">
+            <div className="flex justify-between items-center p-1.5 md:p-2 border-t rounded-b-lg md:rounded-b-xl bg-portal-dark border-white/[0.07]">
               <div className="flex gap-0.5 md:gap-1 relative">
                 <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar" />
-                <button onClick={() => fileInputRef.current?.click()} className="p-1.5 md:p-2 hover:bg-slate-200 rounded-full text-slate-500" title="Attach file">
+                <button onClick={() => fileInputRef.current?.click()} className="p-1.5 md:p-2 hover:bg-portal-surface2 rounded-full text-portal-soft" title="Attach file">
                   <Paperclip className="w-4 h-4 md:w-5 md:h-5" />
                 </button>
 
@@ -2980,7 +2980,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                     setShowEmojiPicker(!showEmojiPicker);
                     setShowGifPicker(false);
                   }}
-                  className="p-1.5 md:p-2 hover:bg-slate-200 rounded-full text-slate-500"
+                  className="p-1.5 md:p-2 hover:bg-portal-surface2 rounded-full text-portal-soft"
                 >
                   <Smile className="w-4 h-4 md:w-5 md:h-5" />
                 </button>
@@ -2994,17 +2994,17 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                       searchGifs('');
                     }
                   }}
-                  className="hidden sm:block p-1.5 md:p-2 hover:bg-slate-200 rounded-full text-slate-500"
+                  className="hidden sm:block p-1.5 md:p-2 hover:bg-portal-surface2 rounded-full text-portal-soft"
                 >
                   <Film className="w-4 h-4 md:w-5 md:h-5" />
                 </button>
 
                 {/* Emoji Picker Dropdown */}
                 {showEmojiPicker && (
-                  <div className="absolute bottom-full left-0 mb-2 bg-white rounded-lg shadow-xl border border-slate-200 p-2 md:p-3 z-[100] w-72 md:w-80">
-                    <div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-200">
-                      <p className="text-sm font-bold text-slate-700">Emojis</p>
-                      <button onClick={() => setShowEmojiPicker(false)} className="text-slate-400 hover:text-slate-600">
+                  <div className="absolute bottom-full left-0 mb-2 bg-portal-surface rounded-lg shadow-xl border border-white/[0.07] p-2 md:p-3 z-[100] w-72 md:w-80">
+                    <div className="flex justify-between items-center mb-2 pb-2 border-b border-white/[0.07]">
+                      <p className="text-sm font-bold text-portal-text">Emojis</p>
+                      <button onClick={() => setShowEmojiPicker(false)} className="text-portal-soft hover:text-portal-soft">
                         <X className="w-4 h-4" />
                       </button>
                     </div>
@@ -3016,7 +3016,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                             setMessage(message + emoji);
                             setShowEmojiPicker(false);
                           }}
-                          className="text-2xl hover:bg-slate-100 rounded p-1 transition-colors"
+                          className="text-2xl hover:bg-portal-surface2 rounded p-1 transition-colors"
                         >
                           {emoji}
                         </button>
@@ -3027,10 +3027,10 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
                 {/* GIF Picker Dropdown */}
                 {showGifPicker && (
-                  <div className="absolute bottom-full left-0 mb-2 bg-white rounded-lg shadow-xl border border-slate-200 p-2 md:p-3 z-[100] w-80 md:w-96">
-                    <div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-200">
-                      <p className="text-sm font-bold text-slate-700">GIFs</p>
-                      <button onClick={() => setShowGifPicker(false)} className="text-slate-400 hover:text-slate-600">
+                  <div className="absolute bottom-full left-0 mb-2 bg-portal-surface rounded-lg shadow-xl border border-white/[0.07] p-2 md:p-3 z-[100] w-80 md:w-96">
+                    <div className="flex justify-between items-center mb-2 pb-2 border-b border-white/[0.07]">
+                      <p className="text-sm font-bold text-portal-text">GIFs</p>
+                      <button onClick={() => setShowGifPicker(false)} className="text-portal-soft hover:text-portal-soft">
                         <X className="w-4 h-4" />
                       </button>
                     </div>
@@ -3045,7 +3045,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                             searchGifs(gifSearch);
                           }
                         }}
-                        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
+                        className="w-full px-3 py-2 text-sm border border-white/[0.07] rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
                       />
                     </div>
                     {gifLoading ? (
@@ -3053,7 +3053,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                         <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
                       </div>
                     ) : gifs.length === 0 ? (
-                      <div className="flex justify-center items-center h-64 text-slate-500">
+                      <div className="flex justify-center items-center h-64 text-portal-soft">
                         No GIFs found. Try searching for something!
                       </div>
                     ) : (
@@ -3130,24 +3130,24 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
           <div className="bg-[#1a1d29] rounded-lg p-6 max-w-md w-full mx-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-white text-lg font-semibold">Manage Channel Members</h3>
-              <button onClick={() => setShowMembersModal(false)} className="text-slate-400 hover:text-white">
+              <button onClick={() => setShowMembersModal(false)} className="text-portal-soft hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {loadingMembers ? (
               <div className="flex justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                <Loader2 className="w-6 h-6 animate-spin text-portal-soft" />
               </div>
             ) : (
               <>
                 <div className="mb-4">
-                  <h4 className="text-slate-300 text-sm font-medium mb-2">Current Members</h4>
+                  <h4 className="text-portal-text text-sm font-medium mb-2">Current Members</h4>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
                     {channelMembers.map((member: any) => (
                       <div key={member.id} className="flex items-center justify-between bg-[#2d3142] rounded p-2">
                         <div className="flex items-center gap-2">
-                          <UserIcon className="w-4 h-4 text-slate-400" />
+                          <UserIcon className="w-4 h-4 text-portal-soft" />
                           <span className="text-white text-sm">{member.profiles?.full_name || 'Unknown User'}</span>
                           {member.role === 'owner' && (
                             <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded">Owner</span>
@@ -3167,14 +3167,14 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                 </div>
 
                 <div>
-                  <h4 className="text-slate-300 text-sm font-medium mb-2">Invite Members</h4>
+                  <h4 className="text-portal-text text-sm font-medium mb-2">Invite Members</h4>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
                     {profiles
                       .filter(p => !channelMembers.some((m: any) => m.user_id === p.id))
                       .map(profile => (
                         <div key={profile.id} className="flex items-center justify-between bg-[#2d3142] rounded p-2">
                           <div className="flex items-center gap-2">
-                            <UserIcon className="w-4 h-4 text-slate-400" />
+                            <UserIcon className="w-4 h-4 text-portal-soft" />
                             <span className="text-white text-sm">{profile.full_name || profile.email}</span>
                           </div>
                           <button

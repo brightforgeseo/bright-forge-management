@@ -107,22 +107,22 @@ const QAChecker: React.FC = () => {
   return (
     <div className="p-8 max-w-7xl mx-auto">
       <div className="mb-6">
-        <h2 className="text-3xl font-bold text-slate-900">QA Checker</h2>
-        <p className="text-slate-500">Check and fix content based on your custom rules.</p>
+        <h2 className="text-3xl font-bold text-white">QA Checker</h2>
+        <p className="text-portal-soft">Check and fix content based on your custom rules.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Editor Panel */}
         <div className="lg:col-span-2">
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-            <div className="bg-slate-50 px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm text-slate-600">
+          <div className="bg-portal-surface rounded-2xl shadow-lg shadow-black/20 border border-white/[0.07] overflow-hidden">
+            <div className="bg-portal-dark px-4 py-3 border-b border-white/[0.07] flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm text-portal-soft">
                 <FileText className="w-4 h-4" />
                 <span>Document Editor</span>
               </div>
               <button
                 onClick={handleCopy}
-                className="flex items-center gap-1 text-sm text-slate-600 hover:text-brand-600"
+                className="flex items-center gap-1 text-sm text-portal-soft hover:text-brand-600"
               >
                 {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                 {copied ? 'Copied!' : 'Copy'}
@@ -140,12 +140,12 @@ const QAChecker: React.FC = () => {
 
         {/* Sidebar */}
         <div className="space-y-6">
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-            <label className="block text-sm font-medium text-slate-700 mb-2">
+          <div className="bg-portal-surface p-6 rounded-2xl shadow-lg shadow-black/20 border border-white/[0.07]">
+            <label className="block text-sm font-medium text-portal-text mb-2">
               Your QA Rules
             </label>
             <textarea
-              className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none resize-none"
+              className="w-full p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none resize-none"
               rows={8}
               placeholder="Enter your QA rules...
 
@@ -161,7 +161,7 @@ Examples:
             <button
               onClick={handleCheck}
               disabled={loading}
-              className="w-full mt-4 px-4 py-3 bg-brand-500 text-white rounded-xl font-medium hover:bg-brand-600 disabled:bg-slate-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full mt-4 px-4 py-3 bg-brand-500 text-white rounded-xl font-medium hover:bg-brand-600 disabled:bg-portal-surface2 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
@@ -186,9 +186,9 @@ Examples:
 
           {/* Corrections Panel */}
           {corrections.length > 0 && (
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+            <div className="bg-portal-surface p-6 rounded-2xl shadow-lg shadow-black/20 border border-white/[0.07]">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-medium text-slate-900">
+                <h3 className="font-medium text-white">
                   Corrections Found
                   <span className="ml-2 px-2 py-0.5 bg-brand-100 text-brand-700 text-sm rounded-full">
                     {corrections.length}
@@ -198,7 +198,7 @@ Examples:
 
               <div className="space-y-2 max-h-64 overflow-y-auto mb-4">
                 {corrections.map((c, i) => (
-                  <div key={i} className="p-3 bg-slate-50 rounded-lg text-sm border-l-3 border-brand-500">
+                  <div key={i} className="p-3 bg-portal-dark rounded-lg text-sm border-l-3 border-brand-500">
                     <div className="text-red-600 line-through">{c.find}</div>
                     <div className="text-green-600 font-medium">→ {c.replace}</div>
                   </div>

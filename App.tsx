@@ -222,7 +222,7 @@ ${currentUser.name}`;
   const isFullHeight = currentView === ToolView.TASKS || currentView === ToolView.TEAM_CHAT;
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden font-sans text-slate-900">
+    <div className="flex h-screen bg-portal-dark overflow-hidden font-sans text-white">
       <Sidebar
         currentView={currentView}
         onChangeView={setCurrentView}
@@ -236,11 +236,11 @@ ${currentUser.name}`;
 
       {/* Mobile Header - Hidden on TeamChat which has its own header */}
       {currentView !== ToolView.TEAM_CHAT && (
-      <div className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-white border-b border-slate-200 z-30 flex items-center justify-between px-3 safe-area-inset-top">
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-portal-surface border-b border-white/[0.07] z-30 flex items-center justify-between px-3 safe-area-inset-top">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <button
             onClick={() => setIsMobileMenuOpen(true)}
-            className="p-2.5 hover:bg-slate-100 rounded-xl transition-colors active:bg-slate-200 flex-shrink-0"
+            className="p-2.5 hover:bg-portal-surface2 rounded-xl transition-colors active:bg-portal-surface2 flex-shrink-0"
             aria-label="Open menu"
           >
             <svg className="w-6 h-6 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -253,26 +253,26 @@ ${currentUser.name}`;
                 <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
               </svg>
             </div>
-            <span className="font-bold text-slate-900 truncate text-sm">{branding.companyName}</span>
+            <span className="font-bold text-white truncate text-sm">{branding.companyName}</span>
           </div>
         </div>
       </div>
       )}
 
-      <main className={`flex-1 lg:ml-64 h-full overflow-hidden relative ${isFullHeight ? '' : 'bg-slate-50'} ${currentView === ToolView.TEAM_CHAT ? '' : 'pt-14'} lg:pt-0`}>
+      <main className={`flex-1 lg:ml-64 h-full overflow-hidden relative ${isFullHeight ? '' : 'bg-portal-dark'} ${currentView === ToolView.TEAM_CHAT ? '' : 'pt-14'} lg:pt-0`}>
         {isFullHeight ? renderContent() : <ScrollablePageWrapper>{renderContent()}</ScrollablePageWrapper>}
       </main>
       <ToastContainer toasts={toasts} removeToast={removeToast} />
 
       {showInviteModal && (
         <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 lg:p-8 animate-fadeIn backdrop-blur-sm">
-           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-100 max-h-[90vh] overflow-y-auto">
-              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                 <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+           <div className="bg-portal-surface rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-white/[0.07] max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-white/[0.07] flex justify-between items-center bg-portal-dark">
+                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
                     <UserPlus className="w-5 h-5 text-brand-600" /> 
                     {inviteStep === 'form' ? 'Create Invite Credentials' : 'Invite Generated'}
                  </h3>
-                 <button onClick={resetInviteModal} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+                 <button onClick={resetInviteModal} className="text-slate-400 hover:text-portal-soft"><X className="w-5 h-5" /></button>
               </div>
               
               {inviteStep === 'form' ? (
@@ -282,7 +282,7 @@ ${currentUser.name}`;
                         <input 
                             value={inviteForm.name}
                             onChange={e => setInviteForm({...inviteForm, name: e.target.value})}
-                            className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                            className="w-full p-2.5 border border-white/[0.07] rounded-lg outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                             placeholder="e.g. Sarah Jones"
                         />
                     </div>
@@ -291,7 +291,7 @@ ${currentUser.name}`;
                         <input 
                             value={inviteForm.email}
                             onChange={e => setInviteForm({...inviteForm, email: e.target.value})}
-                            className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                            className="w-full p-2.5 border border-white/[0.07] rounded-lg outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                             placeholder="colleague@company.com"
                         />
                     </div>
@@ -303,7 +303,7 @@ ${currentUser.name}`;
                         <input 
                             value={inviteForm.password}
                             onChange={e => setInviteForm({...inviteForm, password: e.target.value})}
-                            className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:border-brand-500 font-mono text-sm bg-slate-50"
+                            className="w-full p-2.5 border border-white/[0.07] rounded-lg outline-none focus:border-brand-500 font-mono text-sm bg-portal-dark"
                         />
                     </div>
                     <div className="pt-2">
@@ -353,12 +353,12 @@ ${currentUser.name}`;
                                 navigator.clipboard.writeText(text);
                                 addToast('success', 'Invite message copied to clipboard!');
                             }}
-                            className="flex items-center justify-center gap-2 py-2 border border-slate-200 rounded-lg font-semibold hover:bg-slate-50 text-sm text-slate-600"
+                            className="flex items-center justify-center gap-2 py-2 border border-white/[0.07] rounded-lg font-semibold hover:bg-portal-dark text-sm text-portal-soft"
                         >
                             <MessageSquare className="w-4 h-4" /> Copy Message for Slack
                         </button>
                     </div>
-                    <button onClick={resetInviteModal} className="text-slate-400 hover:text-slate-600 text-sm mt-2">Close</button>
+                    <button onClick={resetInviteModal} className="text-slate-400 hover:text-portal-soft text-sm mt-2">Close</button>
                 </div>
               )}
            </div>
