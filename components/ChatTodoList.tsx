@@ -251,8 +251,17 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
       }
 
       const newTaskId = `task-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-      const defaultStatus = boardData.statusDefs?.[0]?.label || 'Not Started';
-      const defaultPriority = boardData.priorityDefs?.[0]?.label || 'Medium';
+
+      // Find "Working on it" status, or fall back to a non-done status
+      const workingStatus = boardData.statusDefs?.find(s =>
+        s.label.toLowerCase().includes('working')
+      ) || boardData.statusDefs?.find(s =>
+        !s.label.toLowerCase().includes('done') &&
+        !s.label.toLowerCase().includes('complete') &&
+        !s.label.toLowerCase().includes('stuck')
+      ) || boardData.statusDefs?.[0];
+      const defaultStatus = workingStatus?.label || 'Working on it';
+      const defaultPriority = boardData.priorityDefs?.[1]?.label || boardData.priorityDefs?.[0]?.label || 'Medium';
 
       const description = todoData.notes
         ? `${todoData.notes}\n\n— Created from chat reminder by ${todoData.created_by_name}`
