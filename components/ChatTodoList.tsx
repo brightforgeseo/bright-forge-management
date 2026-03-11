@@ -16,6 +16,7 @@ export interface ChatTodo {
   assigned_to: string | null;
   assigned_to_name: string | null;
   notes: string | null;
+  board_task_id: string | null; // ID of the task created in the client board
   is_completed: boolean;
   completed_at: string | null;
   completed_by: string | null;
@@ -125,6 +126,21 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
     const assignee = profiles.find(p => p.id === selectedAssignee);
 
     setAdding(true);
+
+    // 1. If a client board is selected, create the task in the board immediately
+    let boardTaskId: string | null = null;
+    if (selectedBoardId) {
+      boardTaskId = await createTaskInClientBoard({
+        text,
+        notes: newTodoNotes.trim() || null,
+        client_board_id: selectedBoardId,
+        group_id: selectedGroupId || null,
+        assigned_to: selectedAssignee || null,
+        created_by_name: currentUser.name,
+      });
+    }
+
+    // 2. Save the reminder in chat_todos
     const { error } = await supabase
       .from('chat_todos')
       .insert({
@@ -138,6 +154,7 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
         created_by_name: currentUser.name,
         assigned_to: selectedAssignee || null,
         assigned_to_name: assignee?.full_name || null,
+        board_task_id: boardTaskId,
         is_completed: false,
       });
 
@@ -148,7 +165,7 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
       setNewTodoText('');
       setNewTodoNotes('');
       setShowNotesInput(false);
-      addToast('success', 'Reminder added');
+      addToast('success', boardTaskId ? 'Reminder added & task created in client board' : 'Reminder added');
     }
     setAdding(false);
   };
@@ -173,16 +190,23 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
       return;
     }
 
-    // 2. Create task in the client's board if a board was selected
-    if (todo.client_board_id) {
-      await createTaskInClientBoard(todo);
+    // 2. Update the task status to "Done"/"Completed" in the client board
+    if (todo.client_board_id && todo.board_task_id) {
+      await markTaskAsDone(todo);
     }
 
     setCompletingIds(prev => { const s = new Set(prev); s.delete(todo.id); return s; });
-    addToast('success', `Reminder completed${todo.client_board_id ? ' & added to client tasks' : ''}`);
+    addToast('success', `Reminder completed${todo.board_task_id ? ' & task marked as done' : ''}`);
   };
 
-  const createTaskInClientBoard = async (todo: ChatTodo) => {
+  const createTaskInClientBoard = async (todoData: {
+    text: string;
+    notes: string | null;
+    client_board_id: string;
+    group_id: string | null;
+    assigned_to: string | null;
+    created_by_name: string;
+  }): Promise<string | null> => {
     try {
       // Fetch the raw DB row directly
       const { data: rows, error: fetchError } = await supabase
@@ -193,40 +217,28 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
       if (fetchError || !rows) {
         console.error('[ChatTodoList] Error fetching boards:', fetchError?.message);
         addToast('error', 'Failed to fetch client boards');
-        return;
+        return null;
       }
-
-      console.log('[ChatTodoList] Fetched', rows.length, 'board rows');
-      console.log('[ChatTodoList] Looking for board_data.id:', todo.client_board_id);
 
       // Find the matching row by board_data.id
-      const row = rows.find((r: any) => r.board_data?.id === todo.client_board_id);
+      const row = rows.find((r: any) => r.board_data?.id === todoData.client_board_id);
       if (!row) {
-        console.error('[ChatTodoList] Board row not found. Available board IDs:', rows.map((r: any) => r.board_data?.id));
+        console.error('[ChatTodoList] Board row not found for:', todoData.client_board_id);
         addToast('error', 'Client board not found');
-        return;
+        return null;
       }
-
-      console.log('[ChatTodoList] Found board row, DB id:', row.id, 'Board name:', row.board_data?.name);
 
       // Deep clone to avoid reference issues
       const boardData = JSON.parse(JSON.stringify(row.board_data)) as ClientBoard;
 
-      console.log('[ChatTodoList] Board groups:', boardData.groups?.map(g => ({ id: g.id, title: g.title, taskCount: g.tasks?.length })));
-      console.log('[ChatTodoList] Target group_id:', todo.group_id);
-
-      // Find the target group by saved group_id
+      // Find the target group by group_id
       let targetGroupIndex = -1;
-      if (todo.group_id) {
-        targetGroupIndex = boardData.groups.findIndex(g => g.id === todo.group_id);
-        console.log('[ChatTodoList] Found group at index:', targetGroupIndex);
+      if (todoData.group_id) {
+        targetGroupIndex = boardData.groups.findIndex(g => g.id === todoData.group_id);
       }
-      // Fallback to first group
       if (targetGroupIndex === -1 && boardData.groups.length > 0) {
         targetGroupIndex = 0;
-        console.log('[ChatTodoList] Falling back to first group');
       }
-
       if (targetGroupIndex === -1) {
         boardData.groups = boardData.groups || [];
         boardData.groups.push({
@@ -242,45 +254,87 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
       const defaultStatus = boardData.statusDefs?.[0]?.label || 'Not Started';
       const defaultPriority = boardData.priorityDefs?.[0]?.label || 'Medium';
 
-      const description = todo.notes
-        ? `${todo.notes}\n\n— Created from chat reminder by ${todo.created_by_name}`
-        : `Created from chat reminder by ${todo.created_by_name}`;
+      const description = todoData.notes
+        ? `${todoData.notes}\n\n— Created from chat reminder by ${todoData.created_by_name}`
+        : `Created from chat reminder by ${todoData.created_by_name}`;
 
       const newTask = {
         id: newTaskId,
-        title: todo.text,
+        title: todoData.text,
         description,
         status: defaultStatus,
         priority: defaultPriority,
         dueDate: '',
-        assignedTo: todo.assigned_to ? [todo.assigned_to] : [],
+        assignedTo: todoData.assigned_to ? [todoData.assigned_to] : [],
         comments: [],
       };
 
-      // Add task to the correct group
       boardData.groups[targetGroupIndex].tasks.push(newTask);
 
-      console.log('[ChatTodoList] Adding task to group:', boardData.groups[targetGroupIndex].title);
-      console.log('[ChatTodoList] Group now has', boardData.groups[targetGroupIndex].tasks.length, 'tasks');
-
       // Save directly using the row's primary key
-      const { data: updateData, error: updateError } = await supabase
+      const { error: updateError } = await supabase
         .from('client_boards')
         .update({ board_data: boardData, updated_at: new Date().toISOString() })
         .eq('id', row.id)
         .select();
 
       if (updateError) {
-        console.error('[ChatTodoList] Error saving board:', updateError.message, updateError.details, updateError.hint);
-        addToast('error', 'Failed to add task to client board: ' + updateError.message);
-      } else {
-        console.log('[ChatTodoList] Board saved successfully. Updated rows:', updateData?.length);
-        console.log('[ChatTodoList] Task "' + todo.text + '" added to "' + boardData.groups[targetGroupIndex].title + '" in "' + boardData.name + '"');
+        console.error('[ChatTodoList] Error saving board:', updateError.message);
+        addToast('error', 'Failed to add task to client board');
+        return null;
       }
+
+      console.log('[ChatTodoList] Task created in', boardData.groups[targetGroupIndex].title);
+      return newTaskId;
 
     } catch (err) {
       console.error('[ChatTodoList] Error creating task in board:', err);
       addToast('error', 'Unexpected error adding task to board');
+      return null;
+    }
+  };
+
+  // When a reminder is ticked off, find the task in the board and set status to done
+  const markTaskAsDone = async (todo: ChatTodo) => {
+    try {
+      const { data: rows, error: fetchError } = await supabase
+        .from('client_boards')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (fetchError || !rows) return;
+
+      const row = rows.find((r: any) => r.board_data?.id === todo.client_board_id);
+      if (!row) return;
+
+      const boardData = JSON.parse(JSON.stringify(row.board_data)) as ClientBoard;
+
+      // Find the last status def (usually "Done" or "Completed")
+      const doneStatus = boardData.statusDefs?.find(s =>
+        s.label.toLowerCase().includes('done') ||
+        s.label.toLowerCase().includes('complete')
+      ) || boardData.statusDefs?.[boardData.statusDefs.length - 1];
+
+      // Find the task by board_task_id and update its status
+      let found = false;
+      for (const group of boardData.groups) {
+        const task = group.tasks.find(t => t.id === todo.board_task_id);
+        if (task) {
+          task.status = doneStatus?.label || 'Done';
+          found = true;
+          break;
+        }
+      }
+
+      if (!found) return;
+
+      await supabase
+        .from('client_boards')
+        .update({ board_data: boardData, updated_at: new Date().toISOString() })
+        .eq('id', row.id);
+
+    } catch (err) {
+      console.error('[ChatTodoList] Error marking task as done:', err);
     }
   };
 
