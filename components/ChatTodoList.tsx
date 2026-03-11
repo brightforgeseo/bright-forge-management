@@ -252,16 +252,25 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
 
       const newTaskId = `task-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 
-      // Find "Working on it" status, or fall back to a non-done status
-      const workingStatus = boardData.statusDefs?.find(s =>
-        s.label.toLowerCase().includes('working')
-      ) || boardData.statusDefs?.find(s =>
-        !s.label.toLowerCase().includes('done') &&
-        !s.label.toLowerCase().includes('complete') &&
-        !s.label.toLowerCase().includes('stuck')
-      ) || boardData.statusDefs?.[0];
-      const defaultStatus = workingStatus?.label || 'Working on it';
-      const defaultPriority = boardData.priorityDefs?.[1]?.label || boardData.priorityDefs?.[0]?.label || 'Medium';
+      // Log status defs for debugging
+      console.log('[ChatTodoList] statusDefs:', boardData.statusDefs?.map(s => s.label));
+
+      // Find "Working on it" or "To Do" status - explicitly avoid done/complete
+      const defaultStatus =
+        boardData.statusDefs?.find(s => s.label.toLowerCase() === 'working on it')?.label ||
+        boardData.statusDefs?.find(s => s.label.toLowerCase() === 'to do')?.label ||
+        boardData.statusDefs?.find(s =>
+          !s.label.toLowerCase().includes('done') &&
+          !s.label.toLowerCase().includes('complete')
+        )?.label ||
+        'Working on it';
+      const defaultPriority =
+        boardData.priorityDefs?.find(s => s.label.toLowerCase() === 'medium')?.label ||
+        boardData.priorityDefs?.find(s =>
+          !s.label.toLowerCase().includes('critical')
+        )?.label ||
+        boardData.priorityDefs?.[0]?.label ||
+        'Medium';
 
       const description = todoData.notes
         ? `${todoData.notes}\n\n— Created from chat reminder by ${todoData.created_by_name}`
