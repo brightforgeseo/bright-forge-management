@@ -151,14 +151,14 @@ const ClientPortalSettings: React.FC<ClientPortalSettingsProps> = ({
     <div className="p-6 lg:p-8 max-w-3xl mx-auto space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-white">Settings</h1>
-        <p className="text-zinc-400 mt-1">Manage your account and email settings</p>
+        <p className="text-portal-soft mt-1">Manage your account and email settings</p>
       </div>
 
       {/* Profile Section */}
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-        <div className="p-6 border-b border-zinc-800">
+      <div className="bg-portal-surface rounded-xl border border-white/[0.07] overflow-hidden">
+        <div className="p-6 border-b border-white/[0.07]">
           <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-            <User className="w-5 h-5 text-orange-400" />
+            <User className="w-5 h-5 text-portal-accent" />
             Profile
           </h2>
         </div>
@@ -174,7 +174,7 @@ const ClientPortalSettings: React.FC<ClientPortalSettingsProps> = ({
                   className="w-20 h-20 rounded-xl object-cover"
                 />
               ) : (
-                <div className="w-20 h-20 rounded-xl bg-zinc-700 flex items-center justify-center text-white font-bold text-2xl">
+                <div className="w-20 h-20 rounded-xl bg-portal-surface2 flex items-center justify-center text-white font-bold text-2xl">
                   {getInitials(partnerAccount.company_name)}
                 </div>
               )}
@@ -188,7 +188,7 @@ const ClientPortalSettings: React.FC<ClientPortalSettingsProps> = ({
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isUploadingAvatar}
-                className="absolute -bottom-2 -right-2 w-8 h-8 bg-orange-400 rounded-lg flex items-center justify-center text-zinc-900 hover:bg-orange-500 transition-colors disabled:opacity-50"
+                className="absolute -bottom-2 -right-2 w-8 h-8 bg-portal-accent rounded-lg flex items-center justify-center text-white hover:bg-portal-accent transition-colors disabled:opacity-50"
               >
                 {isUploadingAvatar ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -199,32 +199,32 @@ const ClientPortalSettings: React.FC<ClientPortalSettingsProps> = ({
             </div>
             <div>
               <p className="text-white font-medium">{partnerAccount.company_name}</p>
-              <p className="text-sm text-zinc-400">{partnerAccount.email}</p>
+              <p className="text-sm text-portal-soft">{partnerAccount.email}</p>
             </div>
           </div>
 
           {/* Form Fields */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-2">
+              <label className="block text-sm font-medium text-portal-text mb-2">
                 Full Name
               </label>
               <input
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-orange-400 transition-colors"
+                className="w-full px-4 py-3 bg-portal-surface2 border border-white/[0.07] rounded-xl text-white placeholder-portal-soft focus:outline-none focus:border-portal-accent transition-colors"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-2">
+              <label className="block text-sm font-medium text-portal-text mb-2">
                 Company Name
               </label>
               <input
                 type="text"
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
-                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-orange-400 transition-colors"
+                className="w-full px-4 py-3 bg-portal-surface2 border border-white/[0.07] rounded-xl text-white placeholder-portal-soft focus:outline-none focus:border-portal-accent transition-colors"
               />
             </div>
           </div>
@@ -232,7 +232,7 @@ const ClientPortalSettings: React.FC<ClientPortalSettingsProps> = ({
           <button
             onClick={handleSave}
             disabled={isSaving}
-            className="flex items-center gap-2 px-6 py-2.5 bg-orange-400 hover:bg-orange-500 text-zinc-900 font-semibold rounded-xl transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-6 py-2.5 bg-portal-accent hover:bg-portal-accent text-white font-semibold rounded-xl transition-colors disabled:opacity-50"
           >
             {isSaving ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -245,10 +245,10 @@ const ClientPortalSettings: React.FC<ClientPortalSettingsProps> = ({
       </div>
 
       {/* Email Integration Section */}
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-        <div className="p-6 border-b border-zinc-800">
+      <div className="bg-portal-surface rounded-xl border border-white/[0.07] overflow-hidden">
+        <div className="p-6 border-b border-white/[0.07]">
           <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-            <Mail className="w-5 h-5 text-orange-400" />
+            <Mail className="w-5 h-5 text-portal-accent" />
             Email Integration
           </h2>
         </div>
@@ -256,7 +256,7 @@ const ClientPortalSettings: React.FC<ClientPortalSettingsProps> = ({
         <div className="p-6">
           {partnerAccount.email_provider && partnerAccount.email_address ? (
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-zinc-800/50 rounded-xl border border-zinc-700">
+              <div className="flex items-center justify-between p-4 bg-portal-surface2/50 rounded-xl border border-white/[0.07]">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
                     <Check className="w-5 h-5 text-emerald-400" />
@@ -265,7 +265,7 @@ const ClientPortalSettings: React.FC<ClientPortalSettingsProps> = ({
                     <p className="font-medium text-white">
                       {partnerAccount.email_provider === 'gmail' ? 'Gmail' : 'Outlook'} Connected
                     </p>
-                    <p className="text-sm text-zinc-400">{partnerAccount.email_address}</p>
+                    <p className="text-sm text-portal-soft">{partnerAccount.email_address}</p>
                   </div>
                 </div>
                 <button
@@ -282,11 +282,11 @@ const ClientPortalSettings: React.FC<ClientPortalSettingsProps> = ({
                 </button>
               </div>
 
-              <div className="p-4 bg-zinc-800/30 rounded-xl border border-zinc-700/50">
+              <div className="p-4 bg-portal-surface2/30 rounded-xl border border-white/[0.07]/50">
                 <div className="flex items-start gap-3">
-                  <Shield className="w-5 h-5 text-zinc-500 flex-shrink-0 mt-0.5" />
+                  <Shield className="w-5 h-5 text-portal-soft flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm text-zinc-400">
+                    <p className="text-sm text-portal-soft">
                       Your email is connected securely. We only use it to send emails on your behalf
                       when you click "Send Email" on a task. We never read your inbox.
                     </p>
@@ -296,11 +296,11 @@ const ClientPortalSettings: React.FC<ClientPortalSettingsProps> = ({
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-xl flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" />
+              <div className="p-4 bg-portal-accent/10 border border-portal-accent/20 rounded-xl flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-portal-accent flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-orange-400 font-medium">No email connected</p>
-                  <p className="text-sm text-orange-400/70 mt-1">
+                  <p className="text-portal-accent font-medium">No email connected</p>
+                  <p className="text-sm text-portal-accent/70 mt-1">
                     Connect your Gmail or Outlook account to send emails directly to clients.
                   </p>
                 </div>
@@ -308,7 +308,7 @@ const ClientPortalSettings: React.FC<ClientPortalSettingsProps> = ({
 
               <button
                 onClick={() => setShowEmailModal(true)}
-                className="flex items-center gap-2 px-6 py-3 bg-zinc-800 hover:bg-zinc-700 text-white font-medium rounded-xl border border-zinc-700 transition-colors"
+                className="flex items-center gap-2 px-6 py-3 bg-portal-surface2 hover:bg-portal-surface2 text-white font-medium rounded-xl border border-white/[0.07] transition-colors"
               >
                 <Link2 className="w-5 h-5" />
                 Connect Email Account
@@ -319,34 +319,34 @@ const ClientPortalSettings: React.FC<ClientPortalSettingsProps> = ({
       </div>
 
       {/* Account Info */}
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-        <div className="p-6 border-b border-zinc-800">
+      <div className="bg-portal-surface rounded-xl border border-white/[0.07] overflow-hidden">
+        <div className="p-6 border-b border-white/[0.07]">
           <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-orange-400" />
+            <Building2 className="w-5 h-5 text-portal-accent" />
             Account Information
           </h2>
         </div>
 
         <div className="p-6 space-y-4">
-          <div className="flex justify-between py-3 border-b border-zinc-800">
-            <span className="text-zinc-400">Account Email</span>
+          <div className="flex justify-between py-3 border-b border-white/[0.07]">
+            <span className="text-portal-soft">Account Email</span>
             <span className="text-white">{partnerAccount.email}</span>
           </div>
-          <div className="flex justify-between py-3 border-b border-zinc-800">
-            <span className="text-zinc-400">Account Status</span>
+          <div className="flex justify-between py-3 border-b border-white/[0.07]">
+            <span className="text-portal-soft">Account Status</span>
             <span className={partnerAccount.is_active ? 'text-emerald-400' : 'text-red-400'}>
               {partnerAccount.is_active ? 'Active' : 'Inactive'}
             </span>
           </div>
-          <div className="flex justify-between py-3 border-b border-zinc-800">
-            <span className="text-zinc-400">Member Since</span>
+          <div className="flex justify-between py-3 border-b border-white/[0.07]">
+            <span className="text-portal-soft">Member Since</span>
             <span className="text-white">
               {new Date(partnerAccount.created_at).toLocaleDateString()}
             </span>
           </div>
           {partnerAccount.last_login_at && (
             <div className="flex justify-between py-3">
-              <span className="text-zinc-400">Last Login</span>
+              <span className="text-portal-soft">Last Login</span>
               <span className="text-white">
                 {new Date(partnerAccount.last_login_at).toLocaleString()}
               </span>

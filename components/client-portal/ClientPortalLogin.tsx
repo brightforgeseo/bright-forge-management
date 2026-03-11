@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Hexagon, Mail, Lock, ArrowRight, Loader2, AlertTriangle } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Loader2, AlertTriangle } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { ToastType } from '../../types';
 
@@ -60,25 +60,27 @@ const ClientPortalLogin: React.FC<ClientPortalLoginProps> = ({ onLoginSuccess, a
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-portal-dark flex items-center justify-center p-4">
       {/* Background gradient */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-orange-500/10 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-orange-500/5 rounded-full blur-3xl"></div>
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-portal-accent/10 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-portal-accent/5 rounded-full blur-3xl"></div>
       </div>
 
       <div className="w-full max-w-md relative z-10">
         {/* Logo and Title */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-400 to-orange-600 mb-4 shadow-lg shadow-orange-500/20">
-            <Hexagon className="w-8 h-8 text-zinc-900" strokeWidth={2.5} />
-          </div>
+          <img
+            src="https://brightforge.com.ph/images/logo.png"
+            alt="BrightForge"
+            className="h-12 mx-auto mb-4"
+          />
           <h1 className="text-2xl font-bold text-white mb-1">Client Portal</h1>
-          <p className="text-zinc-400">BrightForge SEO</p>
+          <p className="text-portal-soft">BrightForge SEO</p>
         </div>
 
         {/* Login Card */}
-        <div className="bg-zinc-900 rounded-2xl border border-zinc-800 p-8 shadow-xl">
+        <div className="bg-portal-surface rounded-2xl border border-white/[0.07] p-8 shadow-xl">
           <h2 className="text-xl font-semibold text-white mb-6">
             {mode === 'login' ? 'Sign in to your account' : 'Reset your password'}
           </h2>
@@ -98,17 +100,17 @@ const ClientPortalLogin: React.FC<ClientPortalLoginProps> = ({ onLoginSuccess, a
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-2">
+              <label className="block text-sm font-medium text-portal-text mb-2">
                 Email Address
               </label>
               <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-portal-soft" />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@company.com"
-                  className="w-full pl-12 pr-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400 transition-colors"
+                  className="w-full pl-12 pr-4 py-3 bg-portal-surface2 border border-white/[0.07] rounded-xl text-white placeholder-portal-soft focus:outline-none focus:border-portal-accent focus:ring-1 focus:ring-portal-accent transition-colors"
                   required
                   disabled={loading}
                 />
@@ -117,17 +119,17 @@ const ClientPortalLogin: React.FC<ClientPortalLoginProps> = ({ onLoginSuccess, a
 
             {mode === 'login' && (
               <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-2">
+                <label className="block text-sm font-medium text-portal-text mb-2">
                   Password
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-portal-soft" />
                   <input
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
-                    className="w-full pl-12 pr-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400 transition-colors"
+                    className="w-full pl-12 pr-4 py-3 bg-portal-surface2 border border-white/[0.07] rounded-xl text-white placeholder-portal-soft focus:outline-none focus:border-portal-accent focus:ring-1 focus:ring-portal-accent transition-colors"
                     required
                     disabled={loading}
                   />
@@ -138,7 +140,7 @@ const ClientPortalLogin: React.FC<ClientPortalLoginProps> = ({ onLoginSuccess, a
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 px-4 bg-gradient-to-r from-orange-400 to-orange-500 hover:from-orange-500 hover:to-orange-600 text-zinc-900 font-semibold rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-orange-500/20"
+              className="w-full py-3 px-4 bg-portal-accent hover:brightness-110 text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-portal-accent/20"
             >
               {loading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -159,7 +161,7 @@ const ClientPortalLogin: React.FC<ClientPortalLoginProps> = ({ onLoginSuccess, a
                   setError('');
                   setSuccessMsg('');
                 }}
-                className="text-sm text-zinc-400 hover:text-orange-400 transition-colors"
+                className="text-sm text-portal-soft hover:text-portal-accent transition-colors"
               >
                 Forgot your password?
               </button>
@@ -170,7 +172,7 @@ const ClientPortalLogin: React.FC<ClientPortalLoginProps> = ({ onLoginSuccess, a
                   setError('');
                   setSuccessMsg('');
                 }}
-                className="text-sm text-zinc-400 hover:text-orange-400 transition-colors"
+                className="text-sm text-portal-soft hover:text-portal-accent transition-colors"
               >
                 Back to sign in
               </button>
@@ -179,7 +181,7 @@ const ClientPortalLogin: React.FC<ClientPortalLoginProps> = ({ onLoginSuccess, a
         </div>
 
         {/* Footer */}
-        <p className="text-center text-zinc-500 text-sm mt-8">
+        <p className="text-center text-portal-soft text-sm mt-8">
           Need access? Contact your account manager.
         </p>
       </div>

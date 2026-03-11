@@ -224,8 +224,8 @@ const ClientPortalChat: React.FC<ClientPortalChatProps> = ({
     return (
       <div className="h-full flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 text-orange-400 animate-spin mx-auto mb-3" />
-          <p className="text-zinc-400">Loading messages...</p>
+          <Loader2 className="w-8 h-8 text-portal-accent animate-spin mx-auto mb-3" />
+          <p className="text-portal-soft">Loading messages...</p>
         </div>
       </div>
     );
@@ -234,18 +234,18 @@ const ClientPortalChat: React.FC<ClientPortalChatProps> = ({
   return (
     <div className="h-full flex flex-col">
       {/* Chat Header */}
-      <div className="p-6 border-b border-zinc-800 bg-zinc-900/50">
+      <div className="p-6 border-b border-white/[0.07] bg-portal-surface/50">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center">
-            <User className="w-6 h-6 text-zinc-900" />
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-portal-accent to-portal-accent flex items-center justify-center">
+            <User className="w-6 h-6 text-white" />
           </div>
           <div>
             <h2 className="text-lg font-semibold text-white">Chat with Ben</h2>
-            <p className="text-sm text-zinc-400">Bright Forge Account Manager</p>
+            <p className="text-sm text-portal-soft">Bright Forge Account Manager</p>
           </div>
           <div className="ml-auto flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-green-500"></span>
-            <span className="text-sm text-zinc-400">Online</span>
+            <span className="text-sm text-portal-soft">Online</span>
           </div>
         </div>
       </div>
@@ -255,11 +255,11 @@ const ClientPortalChat: React.FC<ClientPortalChatProps> = ({
         {messages.length === 0 ? (
           <div className="h-full flex items-center justify-center">
             <div className="text-center">
-              <div className="w-16 h-16 rounded-2xl bg-zinc-800 flex items-center justify-center mx-auto mb-4">
-                <Send className="w-8 h-8 text-zinc-500" />
+              <div className="w-16 h-16 rounded-2xl bg-portal-surface2 flex items-center justify-center mx-auto mb-4">
+                <Send className="w-8 h-8 text-portal-soft" />
               </div>
-              <p className="text-zinc-400 font-medium">No messages yet</p>
-              <p className="text-sm text-zinc-500 mt-1">Start a conversation with Ben</p>
+              <p className="text-portal-soft font-medium">No messages yet</p>
+              <p className="text-sm text-portal-soft mt-1">Start a conversation with Ben</p>
             </div>
           </div>
         ) : (
@@ -282,7 +282,7 @@ const ClientPortalChat: React.FC<ClientPortalChatProps> = ({
                     <div
                       className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
                         isPartner
-                          ? 'bg-orange-400 text-zinc-900'
+                          ? 'bg-portal-accent text-white'
                           : 'bg-gradient-to-br from-blue-500 to-blue-600 text-white'
                       }`}
                     >
@@ -299,7 +299,7 @@ const ClientPortalChat: React.FC<ClientPortalChatProps> = ({
                   <div>
                     {showAvatar && (
                       <p
-                        className={`text-xs text-zinc-500 mb-1 ${
+                        className={`text-xs text-portal-soft mb-1 ${
                           isPartner ? 'text-right' : 'text-left'
                         }`}
                       >
@@ -310,8 +310,8 @@ const ClientPortalChat: React.FC<ClientPortalChatProps> = ({
                     <div
                       className={`rounded-2xl px-4 py-3 ${
                         isPartner
-                          ? 'bg-orange-400 text-zinc-900 rounded-tr-md'
-                          : 'bg-zinc-800 text-white rounded-tl-md'
+                          ? 'bg-portal-accent text-white rounded-tr-md'
+                          : 'bg-portal-surface2 text-white rounded-tl-md'
                       }`}
                     >
                       {message.attachment_url && (
@@ -328,7 +328,7 @@ const ClientPortalChat: React.FC<ClientPortalChatProps> = ({
                               target="_blank"
                               rel="noopener noreferrer"
                               className={`flex items-center gap-2 p-2 rounded-lg ${
-                                isPartner ? 'bg-orange-500/30' : 'bg-zinc-700'
+                                isPartner ? 'bg-portal-accent/30' : 'bg-portal-surface2'
                               }`}
                             >
                               <File className="w-4 h-4" />
@@ -347,11 +347,11 @@ const ClientPortalChat: React.FC<ClientPortalChatProps> = ({
                         isPartner ? 'justify-end' : 'justify-start'
                       }`}
                     >
-                      <span className="text-xs text-zinc-500">
+                      <span className="text-xs text-portal-soft">
                         {formatTime(message.created_at)}
                       </span>
                       {isPartner && (
-                        <span className="text-zinc-500">
+                        <span className="text-portal-soft">
                           {message.is_read ? (
                             <CheckCheck className="w-3 h-3" />
                           ) : (
@@ -370,10 +370,10 @@ const ClientPortalChat: React.FC<ClientPortalChatProps> = ({
       </div>
 
       {/* Input */}
-      <div className="p-4 border-t border-zinc-800 bg-zinc-900/50">
+      <div className="p-4 border-t border-white/[0.07] bg-portal-surface/50">
         {/* Staged attachment preview */}
         {stagedAttachment && (
-          <div className="relative mb-3 p-3 bg-zinc-800 rounded-xl">
+          <div className="relative mb-3 p-3 bg-portal-surface2 rounded-xl">
             <div className="flex items-start gap-3">
               {stagedAttachment.type === 'image' ? (
                 <img
@@ -382,9 +382,9 @@ const ClientPortalChat: React.FC<ClientPortalChatProps> = ({
                   className="max-h-32 max-w-[200px] rounded-lg object-contain"
                 />
               ) : (
-                <div className="flex items-center gap-2 p-2 bg-zinc-700 rounded-lg">
-                  <File className="w-5 h-5 text-zinc-400" />
-                  <span className="text-sm text-zinc-300">{stagedAttachment.name}</span>
+                <div className="flex items-center gap-2 p-2 bg-portal-surface2 rounded-lg">
+                  <File className="w-5 h-5 text-portal-soft" />
+                  <span className="text-sm text-portal-text">{stagedAttachment.name}</span>
                 </div>
               )}
               <button
@@ -400,7 +400,7 @@ const ClientPortalChat: React.FC<ClientPortalChatProps> = ({
 
         {/* Uploading indicator */}
         {isUploading && (
-          <div className="mb-3 p-3 bg-zinc-800 rounded-xl flex items-center gap-2 text-zinc-400">
+          <div className="mb-3 p-3 bg-portal-surface2 rounded-xl flex items-center gap-2 text-portal-soft">
             <Loader2 className="w-4 h-4 animate-spin" />
             <span className="text-sm">Uploading...</span>
           </div>
@@ -417,7 +417,7 @@ const ClientPortalChat: React.FC<ClientPortalChatProps> = ({
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={isSending || isUploading}
-            className="p-3 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-xl transition-colors disabled:opacity-50"
+            className="p-3 text-portal-soft hover:text-white hover:bg-portal-surface2 rounded-xl transition-colors disabled:opacity-50"
           >
             <Paperclip className="w-5 h-5" />
           </button>
@@ -430,7 +430,7 @@ const ClientPortalChat: React.FC<ClientPortalChatProps> = ({
               onPaste={handlePaste}
               placeholder="Type a message..."
               rows={1}
-              className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-orange-400 resize-none max-h-32"
+              className="w-full px-4 py-3 bg-portal-surface2 border border-white/[0.07] rounded-xl text-white placeholder-portal-soft focus:outline-none focus:border-portal-accent resize-none max-h-32"
               style={{ minHeight: '48px' }}
             />
           </div>
@@ -438,7 +438,7 @@ const ClientPortalChat: React.FC<ClientPortalChatProps> = ({
           <button
             onClick={handleSend}
             disabled={isSending || isUploading || (!newMessage.trim() && !stagedAttachment)}
-            className="p-3 bg-orange-400 hover:bg-orange-500 text-zinc-900 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="p-3 bg-portal-accent hover:bg-portal-accent text-white rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSending ? (
               <Loader2 className="w-5 h-5 animate-spin" />

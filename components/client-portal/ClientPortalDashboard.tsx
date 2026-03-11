@@ -72,7 +72,7 @@ const ClientPortalDashboard: React.FC<ClientPortalDashboardProps> = ({
       case 'completed':
         return 'bg-green-500/20 text-green-400';
       default:
-        return 'bg-zinc-500/20 text-zinc-400';
+        return 'bg-portal-soft/20 text-portal-soft';
     }
   };
 
@@ -84,13 +84,13 @@ const ClientPortalDashboard: React.FC<ClientPortalDashboardProps> = ({
     return (
       <div className="p-8">
         <div className="animate-pulse space-y-8">
-          <div className="h-8 bg-zinc-800 rounded w-48"></div>
+          <div className="h-8 bg-portal-surface2 rounded w-48"></div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-32 bg-zinc-800 rounded-xl"></div>
+              <div key={i} className="h-32 bg-portal-surface2 rounded-xl"></div>
             ))}
           </div>
-          <div className="h-64 bg-zinc-800 rounded-xl"></div>
+          <div className="h-64 bg-portal-surface2 rounded-xl"></div>
         </div>
       </div>
     );
@@ -103,56 +103,56 @@ const ClientPortalDashboard: React.FC<ClientPortalDashboardProps> = ({
         <h1 className="text-2xl font-bold text-white mb-2">
           Welcome back, {partnerAccount.full_name.split(' ')[0]}!
         </h1>
-        <p className="text-zinc-400">
+        <p className="text-portal-soft">
           Here's an overview of your clients and tasks.
         </p>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
+        <div className="bg-portal-surface rounded-xl border border-white/[0.07] p-6">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
               <Users className="w-6 h-6 text-blue-400" />
             </div>
             <div>
-              <p className="text-sm text-zinc-400">Active Clients</p>
+              <p className="text-sm text-portal-soft">Active Clients</p>
               <p className="text-2xl font-bold text-white">{stats?.totalClients || 0}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
+        <div className="bg-portal-surface rounded-xl border border-white/[0.07] p-6">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-orange-500/20 flex items-center justify-center">
-              <CheckSquare className="w-6 h-6 text-orange-400" />
+            <div className="w-12 h-12 rounded-xl bg-portal-accent/20 flex items-center justify-center">
+              <CheckSquare className="w-6 h-6 text-portal-accent" />
             </div>
             <div>
-              <p className="text-sm text-zinc-400">Open Tasks</p>
+              <p className="text-sm text-portal-soft">Open Tasks</p>
               <p className="text-2xl font-bold text-white">{stats?.pendingTasks || 0}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
+        <div className="bg-portal-surface rounded-xl border border-white/[0.07] p-6">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
               <Mail className="w-6 h-6 text-emerald-400" />
             </div>
             <div>
-              <p className="text-sm text-zinc-400">Emails Sent</p>
+              <p className="text-sm text-portal-soft">Emails Sent</p>
               <p className="text-2xl font-bold text-white">{stats?.emailsSent || 0}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
+        <div className="bg-portal-surface rounded-xl border border-white/[0.07] p-6">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center">
               <TrendingUp className="w-6 h-6 text-green-400" />
             </div>
             <div>
-              <p className="text-sm text-zinc-400">Completed</p>
+              <p className="text-sm text-portal-soft">Completed</p>
               <p className="text-2xl font-bold text-white">{stats?.completedTasks || 0}</p>
             </div>
           </div>
@@ -162,23 +162,23 @@ const ClientPortalDashboard: React.FC<ClientPortalDashboardProps> = ({
       {/* Two Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Clients List */}
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-          <div className="p-6 border-b border-zinc-800 flex items-center justify-between">
+        <div className="bg-portal-surface rounded-xl border border-white/[0.07] overflow-hidden">
+          <div className="p-6 border-b border-white/[0.07] flex items-center justify-between">
             <h2 className="text-lg font-semibold text-white">Your Clients</h2>
             <button
               onClick={() => onNavigateToTasks()}
-              className="text-sm text-orange-400 hover:text-orange-300 flex items-center gap-1 transition-colors"
+              className="text-sm text-portal-accent hover:text-orange-300 flex items-center gap-1 transition-colors"
             >
               View All Tasks
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
-          <div className="divide-y divide-zinc-800">
+          <div className="divide-y divide-white/[0.07]">
             {clients.length === 0 ? (
               <div className="p-8 text-center">
-                <Building2 className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
-                <p className="text-zinc-400">No clients assigned yet</p>
-                <p className="text-sm text-zinc-500 mt-1">
+                <Building2 className="w-12 h-12 text-portal-soft mx-auto mb-3" />
+                <p className="text-portal-soft">No clients assigned yet</p>
+                <p className="text-sm text-portal-soft mt-1">
                   Contact your account manager to get started
                 </p>
               </div>
@@ -187,7 +187,7 @@ const ClientPortalDashboard: React.FC<ClientPortalDashboardProps> = ({
                 <button
                   key={client.id}
                   onClick={() => onNavigateToTasks(client.id)}
-                  className="w-full p-4 flex items-center gap-4 hover:bg-zinc-800/50 transition-colors text-left"
+                  className="w-full p-4 flex items-center gap-4 hover:bg-portal-surface2/50 transition-colors text-left"
                 >
                   {client.logoUrl ? (
                     <img
@@ -205,11 +205,11 @@ const ClientPortalDashboard: React.FC<ClientPortalDashboardProps> = ({
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-white truncate">{client.name}</p>
-                    <p className="text-sm text-zinc-400">
+                    <p className="text-sm text-portal-soft">
                       {client.groups?.reduce((acc, g) => acc + g.tasks.length, 0) || 0} tasks
                     </p>
                   </div>
-                  <ArrowRight className="w-4 h-4 text-zinc-500" />
+                  <ArrowRight className="w-4 h-4 text-portal-soft" />
                 </button>
               ))
             )}
@@ -217,16 +217,16 @@ const ClientPortalDashboard: React.FC<ClientPortalDashboardProps> = ({
         </div>
 
         {/* Recent Tasks */}
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-          <div className="p-6 border-b border-zinc-800">
+        <div className="bg-portal-surface rounded-xl border border-white/[0.07] overflow-hidden">
+          <div className="p-6 border-b border-white/[0.07]">
             <h2 className="text-lg font-semibold text-white">Recent Tasks</h2>
           </div>
-          <div className="divide-y divide-zinc-800">
+          <div className="divide-y divide-white/[0.07]">
             {recentTasks.length === 0 ? (
               <div className="p-8 text-center">
-                <CheckSquare className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
-                <p className="text-zinc-400">No tasks assigned yet</p>
-                <p className="text-sm text-zinc-500 mt-1">
+                <CheckSquare className="w-12 h-12 text-portal-soft mx-auto mb-3" />
+                <p className="text-portal-soft">No tasks assigned yet</p>
+                <p className="text-sm text-portal-soft mt-1">
                   Tasks will appear here when assigned to you
                 </p>
               </div>
@@ -234,14 +234,14 @@ const ClientPortalDashboard: React.FC<ClientPortalDashboardProps> = ({
               recentTasks.map((task) => (
                 <div
                   key={task.id}
-                  className="p-4 hover:bg-zinc-800/50 transition-colors"
+                  className="p-4 hover:bg-portal-surface2/50 transition-colors"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-white truncate">
                         {task.task?.title || `Task ${task.task_id}`}
                       </p>
-                      <p className="text-sm text-zinc-400 truncate mt-1">
+                      <p className="text-sm text-portal-soft truncate mt-1">
                         {task.client_name || 'Client'}
                       </p>
                     </div>
@@ -254,7 +254,7 @@ const ClientPortalDashboard: React.FC<ClientPortalDashboardProps> = ({
                     </span>
                   </div>
                   {task.visible_notes && (
-                    <p className="text-sm text-zinc-500 mt-2 line-clamp-2">
+                    <p className="text-sm text-portal-soft mt-2 line-clamp-2">
                       {task.visible_notes}
                     </p>
                   )}
@@ -267,20 +267,20 @@ const ClientPortalDashboard: React.FC<ClientPortalDashboardProps> = ({
 
       {/* Quick Actions */}
       {stats && stats.unreadMessages > 0 && (
-        <div className="bg-gradient-to-r from-orange-500/10 to-orange-600/10 rounded-xl border border-orange-500/20 p-6">
+        <div className="bg-gradient-to-r from-portal-accent/10 to-portal-accent/10 rounded-xl border border-portal-accent/20 p-6">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-orange-400/20 flex items-center justify-center">
-              <MessageCircle className="w-6 h-6 text-orange-400" />
+            <div className="w-12 h-12 rounded-xl bg-portal-accent/20 flex items-center justify-center">
+              <MessageCircle className="w-6 h-6 text-portal-accent" />
             </div>
             <div className="flex-1">
               <p className="font-medium text-white">
                 You have {stats.unreadMessages} unread message{stats.unreadMessages !== 1 ? 's' : ''}
               </p>
-              <p className="text-sm text-zinc-400">Check your messages from Ben</p>
+              <p className="text-sm text-portal-soft">Check your messages from Ben</p>
             </div>
             <button
               onClick={() => onNavigateToTasks()}
-              className="px-4 py-2 bg-orange-400 text-zinc-900 font-semibold rounded-lg hover:bg-orange-500 transition-colors"
+              className="px-4 py-2 bg-portal-accent text-white font-semibold rounded-lg hover:bg-portal-accent transition-colors"
             >
               View Messages
             </button>

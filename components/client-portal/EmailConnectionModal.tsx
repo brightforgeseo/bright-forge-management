@@ -97,18 +97,18 @@ const EmailConnectionModal: React.FC<EmailConnectionModalProps> = ({
       <div className="absolute inset-0 bg-black/70" onClick={onClose} />
 
       {/* Modal */}
-      <div className="relative w-full max-w-md bg-zinc-900 rounded-2xl border border-zinc-800 shadow-2xl">
+      <div className="relative w-full max-w-md bg-portal-surface rounded-2xl border border-white/[0.07] shadow-2xl">
         {/* Header */}
-        <div className="p-6 border-b border-zinc-800 flex items-center justify-between">
+        <div className="p-6 border-b border-white/[0.07] flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-orange-400/20 flex items-center justify-center">
-              <Mail className="w-5 h-5 text-orange-400" />
+            <div className="w-10 h-10 rounded-xl bg-portal-accent/20 flex items-center justify-center">
+              <Mail className="w-5 h-5 text-portal-accent" />
             </div>
             <h2 className="text-lg font-semibold text-white">Connect Email</h2>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors"
+            className="p-2 text-portal-soft hover:text-white hover:bg-portal-surface2 rounded-lg transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -116,7 +116,7 @@ const EmailConnectionModal: React.FC<EmailConnectionModalProps> = ({
 
         {/* Content */}
         <div className="p-6 space-y-4">
-          <p className="text-zinc-400 text-sm">
+          <p className="text-portal-soft text-sm">
             Connect your email account to send emails directly to your clients. Choose your email provider:
           </p>
 
@@ -124,7 +124,7 @@ const EmailConnectionModal: React.FC<EmailConnectionModalProps> = ({
           <button
             onClick={handleGmailConnect}
             disabled={isConnecting !== null}
-            className="w-full flex items-center gap-4 p-4 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex items-center gap-4 p-4 bg-portal-surface2 hover:bg-portal-surface2 border border-white/[0.07] rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center">
               <svg viewBox="0 0 24 24" className="w-6 h-6">
@@ -148,12 +148,12 @@ const EmailConnectionModal: React.FC<EmailConnectionModalProps> = ({
             </div>
             <div className="flex-1 text-left">
               <p className="font-medium text-white">Connect Gmail</p>
-              <p className="text-sm text-zinc-400">Use your Google account</p>
+              <p className="text-sm text-portal-soft">Use your Google account</p>
             </div>
             {isConnecting === 'gmail' ? (
-              <Loader2 className="w-5 h-5 text-zinc-400 animate-spin" />
+              <Loader2 className="w-5 h-5 text-portal-soft animate-spin" />
             ) : (
-              <ExternalLink className="w-5 h-5 text-zinc-500" />
+              <ExternalLink className="w-5 h-5 text-portal-soft" />
             )}
           </button>
 
@@ -161,7 +161,7 @@ const EmailConnectionModal: React.FC<EmailConnectionModalProps> = ({
           <button
             onClick={handleOutlookConnect}
             disabled={isConnecting !== null}
-            className="w-full flex items-center gap-4 p-4 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex items-center gap-4 p-4 bg-portal-surface2 hover:bg-portal-surface2 border border-white/[0.07] rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <div className="w-10 h-10 rounded-lg bg-[#0078d4] flex items-center justify-center">
               <svg viewBox="0 0 24 24" className="w-6 h-6" fill="white">
@@ -170,19 +170,19 @@ const EmailConnectionModal: React.FC<EmailConnectionModalProps> = ({
             </div>
             <div className="flex-1 text-left">
               <p className="font-medium text-white">Connect Outlook</p>
-              <p className="text-sm text-zinc-400">Use your Microsoft account</p>
+              <p className="text-sm text-portal-soft">Use your Microsoft account</p>
             </div>
             {isConnecting === 'outlook' ? (
-              <Loader2 className="w-5 h-5 text-zinc-400 animate-spin" />
+              <Loader2 className="w-5 h-5 text-portal-soft animate-spin" />
             ) : (
-              <ExternalLink className="w-5 h-5 text-zinc-500" />
+              <ExternalLink className="w-5 h-5 text-portal-soft" />
             )}
           </button>
 
           {/* Privacy Note */}
-          <div className="p-4 bg-zinc-800/50 rounded-xl border border-zinc-700/50 flex items-start gap-3">
-            <Shield className="w-5 h-5 text-zinc-500 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-zinc-400">
+          <div className="p-4 bg-portal-surface2/50 rounded-xl border border-white/[0.07]/50 flex items-start gap-3">
+            <Shield className="w-5 h-5 text-portal-soft flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-portal-soft">
               We only request permission to send emails on your behalf. We never read your inbox or
               access any of your existing emails.
             </p>
@@ -190,11 +190,11 @@ const EmailConnectionModal: React.FC<EmailConnectionModalProps> = ({
 
           {/* Not Configured Warning */}
           {(!GMAIL_CLIENT_ID && !OUTLOOK_CLIENT_ID) && (
-            <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-xl flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" />
+            <div className="p-4 bg-portal-accent/10 border border-portal-accent/20 rounded-xl flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-portal-accent flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-orange-400 text-sm font-medium">Email integration not configured</p>
-                <p className="text-orange-400/70 text-sm mt-1">
+                <p className="text-portal-accent text-sm font-medium">Email integration not configured</p>
+                <p className="text-portal-accent/70 text-sm mt-1">
                   Please contact your account manager to set up email integration.
                 </p>
               </div>

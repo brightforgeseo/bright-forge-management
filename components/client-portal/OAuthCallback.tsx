@@ -109,15 +109,15 @@ const OAuthCallback: React.FC<OAuthCallbackProps> = ({ onComplete }) => {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
-      <div className="bg-zinc-900 rounded-2xl border border-zinc-800 p-8 max-w-md w-full text-center">
+    <div className="min-h-screen bg-portal-dark flex items-center justify-center p-4">
+      <div className="bg-portal-surface rounded-2xl border border-white/[0.07] p-8 max-w-md w-full text-center">
         {status === 'processing' && (
           <>
-            <div className="w-16 h-16 rounded-full bg-orange-400/20 flex items-center justify-center mx-auto mb-6">
-              <Loader2 className="w-8 h-8 text-orange-400 animate-spin" />
+            <div className="w-16 h-16 rounded-full bg-portal-accent/20 flex items-center justify-center mx-auto mb-6">
+              <Loader2 className="w-8 h-8 text-portal-accent animate-spin" />
             </div>
             <h2 className="text-xl font-semibold text-white mb-2">Connecting Email</h2>
-            <p className="text-zinc-400">{message}</p>
+            <p className="text-portal-soft">{message}</p>
           </>
         )}
 
@@ -127,8 +127,8 @@ const OAuthCallback: React.FC<OAuthCallbackProps> = ({ onComplete }) => {
               <CheckCircle2 className="w-8 h-8 text-green-400" />
             </div>
             <h2 className="text-xl font-semibold text-white mb-2">Email Connected!</h2>
-            <p className="text-zinc-400">{message}</p>
-            <p className="text-zinc-500 text-sm mt-4">Redirecting to settings...</p>
+            <p className="text-portal-soft">{message}</p>
+            <p className="text-portal-soft text-sm mt-4">Redirecting to settings...</p>
           </>
         )}
 
@@ -139,7 +139,7 @@ const OAuthCallback: React.FC<OAuthCallbackProps> = ({ onComplete }) => {
             </div>
             <h2 className="text-xl font-semibold text-white mb-2">Connection Failed</h2>
             <p className="text-red-400">{message}</p>
-            <p className="text-zinc-500 text-sm mt-4">Redirecting to settings...</p>
+            <p className="text-portal-soft text-sm mt-4">Redirecting to settings...</p>
           </>
         )}
       </div>

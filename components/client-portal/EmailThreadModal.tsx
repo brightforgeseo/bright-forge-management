@@ -175,29 +175,29 @@ const EmailThreadModal: React.FC<EmailThreadModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70" onClick={onClose} />
 
-      <div className="relative w-full max-w-2xl max-h-[90vh] bg-zinc-900 rounded-2xl border border-zinc-800 shadow-2xl flex flex-col">
+      <div className="relative w-full max-w-2xl max-h-[90vh] bg-portal-surface rounded-2xl border border-white/[0.07] shadow-2xl flex flex-col">
         {/* Header */}
-        <div className="p-4 border-b border-zinc-800 flex items-center justify-between flex-shrink-0">
+        <div className="p-4 border-b border-white/[0.07] flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
               <Mail className="w-5 h-5 text-purple-400" />
             </div>
             <div>
               <h2 className="text-lg font-semibold text-white">Email Thread</h2>
-              <p className="text-sm text-zinc-400">{task.task?.title || 'Task'}</p>
+              <p className="text-sm text-portal-soft">{task.task?.title || 'Task'}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={loadThread}
               disabled={isLoading}
-              className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors"
+              className="p-2 text-portal-soft hover:text-white hover:bg-portal-surface2 rounded-lg transition-colors"
             >
               <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
             </button>
             <button
               onClick={onClose}
-              className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors"
+              className="p-2 text-portal-soft hover:text-white hover:bg-portal-surface2 rounded-lg transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -208,12 +208,12 @@ const EmailThreadModal: React.FC<EmailThreadModalProps> = ({
         <div className="flex-1 overflow-y-auto p-4">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 text-orange-400 animate-spin" />
+              <Loader2 className="w-8 h-8 text-portal-accent animate-spin" />
             </div>
           ) : !hasThread ? (
             <div className="text-center py-12">
               <Mail className="w-12 h-12 text-zinc-600 mx-auto mb-4" />
-              <p className="text-zinc-400">No emails sent for this task yet</p>
+              <p className="text-portal-soft">No emails sent for this task yet</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -222,18 +222,18 @@ const EmailThreadModal: React.FC<EmailThreadModalProps> = ({
                   key={msg.id}
                   className={`p-4 rounded-xl ${
                     msg.isFromPartner
-                      ? 'bg-orange-500/10 border border-orange-500/20 ml-8'
-                      : 'bg-zinc-800 border border-zinc-700 mr-8'
+                      ? 'bg-portal-accent/10 border border-portal-accent/20 ml-8'
+                      : 'bg-portal-surface2 border border-white/[0.07] mr-8'
                   }`}
                 >
                   <div className="flex items-center gap-2 mb-2">
                     <div
                       className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                        msg.isFromPartner ? 'bg-orange-500/20' : 'bg-blue-500/20'
+                        msg.isFromPartner ? 'bg-portal-accent/20' : 'bg-blue-500/20'
                       }`}
                     >
                       {msg.isFromPartner ? (
-                        <Send className="w-4 h-4 text-orange-400" />
+                        <Send className="w-4 h-4 text-portal-accent" />
                       ) : (
                         <User className="w-4 h-4 text-blue-400" />
                       )}
@@ -242,23 +242,23 @@ const EmailThreadModal: React.FC<EmailThreadModalProps> = ({
                       <p className="text-sm font-medium text-white">
                         {msg.isFromPartner ? 'You' : extractName(msg.from)}
                       </p>
-                      <p className="text-xs text-zinc-500">{formatDate(msg.date)}</p>
+                      <p className="text-xs text-portal-soft">{formatDate(msg.date)}</p>
                     </div>
                   </div>
                   {idx === 0 && (
-                    <p className="text-sm text-zinc-400 mb-2 font-medium">
+                    <p className="text-sm text-portal-soft mb-2 font-medium">
                       Subject: {msg.subject}
                     </p>
                   )}
-                  <p className="text-sm text-zinc-300 whitespace-pre-wrap">{msg.body}</p>
+                  <p className="text-sm text-portal-text whitespace-pre-wrap">{msg.body}</p>
                 </div>
               ))}
 
               {/* Reply indicator if last message is from client */}
               {messages.length > 0 && !messages[messages.length - 1].isFromPartner && (
                 <div className="flex items-center justify-center gap-2 py-4">
-                  <ArrowRight className="w-4 h-4 text-orange-400" />
-                  <span className="text-sm text-orange-400">Client replied - generate a response below</span>
+                  <ArrowRight className="w-4 h-4 text-portal-accent" />
+                  <span className="text-sm text-portal-accent">Client replied - generate a response below</span>
                 </div>
               )}
             </div>
@@ -267,19 +267,19 @@ const EmailThreadModal: React.FC<EmailThreadModalProps> = ({
 
         {/* Reply Form */}
         {hasThread && (
-          <div className="p-4 border-t border-zinc-800 flex-shrink-0">
+          <div className="p-4 border-t border-white/[0.07] flex-shrink-0">
             {showReplyForm ? (
               <div className="space-y-3">
                 <textarea
                   value={replyBody}
                   onChange={(e) => setReplyBody(e.target.value)}
                   placeholder="Write your reply..."
-                  className="w-full h-32 px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-orange-400 resize-none"
+                  className="w-full h-32 px-4 py-3 bg-portal-surface2 border border-white/[0.07] rounded-xl text-white placeholder-portal-soft focus:outline-none focus:border-portal-accent resize-none"
                 />
                 <div className="flex items-center justify-between">
                   <button
                     onClick={() => setShowReplyForm(false)}
-                    className="px-4 py-2 text-zinc-400 hover:text-white transition-colors"
+                    className="px-4 py-2 text-portal-soft hover:text-white transition-colors"
                   >
                     Cancel
                   </button>
@@ -287,7 +287,7 @@ const EmailThreadModal: React.FC<EmailThreadModalProps> = ({
                     <button
                       onClick={generateAIResponse}
                       disabled={isGenerating}
-                      className="flex items-center gap-2 px-4 py-2 bg-zinc-800 text-orange-400 border border-orange-400/30 rounded-lg hover:bg-orange-400/10 transition-colors disabled:opacity-50"
+                      className="flex items-center gap-2 px-4 py-2 bg-portal-surface2 text-portal-accent border border-portal-accent/30 rounded-lg hover:bg-portal-accent/10 transition-colors disabled:opacity-50"
                     >
                       {isGenerating ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -299,7 +299,7 @@ const EmailThreadModal: React.FC<EmailThreadModalProps> = ({
                     <button
                       onClick={sendReply}
                       disabled={isSending || !replyBody.trim()}
-                      className="flex items-center gap-2 px-4 py-2 bg-orange-400 text-black font-medium rounded-lg hover:bg-orange-300 transition-colors disabled:opacity-50"
+                      className="flex items-center gap-2 px-4 py-2 bg-portal-accent text-black font-medium rounded-lg hover:bg-orange-300 transition-colors disabled:opacity-50"
                     >
                       {isSending ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -316,7 +316,7 @@ const EmailThreadModal: React.FC<EmailThreadModalProps> = ({
                 <button
                   onClick={generateAIResponse}
                   disabled={isGenerating || messages.length === 0}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-orange-400 text-black font-medium rounded-xl hover:bg-orange-300 transition-colors disabled:opacity-50"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-portal-accent text-black font-medium rounded-xl hover:bg-orange-300 transition-colors disabled:opacity-50"
                 >
                   {isGenerating ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
@@ -327,7 +327,7 @@ const EmailThreadModal: React.FC<EmailThreadModalProps> = ({
                 </button>
                 <button
                   onClick={() => setShowReplyForm(true)}
-                  className="px-4 py-3 bg-zinc-800 text-white rounded-xl hover:bg-zinc-700 transition-colors"
+                  className="px-4 py-3 bg-portal-surface2 text-white rounded-xl hover:bg-portal-surface2 transition-colors"
                 >
                   Write Manually
                 </button>
