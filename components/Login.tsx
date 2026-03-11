@@ -183,9 +183,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, branding }) => {
       
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden animate-slideIn">
         <div className="p-8 text-center border-b border-slate-50 bg-white">
-          <div className="w-16 h-16 bg-gradient-to-br from-brand-500 to-brand-600 rounded-2xl flex items-center justify-center shadow-lg shadow-brand-900/20 mx-auto mb-4 transform rotate-3">
-            <Hexagon className="w-8 h-8 text-white" fill="currentColor" />
-          </div>
+          <img src="https://brightforge.com.ph/images/logo.png" alt="BrightForge" className="h-12 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-slate-900">{branding.companyName}</h1>
           <p className="text-slate-500 mt-2 text-sm">
              {mode === 'login' && 'Sign in to access your team portal'}

@@ -136,9 +136,9 @@ const App: React.FC = () => {
   };
 
   const [branding, setBranding] = useState<BrandingConfig>(() => {
-    try { return JSON.parse(localStorage.getItem('bf_branding') || '{}'); } catch { return { companyName: 'Bright Forge Portal', primaryColor: 'orange' }; }
+    try { return JSON.parse(localStorage.getItem('bf_branding') || '{}'); } catch { return { companyName: 'BrightForge', primaryColor: 'orange' }; }
   });
-  if (!branding.companyName) branding.companyName = 'Bright Forge Portal';
+  if (!branding.companyName) branding.companyName = 'BrightForge';
 
   useEffect(() => { localStorage.setItem('bf_branding', JSON.stringify(branding)); document.title = branding.companyName; }, [branding]);
 
