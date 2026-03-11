@@ -2059,7 +2059,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
         {activePartnerId ? (
           <>
             {/* Partner Chat Header */}
-            <div className="h-14 md:h-16 border-b border-white/[0.07] flex items-center justify-between px-2 md:px-6 flex-shrink-0 bg-gradient-to-r from-purple-50 to-white safe-area-inset-top">
+            <div className="h-14 md:h-16 border-b border-white/[0.07] flex items-center justify-between px-2 md:px-6 flex-shrink-0 bg-portal-dark safe-area-inset-top">
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <button
                   onClick={() => setIsMobileSidebarOpen(true)}

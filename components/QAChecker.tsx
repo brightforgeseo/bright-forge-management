@@ -131,7 +131,7 @@ const QAChecker: React.FC = () => {
             <div
               ref={editorRef}
               contentEditable
-              className="min-h-[500px] p-6 outline-none prose prose-slate max-w-none"
+              className="min-h-[500px] p-6 outline-none prose prose-slate max-w-none bg-white text-slate-900"
               style={{ fontFamily: 'Arial, sans-serif', fontSize: '14px', lineHeight: '1.6' }}
               data-placeholder="Paste your document here from Word or Google Docs..."
             />
@@ -145,7 +145,7 @@ const QAChecker: React.FC = () => {
               Your QA Rules
             </label>
             <textarea
-              className="w-full p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none resize-none"
+              className="w-full p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none resize-none bg-white text-slate-900 placeholder-slate-400"
               rows={8}
               placeholder="Enter your QA rules...
 

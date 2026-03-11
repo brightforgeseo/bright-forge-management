@@ -36,7 +36,7 @@ const AuditTool: React.FC = () => {
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder="Paste your article text, meta tags, or HTML snippet here..."
-              className="w-full h-96 p-6 rounded-xl outline-none resize-none text-portal-text text-base leading-relaxed focus:ring-2 focus:ring-brand-500 focus:rounded-xl transition-all"
+              className="w-full h-96 p-6 rounded-xl outline-none resize-none text-slate-900 bg-white text-base leading-relaxed focus:ring-2 focus:ring-brand-500 focus:rounded-xl transition-all placeholder-slate-400"
             />
           </div>
           <button

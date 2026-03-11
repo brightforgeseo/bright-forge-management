@@ -42,7 +42,7 @@ const KeywordTool: React.FC = () => {
               value={seed}
               onChange={(e) => setSeed(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleAnalyze()}
-              className="w-full pl-10 pr-4 py-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none transition-all"
+              className="w-full pl-10 pr-4 py-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none transition-all bg-white text-slate-900 placeholder-slate-400"
               placeholder="e.g. vintage coffee machines"
             />
           </div>

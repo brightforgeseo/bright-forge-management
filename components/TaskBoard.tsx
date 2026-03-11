@@ -1921,7 +1921,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
         <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 animate-fadeIn backdrop-blur-sm">
           <div className="bg-portal-surface rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden border border-white/[0.07] max-h-[90vh] flex flex-col">
             {/* Modal Header */}
-            <div className="p-6 border-b border-white/[0.07] flex justify-between items-start bg-gradient-to-r from-slate-50 to-white">
+            <div className="p-6 border-b border-white/[0.07] flex justify-between items-start bg-portal-dark">
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="w-1 h-8 rounded-full" style={{ backgroundColor: taskModal.groupColor }}></div>
@@ -2415,7 +2415,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
       {showShareModal && taskModal && (
         <div className="fixed inset-0 bg-slate-900/60 z-[60] flex items-center justify-center p-4 animate-fadeIn backdrop-blur-sm">
           <div className="bg-portal-surface rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-white/[0.07]">
-            <div className="p-5 border-b border-white/[0.07] flex justify-between items-center bg-gradient-to-r from-slate-50 to-white">
+            <div className="p-5 border-b border-white/[0.07] flex justify-between items-center bg-portal-dark">
               <div>
                 <h3 className="font-bold text-lg text-white flex items-center gap-2">
                   <Share2 className="w-5 h-5 text-brand-600" />
@@ -2570,7 +2570,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
       {showArchivePanel && activeClient && (
         <div className="fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4 animate-fadeIn">
           <div className="bg-portal-surface rounded-2xl shadow-xl max-w-2xl w-full overflow-hidden max-h-[80vh] flex flex-col">
-            <div className="p-5 border-b border-white/[0.07] flex justify-between items-center bg-gradient-to-r from-amber-50 to-white">
+            <div className="p-5 border-b border-white/[0.07] flex justify-between items-center bg-portal-dark">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
                   <Archive className="w-5 h-5 text-amber-600" />

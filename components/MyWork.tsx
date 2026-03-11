@@ -908,7 +908,7 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => { setIsTaskModalOpen(false); setShowStatusPicker(false); setShowPriorityPicker(false); }}>
           <div className="bg-portal-surface rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             {/* Modal Header */}
-            <div className="p-6 border-b border-white/[0.07] bg-gradient-to-r from-slate-50 to-white rounded-t-2xl">
+            <div className="p-6 border-b border-white/[0.07] bg-portal-dark rounded-t-2xl">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
