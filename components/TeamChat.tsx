@@ -10,6 +10,26 @@ import { supabase } from '../lib/supabaseClient';
 import ChatTodoList from './ChatTodoList';
 // Removed custom VideoCall - now using Google Meet
 
+// Play a short notification sound for new chat messages
+const playMessageSound = async () => {
+  try {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    if (audioContext.state === 'suspended') await audioContext.resume();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    oscillator.frequency.value = 880;
+    oscillator.type = 'sine';
+    gainNode.gain.setValueAtTime(0.12, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.2);
+  } catch (e) {
+    // Silently ignore audio errors
+  }
+};
+
 interface TeamChatProps {
   currentUser: User;
   addToast: (type: ToastType, message: string) => void;
@@ -767,6 +787,11 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
           parentMessageId: newMsg.parent_message_id,
           replyCount: newMsg.reply_count || 0
         };
+
+        // Play notification sound for messages from other users
+        if (!newMsg.is_ai && newMsg.sender_id !== currentUser.id) {
+          playMessageSound();
+        }
 
         // Only update if message is for current channel
         if (newMsg.channel_id === activeChannelRef.current) {
@@ -2420,7 +2445,18 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
               {pinnedMessages.map((msg) => (
                 <div
                   key={msg.id}
-                  className="p-3 bg-white rounded-lg border border-amber-200 hover:border-amber-300 transition-colors"
+                  className="p-3 bg-white rounded-lg border border-amber-200 hover:border-amber-300 transition-colors cursor-pointer"
+                  onClick={() => {
+                    setShowPinnedMessages(false);
+                    setTimeout(() => {
+                      const messageEl = document.getElementById(`msg-${msg.id}`);
+                      if (messageEl) {
+                        messageEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        messageEl.classList.add('bg-yellow-100');
+                        setTimeout(() => messageEl.classList.remove('bg-yellow-100'), 2000);
+                      }
+                    }, 300);
+                  }}
                 >
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
@@ -2430,7 +2466,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                       </span>
                     </div>
                     <button
-                      onClick={() => handleUnpinMessage(msg.id)}
+                      onClick={(e) => { e.stopPropagation(); handleUnpinMessage(msg.id); }}
                       className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-red-500 transition-colors"
                       title="Unpin message"
                     >
@@ -2627,7 +2663,13 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                           ? 'bg-brand-100 border-brand-300 border-2'
                           : 'bg-slate-100 border border-slate-300 hover:bg-slate-200'
                       }`}
-                      title={`Reacted by ${reaction.count} ${reaction.count === 1 ? 'person' : 'people'}`}
+                      title={reaction.userIds
+                        .map(uid => {
+                          if (uid === currentUser.id) return 'You';
+                          const profile = profiles.find(p => p.id === uid);
+                          return profile?.full_name || 'Unknown';
+                        })
+                        .join(', ')}
                     >
                       <span>{reaction.emoji}</span>
                       <span className="text-xs font-medium text-slate-600">{reaction.count}</span>
