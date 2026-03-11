@@ -256,9 +256,6 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
       const defaultStatus = 'Working on it';
       const defaultPriority = 'Medium';
 
-      // DEBUG: Remove this alert after confirming the right code is running
-      alert('Creating task with status: ' + defaultStatus + ' | priority: ' + defaultPriority);
-
       const description = todoData.notes
         ? `${todoData.notes}\n\n— Created from chat reminder by ${todoData.created_by_name}`
         : `Created from chat reminder by ${todoData.created_by_name}`;
@@ -287,6 +284,27 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
         console.error('[ChatTodoList] Error saving board:', updateError.message);
         addToast('error', 'Failed to add task to client board');
         return null;
+      }
+
+      // Verify: read back from DB to confirm status was saved correctly
+      const { data: verifyRows } = await supabase
+        .from('client_boards')
+        .select('board_data')
+        .eq('id', row.id)
+        .single();
+
+      if (verifyRows) {
+        const verifyBoard = verifyRows.board_data as ClientBoard;
+        for (const g of verifyBoard.groups) {
+          const t = g.tasks.find(t => t.id === newTaskId);
+          if (t) {
+            console.log('[ChatTodoList] VERIFIED in DB - task status:', t.status, '| priority:', t.priority, '| group:', g.title);
+            if (t.status !== 'Working on it') {
+              alert('BUG: DB has status "' + t.status + '" instead of "Working on it"! Something overwrote it.');
+            }
+            break;
+          }
+        }
       }
 
       console.log('[ChatTodoList] Task created in', boardData.groups[targetGroupIndex].title);
