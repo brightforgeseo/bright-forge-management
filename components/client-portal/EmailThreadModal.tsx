@@ -212,7 +212,7 @@ const EmailThreadModal: React.FC<EmailThreadModalProps> = ({
             </div>
           ) : !hasThread ? (
             <div className="text-center py-12">
-              <Mail className="w-12 h-12 text-zinc-600 mx-auto mb-4" />
+              <Mail className="w-12 h-12 text-portal-soft mx-auto mb-4" />
               <p className="text-portal-soft">No emails sent for this task yet</p>
             </div>
           ) : (

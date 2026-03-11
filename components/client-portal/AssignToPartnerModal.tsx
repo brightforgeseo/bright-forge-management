@@ -141,7 +141,7 @@ const AssignToPartnerModal: React.FC<AssignToPartnerModalProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search partners..."
-              className="w-full pl-10 pr-4 py-3 bg-portal-surface2 border border-white/[0.07] rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-purple-400 transition-colors"
+              className="w-full pl-10 pr-4 py-3 bg-portal-surface2 border border-white/[0.07] rounded-xl text-white placeholder-portal-soft focus:outline-none focus:border-purple-400 transition-colors"
             />
           </div>
 
@@ -203,7 +203,7 @@ const AssignToPartnerModal: React.FC<AssignToPartnerModalProps> = ({
               onChange={(e) => setVisibleNotes(e.target.value)}
               placeholder="Add any instructions or context for the partner..."
               rows={3}
-              className="w-full px-4 py-3 bg-portal-surface2 border border-white/[0.07] rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-purple-400 resize-none transition-colors"
+              className="w-full px-4 py-3 bg-portal-surface2 border border-white/[0.07] rounded-xl text-white placeholder-portal-soft focus:outline-none focus:border-purple-400 resize-none transition-colors"
             />
             <p className="text-xs text-portal-soft mt-1">These notes will be visible to the partner</p>
           </div>
