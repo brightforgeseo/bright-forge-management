@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Plus, Check, Trash2, ChevronDown, Loader2, ListTodo, ArrowRight, FileText, ChevronUp, FolderOpen } from 'lucide-react';
-import { supabase, supabaseAdmin } from '../lib/supabaseClient';
-import { ClientBoard, TaskGroup, User, ToastType } from '../types';
-import { fetchClientBoards } from '../services/databaseService';
+import { X, Plus, Check, Trash2, ChevronDown, Loader2, ListTodo, ArrowRight, FileText, ChevronUp, FolderOpen, UserCircle } from 'lucide-react';
+import { supabase } from '../lib/supabaseClient';
+import { ClientBoard, TaskGroup, User, ToastType, Profile } from '../types';
+import { fetchClientBoards, fetchProfiles } from '../services/databaseService';
 
 export interface ChatTodo {
   id: string;
@@ -14,6 +14,7 @@ export interface ChatTodo {
   created_by: string;
   created_by_name: string;
   assigned_to: string | null;
+  assigned_to_name: string | null;
   notes: string | null;
   is_completed: boolean;
   completed_at: string | null;
@@ -34,7 +35,9 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
   const [showNotesInput, setShowNotesInput] = useState(false);
   const [selectedBoardId, setSelectedBoardId] = useState<string>('');
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
+  const [selectedAssignee, setSelectedAssignee] = useState<string>('');
   const [clientBoards, setClientBoards] = useState<ClientBoard[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [filter, setFilter] = useState<'active' | 'completed'>('active');
@@ -49,6 +52,7 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
   useEffect(() => {
     loadTodos();
     loadClientBoards();
+    loadProfiles();
 
     // Subscribe to realtime changes
     const channel = supabase
@@ -107,12 +111,18 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
     }
   };
 
+  const loadProfiles = async () => {
+    const p = await fetchProfiles();
+    setProfiles(p);
+  };
+
   const addTodo = async () => {
     const text = newTodoText.trim();
     if (!text) return;
 
     const board = clientBoards.find(b => b.id === selectedBoardId);
     const group = board?.groups.find(g => g.id === selectedGroupId);
+    const assignee = profiles.find(p => p.id === selectedAssignee);
 
     setAdding(true);
     const { error } = await supabase
@@ -126,6 +136,8 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
         group_name: group?.title || null,
         created_by: currentUser.id,
         created_by_name: currentUser.name,
+        assigned_to: selectedAssignee || null,
+        assigned_to_name: assignee?.full_name || null,
         is_completed: false,
       });
 
@@ -172,38 +184,51 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
 
   const createTaskInClientBoard = async (todo: ChatTodo) => {
     try {
-      // Fetch the raw DB row directly to avoid any data corruption
-      const { data: rows, error: fetchError } = await supabaseAdmin
+      // Fetch the raw DB row directly
+      const { data: rows, error: fetchError } = await supabase
         .from('client_boards')
         .select('*')
         .order('created_at', { ascending: true });
 
       if (fetchError || !rows) {
         console.error('[ChatTodoList] Error fetching boards:', fetchError?.message);
+        addToast('error', 'Failed to fetch client boards');
         return;
       }
+
+      console.log('[ChatTodoList] Fetched', rows.length, 'board rows');
+      console.log('[ChatTodoList] Looking for board_data.id:', todo.client_board_id);
 
       // Find the matching row by board_data.id
       const row = rows.find((r: any) => r.board_data?.id === todo.client_board_id);
       if (!row) {
-        console.error('[ChatTodoList] Board row not found for:', todo.client_board_id);
+        console.error('[ChatTodoList] Board row not found. Available board IDs:', rows.map((r: any) => r.board_data?.id));
+        addToast('error', 'Client board not found');
         return;
       }
 
-      const boardData = { ...row.board_data } as ClientBoard;
+      console.log('[ChatTodoList] Found board row, DB id:', row.id, 'Board name:', row.board_data?.name);
+
+      // Deep clone to avoid reference issues
+      const boardData = JSON.parse(JSON.stringify(row.board_data)) as ClientBoard;
+
+      console.log('[ChatTodoList] Board groups:', boardData.groups?.map(g => ({ id: g.id, title: g.title, taskCount: g.tasks?.length })));
+      console.log('[ChatTodoList] Target group_id:', todo.group_id);
 
       // Find the target group by saved group_id
       let targetGroupIndex = -1;
       if (todo.group_id) {
         targetGroupIndex = boardData.groups.findIndex(g => g.id === todo.group_id);
+        console.log('[ChatTodoList] Found group at index:', targetGroupIndex);
       }
       // Fallback to first group
       if (targetGroupIndex === -1 && boardData.groups.length > 0) {
         targetGroupIndex = 0;
+        console.log('[ChatTodoList] Falling back to first group');
       }
 
       if (targetGroupIndex === -1) {
-        // No groups at all - create one
+        boardData.groups = boardData.groups || [];
         boardData.groups.push({
           id: `grp-${Date.now()}`,
           title: 'From Reminders',
@@ -213,7 +238,7 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
         targetGroupIndex = boardData.groups.length - 1;
       }
 
-      const newTaskId = `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const newTaskId = `task-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
       const defaultStatus = boardData.statusDefs?.[0]?.label || 'Not Started';
       const defaultPriority = boardData.priorityDefs?.[0]?.label || 'Medium';
 
@@ -235,20 +260,27 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
       // Add task to the correct group
       boardData.groups[targetGroupIndex].tasks.push(newTask);
 
-      // Save directly using the row's primary key with admin client
-      const { error: updateError } = await supabaseAdmin
+      console.log('[ChatTodoList] Adding task to group:', boardData.groups[targetGroupIndex].title);
+      console.log('[ChatTodoList] Group now has', boardData.groups[targetGroupIndex].tasks.length, 'tasks');
+
+      // Save directly using the row's primary key
+      const { data: updateData, error: updateError } = await supabase
         .from('client_boards')
         .update({ board_data: boardData, updated_at: new Date().toISOString() })
-        .eq('id', row.id);
+        .eq('id', row.id)
+        .select();
 
       if (updateError) {
-        console.error('[ChatTodoList] Error saving board:', updateError.message);
+        console.error('[ChatTodoList] Error saving board:', updateError.message, updateError.details, updateError.hint);
+        addToast('error', 'Failed to add task to client board: ' + updateError.message);
       } else {
-        console.log('[ChatTodoList] Task added to group:', boardData.groups[targetGroupIndex].title, 'in board:', boardData.name);
+        console.log('[ChatTodoList] Board saved successfully. Updated rows:', updateData?.length);
+        console.log('[ChatTodoList] Task "' + todo.text + '" added to "' + boardData.groups[targetGroupIndex].title + '" in "' + boardData.name + '"');
       }
 
     } catch (err) {
       console.error('[ChatTodoList] Error creating task in board:', err);
+      addToast('error', 'Unexpected error adding task to board');
     }
   };
 
@@ -372,6 +404,20 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
               <option value="">No client (general reminder)</option>
               {clientBoards.map(board => (
                 <option key={board.id} value={board.id}>{board.name}</option>
+              ))}
+            </select>
+          </div>
+          {/* Assign to member */}
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs text-slate-500 whitespace-nowrap">Assign to:</span>
+            <select
+              value={selectedAssignee}
+              onChange={e => setSelectedAssignee(e.target.value)}
+              className="flex-1 px-2 py-1 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-violet-300"
+            >
+              <option value="">No one (general)</option>
+              {profiles.map(p => (
+                <option key={p.id} value={p.id}>{p.full_name || p.email || 'Unknown'}</option>
               ))}
             </select>
           </div>
@@ -500,6 +546,12 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[11px] font-medium">
                         <FolderOpen className="w-3 h-3" />
                         {todo.group_name}
+                      </span>
+                    )}
+                    {todo.assigned_to_name && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[11px] font-medium">
+                        <UserCircle className="w-3 h-3" />
+                        {todo.assigned_to_name}
                       </span>
                     )}
                     {todo.is_completed && todo.completed_at && (
