@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Mail, Lock, ArrowRight, Loader2, AlertTriangle } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { ToastType } from '../../types';
+import logoUrl from '../../logo';
 
 interface ClientPortalLoginProps {
   onLoginSuccess: () => void;
@@ -71,7 +72,7 @@ const ClientPortalLogin: React.FC<ClientPortalLoginProps> = ({ onLoginSuccess, a
         {/* Logo and Title */}
         <div className="text-center mb-8">
           <img
-            src="/brightforge-logo.webp"
+            src={logoUrl}
             alt="BrightForge"
             className="h-12 mx-auto mb-4"
           />

@@ -5,6 +5,7 @@ import { ToolView, BrandingConfig, User, AppNotification } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { fetchNotifications, markNotificationRead, markAllNotificationsRead, deleteAllNotifications, deleteNotification } from '../services/databaseService';
 import { version } from '../package.json';
+import logoUrl from '../logo';
 
 // Flash favicon when receiving notifications
 let faviconFlashInterval: ReturnType<typeof setInterval> | null = null;
@@ -330,7 +331,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       {/* Brand Header */}
       <div className="p-3 pt-8 border-b border-white/[0.07] flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-2 overflow-hidden min-w-0 flex-1">
-            <img src="/brightforge-logo.webp" alt="BrightForge" className="h-7 flex-shrink-0" />
+            <img src={logoUrl} alt="BrightForge" className="h-7 flex-shrink-0" />
         </div>
         {/* Mobile close button */}
         <button

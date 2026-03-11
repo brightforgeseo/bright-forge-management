@@ -1804,7 +1804,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
           <div className="p-2 bg-portal-surface2 border-b border-white/[0.07]">
             <input
               autoFocus
-              className="w-full text-xs p-1 rounded text-white outline-none mb-1"
+              className="w-full text-xs p-1 rounded text-slate-900 bg-white outline-none mb-1"
               placeholder="channel-name"
               value={newChannelName}
               onChange={e => setNewChannelName(e.target.value)}
@@ -2581,7 +2581,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                     <textarea
                       value={editingText}
                       onChange={(e) => setEditingText(e.target.value)}
-                      className="w-full p-2 text-xs md:text-sm border border-white/[0.07] rounded-lg focus:ring-2 focus:ring-brand-500 outline-none resize-none"
+                      className="w-full p-2 text-xs md:text-sm border border-white/[0.07] rounded-lg focus:ring-2 focus:ring-brand-500 outline-none resize-none bg-white text-slate-900"
                       rows={3}
                       autoFocus
                       onKeyDown={(e) => {
@@ -2966,7 +2966,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                   ? `Message ${getDMInfo(activeChannel!).name}...`
                   : `Message #${activeChannel?.name}...`
               }
-              className="w-full max-h-40 min-h-[44px] md:min-h-[60px] p-2 md:p-3 text-sm md:text-base outline-none resize-none rounded-t-lg md:rounded-t-xl"
+              className="w-full max-h-40 min-h-[44px] md:min-h-[60px] p-2 md:p-3 text-sm md:text-base outline-none resize-none rounded-t-lg md:rounded-t-xl bg-white text-slate-900 placeholder-slate-400"
             />
             <div className="flex justify-between items-center p-1.5 md:p-2 border-t rounded-b-lg md:rounded-b-xl bg-portal-dark border-white/[0.07]">
               <div className="flex gap-0.5 md:gap-1 relative">

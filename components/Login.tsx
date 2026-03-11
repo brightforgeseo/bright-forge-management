@@ -4,6 +4,7 @@ import { Mail, Lock, ArrowRight, Loader2, AlertTriangle, User } from 'lucide-rea
 import { BrandingConfig } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { checkAllowlist, verifyPreProvisionedUser, consumePreProvisionedUser, ensureProfileExists } from '../services/databaseService';
+import logoUrl from '../logo';
 
 interface LoginProps {
   onLogin: (email: string) => void;
@@ -187,7 +188,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, branding }) => {
       <div className="w-full max-w-md relative z-10">
         {/* Logo and Title */}
         <div className="text-center mb-8">
-          <img src="/brightforge-logo.webp" alt="BrightForge" className="h-12 mx-auto mb-4" />
+          <img src={logoUrl} alt="BrightForge" className="h-12 mx-auto mb-4" />
           <p className="text-portal-soft">
             {mode === 'login' && 'Sign in to access your team portal'}
             {mode === 'signup' && 'Create your team account'}

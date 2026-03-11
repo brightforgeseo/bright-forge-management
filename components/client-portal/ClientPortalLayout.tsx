@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { PortalView, PartnerAccount } from '../../types-portal';
 import { ToastType } from '../../types';
+import logoUrl from '../../logo';
 
 interface ClientPortalLayoutProps {
   partnerAccount: PartnerAccount;
@@ -65,7 +66,7 @@ const ClientPortalLayout: React.FC<ClientPortalLayoutProps> = ({
           <Menu className="w-6 h-6" />
         </button>
         <div className="flex items-center gap-2">
-          <img src="/brightforge-logo.webp" alt="BrightForge" className="h-7" />
+          <img src={logoUrl} alt="BrightForge" className="h-7" />
         </div>
         <div className="w-10" /> {/* Spacer for centering */}
       </div>
@@ -88,7 +89,7 @@ const ClientPortalLayout: React.FC<ClientPortalLayoutProps> = ({
         <div className="p-6 border-b border-white/[0.07]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <img src="/brightforge-logo.webp" alt="BrightForge" className="h-8" />
+              <img src={logoUrl} alt="BrightForge" className="h-8" />
             </div>
             <button
               onClick={() => setIsMobileSidebarOpen(false)}
