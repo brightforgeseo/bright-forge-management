@@ -324,32 +324,32 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Sidebar */}
       <div className={`
-        w-72 lg:w-64 bg-slate-900 text-white flex flex-col h-full fixed left-0 top-0 shadow-xl transition-transform duration-300 ease-out
+        w-72 lg:w-64 bg-portal-surface text-white flex flex-col h-full fixed left-0 top-0 shadow-xl transition-transform duration-300 ease-out
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `} style={{ zIndex: 100 }}>
       {/* Brand Header */}
-      <div className="p-3 pt-8 border-b border-slate-800 flex items-center justify-between flex-shrink-0">
+      <div className="p-3 pt-8 border-b border-white/[0.07] flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-2 overflow-hidden min-w-0 flex-1">
             <img src="https://brightforge.com.ph/images/logo.png" alt="BrightForge" className="h-7 flex-shrink-0" />
         </div>
         {/* Mobile close button */}
         <button
           onClick={() => setIsMobileMenuOpen(false)}
-          className="lg:hidden p-2 hover:bg-slate-800 rounded-lg transition-colors"
+          className="lg:hidden p-2 hover:bg-portal-surface2 rounded-lg transition-colors"
           aria-label="Close menu"
         >
-          <X className="w-5 h-5 text-slate-400" />
+          <X className="w-5 h-5 text-portal-soft" />
         </button>
 
         {/* Notification Bell */}
         <div className="relative flex-shrink-0">
           <button
             onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-            className="p-1.5 rounded-lg hover:bg-slate-800 transition-colors relative"
+            className="p-1.5 rounded-lg hover:bg-portal-surface2 transition-colors relative"
           >
-            <Bell className={`w-4 h-4 ${unreadCount > 0 ? 'text-orange-500' : 'text-slate-400'}`} />
+            <Bell className={`w-4 h-4 ${unreadCount > 0 ? 'text-portal-accent' : 'text-portal-soft'}`} />
             {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] bg-orange-500 text-white text-[9px] font-bold rounded-full border-2 border-slate-900 flex items-center justify-center px-0.5">
+              <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] bg-portal-accent text-white text-[9px] font-bold rounded-full border-2 border-portal-surface flex items-center justify-center px-0.5">
                 {unreadCount}
               </span>
             )}
@@ -377,7 +377,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 </div>
                 <div className="overflow-y-auto max-h-[500px]">
                   {notifications.length === 0 ? (
-                    <div className="p-8 text-center text-slate-400 text-sm">No notifications</div>
+                    <div className="p-8 text-center text-portal-soft text-sm">No notifications</div>
                   ) : (
                     notifications.map(n => (
                       <div
@@ -388,8 +388,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                         <div className="flex justify-between items-start gap-2">
                           <div className="flex-1 min-w-0">
                             <p className={`text-sm ${!n.isRead ? 'font-bold text-slate-900' : 'font-medium text-slate-700'}`}>{n.title}</p>
-                            <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">{n.message}</p>
-                            <p className="text-[10px] text-slate-400 mt-1">
+                            <p className="text-xs text-portal-soft line-clamp-2 mt-0.5">{n.message}</p>
+                            <p className="text-[10px] text-portal-soft mt-1">
                               {new Date(n.createdAt).toLocaleTimeString()} · {new Date(n.createdAt).toLocaleDateString()}
                             </p>
                           </div>
@@ -397,7 +397,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                             {!n.isRead && <div className="w-2 h-2 bg-brand-500 rounded-full"></div>}
                             <button
                               onClick={(e) => handleDeleteNotification(e, n.id)}
-                              className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-all"
+                              className="p-1 text-portal-soft hover:text-red-500 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-all"
                               title="Delete notification"
                             >
                               <X className="w-3.5 h-3.5" />
@@ -424,11 +424,11 @@ const Sidebar: React.FC<SidebarProps> = ({
               onClick={() => handleViewChange(item.id)}
               className={`w-full flex items-center gap-3 px-3 py-3 lg:py-2 rounded-xl lg:rounded-lg transition-all duration-200 group active:scale-[0.98] ${
                 isActive
-                  ? 'bg-brand-600 text-white shadow-md shadow-brand-900/20'
-                  : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100 active:bg-slate-700'
+                  ? 'bg-portal-accent text-white shadow-md shadow-portal-accent/20'
+                  : 'text-portal-soft hover:bg-portal-surface2 hover:text-portal-text active:bg-portal-surface2'
               }`}
             >
-              <Icon className={`w-5 h-5 lg:w-4 lg:h-4 flex-shrink-0 ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-300'}`} />
+              <Icon className={`w-5 h-5 lg:w-4 lg:h-4 flex-shrink-0 ${isActive ? 'text-white' : 'text-portal-soft group-hover:text-portal-text'}`} />
               <span className="font-medium text-base lg:text-sm truncate">{item.label}</span>
             </button>
           );
@@ -436,8 +436,8 @@ const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Invite Button - Moved to main nav as requested */}
         {currentUser.role === 'Owner' && (
-            <div className="pt-6 mt-2 border-t border-slate-800">
-                <div className="px-3 text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Team</div>
+            <div className="pt-6 mt-2 border-t border-white/[0.07]">
+                <div className="px-3 text-[10px] font-semibold text-portal-soft uppercase tracking-wider mb-2">Team</div>
                 <button
                     onClick={onInvite}
                     className="w-full flex items-center gap-3 px-3 py-3 lg:py-2 rounded-xl lg:rounded-lg transition-all duration-200 bg-blue-600/10 text-blue-400 border border-blue-600/20 hover:bg-blue-600 hover:text-white active:scale-[0.98] group"
@@ -449,34 +449,34 @@ const Sidebar: React.FC<SidebarProps> = ({
         )}
       </nav>
 
-      <div className="p-2 border-t border-slate-800 flex-shrink-0">
+      <div className="p-2 border-t border-white/[0.07] flex-shrink-0">
         {/* User Profile */}
         <div className="relative">
             <button
               onClick={() => setIsProfileOpen(!isProfileOpen)}
-              className="w-full flex items-center gap-2 p-1.5 hover:bg-slate-800 rounded-lg transition-colors group"
+              className="w-full flex items-center gap-2 p-1.5 hover:bg-portal-surface2 rounded-lg transition-colors group"
             >
               {currentUser.avatarUrl ? (
-                  <img src={currentUser.avatarUrl} alt="Avatar" className="w-7 h-7 rounded-full object-cover border border-brand-400 flex-shrink-0" />
+                  <img src={currentUser.avatarUrl} alt="Avatar" className="w-7 h-7 rounded-full object-cover border border-portal-accent flex-shrink-0" />
               ) : (
-                  <div className="w-7 h-7 rounded-full bg-brand-600 flex items-center justify-center text-[10px] font-bold text-white border border-brand-400 shadow-sm flex-shrink-0">
+                  <div className="w-7 h-7 rounded-full bg-portal-accent flex items-center justify-center text-[10px] font-bold text-white border border-portal-accent shadow-sm flex-shrink-0">
                     {currentUser.initials}
                   </div>
               )}
               <div className="flex-1 text-left overflow-hidden min-w-0">
-                <p className="text-xs font-medium text-slate-200 truncate">{currentUser.name}</p>
-                <p className="text-[10px] text-slate-500 truncate">{currentUser.role}</p>
+                <p className="text-xs font-medium text-portal-text truncate">{currentUser.name}</p>
+                <p className="text-[10px] text-portal-soft truncate">{currentUser.role}</p>
               </div>
-              <MoreVertical className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-300 flex-shrink-0" />
+              <MoreVertical className="w-3.5 h-3.5 text-portal-soft group-hover:text-portal-text flex-shrink-0" />
             </button>
 
             {/* Profile Menu */}
             {isProfileOpen && (
               <>
               <div className="fixed inset-0 z-10" onClick={() => setIsProfileOpen(false)}></div>
-              <div className="absolute bottom-full left-0 w-full bg-slate-800 border border-slate-700 rounded-xl shadow-xl mb-2 overflow-hidden z-20 animate-fadeIn">
-                 <div className="p-2.5 border-b border-slate-700">
-                    <p className="text-[10px] text-slate-400">Signed in as</p>
+              <div className="absolute bottom-full left-0 w-full bg-portal-surface2 border border-white/[0.07] rounded-xl shadow-xl mb-2 overflow-hidden z-20 animate-fadeIn">
+                 <div className="p-2.5 border-b border-white/[0.07]">
+                    <p className="text-[10px] text-portal-soft">Signed in as</p>
                     <p className="text-xs font-medium text-white truncate">{currentUser.email}</p>
                  </div>
                  <button
@@ -492,7 +492,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Version Number */}
         <div className="text-center pt-1">
-          <span className="text-[10px] text-slate-600">v{version}</span>
+          <span className="text-[10px] text-portal-soft">v{version}</span>
         </div>
       </div>
     </div>

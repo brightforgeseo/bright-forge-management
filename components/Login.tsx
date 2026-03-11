@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Hexagon, Mail, Lock, ArrowRight, Loader2, AlertTriangle, User } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Loader2, AlertTriangle, User } from 'lucide-react';
 import { BrandingConfig } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { checkAllowlist, verifyPreProvisionedUser, consumePreProvisionedUser, ensureProfileExists } from '../services/databaseService';
@@ -129,7 +129,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, branding }) => {
       } else {
           // SIGN UP (Manual)
           if (!fullName.trim()) throw new Error('Please enter your full name.');
-          
+
           // 1. Check Allowlist
           const isAllowed = await checkAllowlist(email);
           if (!isAllowed) {
@@ -178,41 +178,47 @@ const Login: React.FC<LoginProps> = ({ onLogin, branding }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 relative overflow-hidden">
-      <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-b from-brand-100/50 to-transparent -z-10"></div>
-      
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden animate-slideIn">
-        <div className="p-8 text-center border-b border-slate-50 bg-white">
+    <div className="min-h-screen bg-portal-dark flex flex-col items-center justify-center p-4 relative overflow-hidden">
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-portal-accent/10 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-portal-accent/5 rounded-full blur-3xl"></div>
+      </div>
+
+      <div className="w-full max-w-md relative z-10">
+        {/* Logo and Title */}
+        <div className="text-center mb-8">
           <img src="https://brightforge.com.ph/images/logo.png" alt="BrightForge" className="h-12 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-slate-900">{branding.companyName}</h1>
-          <p className="text-slate-500 mt-2 text-sm">
-             {mode === 'login' && 'Sign in to access your team portal'}
-             {mode === 'signup' && 'Create your team account'}
-             {mode === 'forgot' && 'Reset your password'}
+          <p className="text-portal-soft">
+            {mode === 'login' && 'Sign in to access your team portal'}
+            {mode === 'signup' && 'Create your team account'}
+            {mode === 'forgot' && 'Reset your password'}
           </p>
         </div>
 
+        {/* Login Card */}
+        <div className="bg-portal-surface rounded-2xl border border-white/[0.07] p-8 shadow-xl">
+
         {!isConfigured && (
-             <div className="bg-amber-50 border-b border-amber-100 p-4 flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                <div className="text-sm text-amber-800">
+             <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-amber-300">
                     <p className="font-bold">Configuration Required</p>
                     <p>Please add your Supabase API Key to <code>lib/supabaseClient.ts</code>.</p>
                 </div>
              </div>
         )}
 
-        <form onSubmit={handleSubmit} className="p-8 space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-5">
           {mode === 'signup' && (
              <div className="space-y-2 animate-slideIn">
-               <label className="block text-sm font-medium text-slate-700">Full Name</label>
+               <label className="block text-sm font-medium text-portal-text">Full Name</label>
                <div className="relative">
-                 <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                 <input 
-                    type="text" 
+                 <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-portal-soft" />
+                 <input
+                    type="text"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none"
+                    className="w-full pl-12 pr-4 py-3 bg-portal-surface2 border border-white/[0.07] rounded-xl text-white placeholder-portal-soft focus:outline-none focus:border-portal-accent focus:ring-1 focus:ring-portal-accent transition-colors"
                     placeholder="e.g. Jane Doe"
                     required={mode === 'signup'}
                   />
@@ -221,14 +227,14 @@ const Login: React.FC<LoginProps> = ({ onLogin, branding }) => {
           )}
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-slate-700">Work Email</label>
+            <label className="block text-sm font-medium text-portal-text">Work Email</label>
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-              <input 
-                type="email" 
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-portal-soft" />
+              <input
+                type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none"
+                className="w-full pl-12 pr-4 py-3 bg-portal-surface2 border border-white/[0.07] rounded-xl text-white placeholder-portal-soft focus:outline-none focus:border-portal-accent focus:ring-1 focus:ring-portal-accent transition-colors"
                 placeholder="name@company.com"
                 required
               />
@@ -237,28 +243,28 @@ const Login: React.FC<LoginProps> = ({ onLogin, branding }) => {
 
           {mode !== 'forgot' && (
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-slate-700">Password</label>
+            <label className="block text-sm font-medium text-portal-text">Password</label>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-portal-soft" />
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none"
-                placeholder="••••••••"
+                className="w-full pl-12 pr-4 py-3 bg-portal-surface2 border border-white/[0.07] rounded-xl text-white placeholder-portal-soft focus:outline-none focus:border-portal-accent focus:ring-1 focus:ring-portal-accent transition-colors"
+                placeholder="Enter your password"
                 required
               />
             </div>
           </div>
           )}
 
-          {error && <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm font-medium border border-red-100 text-center">{error}</div>}
-          {successMsg && <div className="p-3 rounded-lg bg-green-50 text-green-600 text-sm font-medium border border-green-100 text-center">{successMsg}</div>}
+          {error && <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-medium text-center">{error}</div>}
+          {successMsg && <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-medium text-center">{successMsg}</div>}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-70"
+            className="w-full py-3 bg-portal-accent hover:brightness-110 text-white rounded-xl font-bold shadow-lg shadow-portal-accent/20 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
           >
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
               <>
@@ -274,29 +280,30 @@ const Login: React.FC<LoginProps> = ({ onLogin, branding }) => {
             <button
               type="button"
               onClick={() => { setMode('forgot'); setError(''); setSuccessMsg(''); }}
-              className="w-full mt-3 text-sm text-slate-500 hover:text-brand-600"
+              className="w-full mt-3 text-sm text-portal-soft hover:text-portal-accent transition-colors"
             >
               Forgot your password?
             </button>
           )}
         </form>
 
-        <div className="p-6 border-t border-slate-50 bg-slate-50/50 text-center space-y-2">
+        <div className="mt-6 text-center">
            {mode === 'forgot' ? (
              <button
                onClick={() => { setMode('login'); setError(''); setSuccessMsg(''); }}
-               className="text-sm text-brand-600 hover:text-brand-700 font-medium"
+               className="text-sm text-portal-accent hover:text-portal-accent-light font-medium transition-colors"
              >
                Back to Sign In
              </button>
            ) : (
              <button
                onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError(''); setSuccessMsg(''); }}
-               className="text-sm text-brand-600 hover:text-brand-700 font-medium"
+               className="text-sm text-portal-accent hover:text-portal-accent-light font-medium transition-colors"
              >
                {mode === 'login' ? 'Invited to the team? Sign Up' : 'Already have an account? Sign In'}
              </button>
            )}
+        </div>
         </div>
       </div>
     </div>
