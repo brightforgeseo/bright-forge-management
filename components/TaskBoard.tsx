@@ -1580,8 +1580,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                            <input
                              value={group.title}
                              onChange={(e) => updateGroupTitle(activeClient.id, group.id, e.target.value)}
-                             className={`font-bold text-lg bg-transparent outline-none text-[${group.color}] w-full`}
-                             style={{ color: group.color }}
+                             className="font-bold text-lg bg-transparent outline-none text-white w-full"
                            />
                            <span className="text-xs font-semibold px-2.5 py-1 rounded-lg" style={{
                              backgroundColor: `${group.color}15`,
