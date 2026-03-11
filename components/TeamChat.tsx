@@ -3045,7 +3045,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                             searchGifs(gifSearch);
                           }
                         }}
-                        className="w-full px-3 py-2 text-sm border border-white/[0.07] rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
+                        className="w-full px-3 py-2 text-sm border border-white/[0.07] rounded-lg focus:ring-2 focus:ring-brand-500 outline-none bg-white text-slate-900 placeholder-slate-400"
                       />
                     </div>
                     {gifLoading ? (

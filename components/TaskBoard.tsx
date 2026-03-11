@@ -1417,7 +1417,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                       <div className="space-y-2">
                          <input 
                            autoFocus
-                           className="w-full p-2 text-sm border border-white/[0.07] rounded-lg outline-none focus:border-brand-500"
+                           className="w-full p-2 text-sm border border-white/[0.07] rounded-lg outline-none focus:border-brand-500 bg-white text-slate-900"
                            placeholder="Client Name"
                            value={newClientName}
                            onChange={(e) => setNewClientName(e.target.value)}
@@ -1510,7 +1510,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                       onChange={(e) => setGoal(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleGenerateGroup(activeClient.id)}
                       placeholder="e.g. Launch Q4 Campaign"
-                      className="outline-none text-sm px-3 py-1.5 flex-1 sm:w-48 lg:w-64 min-w-0"
+                      className="outline-none text-sm px-3 py-1.5 flex-1 sm:w-48 lg:w-64 min-w-0 bg-white text-slate-900"
                     />
                     <button
                       onClick={() => handleGenerateGroup(activeClient.id)}
@@ -2207,7 +2207,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                         }
                       }}
                       placeholder="Add a comment... (Use @name or @everyone to mention)"
-                      className="flex-1 p-2 border border-white/[0.07] rounded-lg outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 text-sm"
+                      className="flex-1 p-2 border border-white/[0.07] rounded-lg outline-none focus:border-brand-500 bg-white text-slate-900 focus:ring-1 focus:ring-brand-500 text-sm"
                     />
 
                     {/* Mention Dropdown */}
@@ -2346,23 +2346,23 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
 
                    <div>
                       <label className="block text-xs font-semibold text-portal-soft uppercase tracking-wide mb-1">Client Name</label>
-                      <input value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} className="w-full p-2 border rounded-lg outline-none focus:border-brand-500 text-sm" />
+                      <input value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} className="w-full p-2 border rounded-lg outline-none focus:border-brand-500 text-sm bg-white text-slate-900" />
                    </div>
                    <div>
                       <label className="block text-xs font-semibold text-portal-soft uppercase tracking-wide mb-1">Email Contact</label>
-                      <input value={editForm.email} onChange={e => setEditForm({...editForm, email: e.target.value})} className="w-full p-2 border rounded-lg outline-none focus:border-brand-500 text-sm" />
+                      <input value={editForm.email} onChange={e => setEditForm({...editForm, email: e.target.value})} className="w-full p-2 border rounded-lg outline-none focus:border-brand-500 text-sm bg-white text-slate-900" />
                    </div>
                    <div>
                       <label className="block text-xs font-semibold text-portal-soft uppercase tracking-wide mb-1">Phone</label>
-                      <input value={editForm.phone} onChange={e => setEditForm({...editForm, phone: e.target.value})} className="w-full p-2 border rounded-lg outline-none focus:border-brand-500 text-sm" />
+                      <input value={editForm.phone} onChange={e => setEditForm({...editForm, phone: e.target.value})} className="w-full p-2 border rounded-lg outline-none focus:border-brand-500 text-sm bg-white text-slate-900" />
                    </div>
                    <div>
                       <label className="block text-xs font-semibold text-portal-soft uppercase tracking-wide mb-1">Website</label>
-                      <input value={editForm.website} onChange={e => setEditForm({...editForm, website: e.target.value})} className="w-full p-2 border rounded-lg outline-none focus:border-brand-500 text-sm" />
+                      <input value={editForm.website} onChange={e => setEditForm({...editForm, website: e.target.value})} className="w-full p-2 border rounded-lg outline-none focus:border-brand-500 text-sm bg-white text-slate-900" />
                    </div>
                    <div>
                       <label className="block text-xs font-semibold text-portal-soft uppercase tracking-wide mb-1">Client Notes</label>
-                      <textarea value={editForm.notes} onChange={e => setEditForm({...editForm, notes: e.target.value})} rows={4} placeholder="Add notes about this client..." className="w-full p-2 border rounded-lg outline-none focus:border-brand-500 text-sm resize-none" />
+                      <textarea value={editForm.notes} onChange={e => setEditForm({...editForm, notes: e.target.value})} rows={4} placeholder="Add notes about this client..." className="w-full p-2 border rounded-lg outline-none focus:border-brand-500 text-sm resize-none bg-white text-slate-900" />
                    </div>
                 </div>
                 <div className="p-6 bg-portal-dark border-t border-white/[0.07] flex justify-between items-center">
@@ -2393,7 +2393,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                         <input
                           value={def.label}
                           onChange={(e) => handleUpdateLabel(activeClient.id, labelEditorType, def.id, 'label', e.target.value)}
-                          className="flex-1 p-2 border border-white/[0.07] rounded text-sm outline-none focus:border-brand-500"
+                          className="flex-1 p-2 border border-white/[0.07] rounded text-sm outline-none focus:border-brand-500 bg-white text-slate-900"
                         />
                         <button onClick={() => handleDeleteLabel(activeClient.id, labelEditorType, def.id)} className="p-2 text-portal-text hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
                      </div>
@@ -2464,7 +2464,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                 value={shareMessage}
                 onChange={handleShareMessageChange}
                 placeholder="Add a message... Type @ to mention someone"
-                className="w-full p-3 text-sm border border-white/[0.07] rounded-lg outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 resize-none"
+                className="w-full p-3 text-sm border border-white/[0.07] rounded-lg outline-none focus:border-brand-500 bg-white text-slate-900 focus:ring-1 focus:ring-brand-500 resize-none"
                 rows={3}
               />
 

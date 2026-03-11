@@ -1130,7 +1130,7 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
                       onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}
                       placeholder="Add a comment... (Use @name to mention)"
                       disabled={isSaving}
-                      className="flex-1 p-2.5 border border-white/[0.07] rounded-lg outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 text-sm disabled:opacity-50"
+                      className="flex-1 p-2.5 border border-white/[0.07] rounded-lg outline-none focus:border-brand-500 bg-white text-slate-900 focus:ring-1 focus:ring-brand-500 text-sm disabled:opacity-50"
                     />
 
                     {/* Mention Dropdown */}

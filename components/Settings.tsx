@@ -379,7 +379,7 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
               type="text"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              className="w-full p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none"
+              className="w-full p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none bg-white text-slate-900"
               placeholder="Enter your full name"
             />
           </div>
@@ -434,7 +434,7 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
                 type="text"
                 value={localConfig.companyName}
                 onChange={(e) => setLocalConfig({ ...localConfig, companyName: e.target.value })}
-                className="w-full p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none"
+                className="w-full p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none bg-white text-slate-900"
               />
               <p className="text-xs text-portal-soft mt-2">This name will appear in the sidebar and browser tab.</p>
             </div>
@@ -656,7 +656,7 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Enter new password"
-                  className="w-full p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none"
+                  className="w-full p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none bg-white text-slate-900"
                 />
               </div>
               <div className="flex gap-3 pt-2">
@@ -806,7 +806,7 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
                       value={newPartner.companyName}
                       onChange={(e) => setNewPartner({ ...newPartner, companyName: e.target.value })}
                       placeholder="e.g., 10XR Agency"
-                      className="w-full p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none"
+                      className="w-full p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none bg-white text-slate-900"
                     />
                   </div>
                   <div>
@@ -816,7 +816,7 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
                       value={newPartner.fullName}
                       onChange={(e) => setNewPartner({ ...newPartner, fullName: e.target.value })}
                       placeholder="e.g., John Smith"
-                      className="w-full p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none"
+                      className="w-full p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none bg-white text-slate-900"
                     />
                   </div>
                   <div>
@@ -826,7 +826,7 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
                       value={newPartner.email}
                       onChange={(e) => setNewPartner({ ...newPartner, email: e.target.value })}
                       placeholder="partner@company.com"
-                      className="w-full p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none"
+                      className="w-full p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none bg-white text-slate-900"
                     />
                   </div>
                   <div>
@@ -837,7 +837,7 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
                         value={newPartner.password}
                         onChange={(e) => setNewPartner({ ...newPartner, password: e.target.value })}
                         placeholder="Enter password"
-                        className="flex-1 p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none"
+                        className="flex-1 p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none bg-white text-slate-900"
                       />
                       <button
                         onClick={generatePartnerPassword}

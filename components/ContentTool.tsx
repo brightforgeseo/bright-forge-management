@@ -45,7 +45,7 @@ const ContentTool: React.FC = () => {
           <div>
             <label className="block text-sm font-medium text-portal-text mb-2">Topic / Title</label>
             <input
-              className="w-full p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none"
+              className="w-full p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none bg-white text-slate-900"
               placeholder="e.g. Benefits of Remote Work"
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
@@ -55,7 +55,7 @@ const ContentTool: React.FC = () => {
           <div>
             <label className="block text-sm font-medium text-portal-text mb-2">Target Keywords</label>
             <input
-              className="w-full p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none"
+              className="w-full p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none bg-white text-slate-900"
               placeholder="productivity, work-life balance"
               value={keywords}
               onChange={(e) => setKeywords(e.target.value)}
