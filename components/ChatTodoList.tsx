@@ -286,27 +286,6 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
         return null;
       }
 
-      // Verify: read back from DB to confirm status was saved correctly
-      const { data: verifyRows } = await supabase
-        .from('client_boards')
-        .select('board_data')
-        .eq('id', row.id)
-        .single();
-
-      if (verifyRows) {
-        const verifyBoard = verifyRows.board_data as ClientBoard;
-        for (const g of verifyBoard.groups) {
-          const t = g.tasks.find(t => t.id === newTaskId);
-          if (t) {
-            console.log('[ChatTodoList] VERIFIED in DB - task status:', t.status, '| priority:', t.priority, '| group:', g.title);
-            if (t.status !== 'Working on it') {
-              alert('BUG: DB has status "' + t.status + '" instead of "Working on it"! Something overwrote it.');
-            }
-            break;
-          }
-        }
-      }
-
       console.log('[ChatTodoList] Task created in', boardData.groups[targetGroupIndex].title);
       return newTaskId;
 
