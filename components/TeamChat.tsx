@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check, Smile, Film, SmilePlus, Video, Lock, UserPlus, Menu, ClipboardList, Calendar, ArrowRight, Palette, Paperclip, Download, File, Search, Pin, PinOff, Reply, ChevronDown, ChevronUp } from 'lucide-react';
+import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check, Smile, Film, SmilePlus, Video, Lock, UserPlus, Menu, ClipboardList, Calendar, ArrowRight, Palette, Paperclip, Download, File, Search, Pin, PinOff, Reply, ChevronDown, ChevronUp, ListTodo } from 'lucide-react';
 import { ChatChannel, ChatMessage, User, ToastType, Profile, MessageReaction } from '../types';
 import { getChatResponse } from '../services/geminiService';
 import { storeEchoConversation, buildConversationContext } from '../services/echoMemory';
@@ -7,6 +7,7 @@ import { fetchChatMessages, sendChatMessage, clearChatHistory, uploadFile, fetch
 import { fetchAllPartners, fetchPartnerMessages, sendPartnerMessage, markPartnerMessagesRead } from '../services/clientPortalService';
 import { PartnerWithStats, PartnerMessage } from '../types-portal';
 import { supabase } from '../lib/supabaseClient';
+import ChatTodoList from './ChatTodoList';
 // Removed custom VideoCall - now using Google Meet
 
 interface TeamChatProps {
@@ -97,6 +98,9 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
   const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
   const [threadReplies, setThreadReplies] = useState<Record<string, ChatMessage[]>>({});
   const [loadingThreads, setLoadingThreads] = useState<Set<string>>(new Set());
+
+  // Todo list state
+  const [showTodoList, setShowTodoList] = useState(false);
 
   // Chat background state - per channel
   const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
@@ -2193,6 +2197,14 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                 </span>
               </button>
             )}
+            {/* Todo/Reminders Button */}
+            <button
+              onClick={() => setShowTodoList(true)}
+              className="p-1.5 md:p-2 hover:bg-violet-50 rounded-lg transition-colors group"
+              title="Team Reminders"
+            >
+              <ListTodo className="w-4 h-4 md:w-5 md:h-5 text-slate-400 group-hover:text-violet-600" />
+            </button>
             {/* Search Button */}
             <button
               onClick={() => {
@@ -3114,6 +3126,14 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
             )}
           </div>
         </div>
+      )}
+      {/* Todo List Popup */}
+      {showTodoList && (
+        <ChatTodoList
+          currentUser={currentUser}
+          addToast={addToast}
+          onClose={() => setShowTodoList(false)}
+        />
       )}
     </div>
   );
