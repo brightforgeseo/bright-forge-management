@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Plus, Check, Trash2, ChevronDown, Loader2, ListTodo, ArrowRight, FileText, ChevronUp } from 'lucide-react';
+import { X, Plus, Check, Trash2, ChevronDown, Loader2, ListTodo, ArrowRight, FileText, ChevronUp, FolderOpen } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
-import { ClientBoard, User, ToastType } from '../types';
+import { ClientBoard, TaskGroup, User, ToastType } from '../types';
 import { fetchClientBoards, saveClientBoard } from '../services/databaseService';
-import { assignTaskToPartner } from '../services/clientPortalService';
 
 export interface ChatTodo {
   id: string;
   text: string;
   client_board_id: string | null;
   client_board_name: string | null;
+  group_id: string | null;
+  group_name: string | null;
   created_by: string;
   created_by_name: string;
   assigned_to: string | null;
@@ -32,6 +33,7 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
   const [newTodoNotes, setNewTodoNotes] = useState('');
   const [showNotesInput, setShowNotesInput] = useState(false);
   const [selectedBoardId, setSelectedBoardId] = useState<string>('');
+  const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [clientBoards, setClientBoards] = useState<ClientBoard[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -39,6 +41,10 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
   const [completingIds, setCompletingIds] = useState<Set<string>>(new Set());
   const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Get the groups for the currently selected board
+  const selectedBoard = clientBoards.find(b => b.id === selectedBoardId);
+  const availableGroups: TaskGroup[] = selectedBoard?.groups || [];
 
   useEffect(() => {
     loadTodos();
@@ -67,6 +73,15 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
     }
   }, [loading]);
 
+  // When selected board changes, auto-select the first group
+  useEffect(() => {
+    if (selectedBoard && selectedBoard.groups.length > 0) {
+      setSelectedGroupId(selectedBoard.groups[0].id);
+    } else {
+      setSelectedGroupId('');
+    }
+  }, [selectedBoardId]);
+
   const loadTodos = async () => {
     const { data, error } = await supabase
       .from('chat_todos')
@@ -86,6 +101,9 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
     setClientBoards(boards);
     if (boards.length > 0 && !selectedBoardId) {
       setSelectedBoardId(boards[0].id);
+      if (boards[0].groups.length > 0) {
+        setSelectedGroupId(boards[0].groups[0].id);
+      }
     }
   };
 
@@ -94,6 +112,7 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
     if (!text) return;
 
     const board = clientBoards.find(b => b.id === selectedBoardId);
+    const group = board?.groups.find(g => g.id === selectedGroupId);
 
     setAdding(true);
     const { error } = await supabase
@@ -103,6 +122,8 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
         notes: newTodoNotes.trim() || null,
         client_board_id: selectedBoardId || null,
         client_board_name: board?.name || null,
+        group_id: selectedGroupId || null,
+        group_name: group?.title || null,
         created_by: currentUser.id,
         created_by_name: currentUser.name,
         is_completed: false,
@@ -158,13 +179,20 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
         return;
       }
 
-      // Find the first group or create a "From Reminders" group
-      let targetGroup = board.groups.find(g => g.title.toLowerCase().includes('reminder') || g.title.toLowerCase().includes('todo'));
-      if (!targetGroup) {
-        targetGroup = board.groups[0]; // Use first group as fallback
+      // Use the saved group_id to find the correct group
+      let targetGroup: TaskGroup | undefined;
+
+      if (todo.group_id) {
+        targetGroup = board.groups.find(g => g.id === todo.group_id);
       }
+
+      // Fallback: first group if saved group no longer exists
       if (!targetGroup) {
-        // Create a new group if board is empty
+        targetGroup = board.groups[0];
+      }
+
+      if (!targetGroup) {
+        // Create a new group if board has no groups at all
         targetGroup = {
           id: `grp-${Date.now()}`,
           title: 'From Reminders',
@@ -311,7 +339,7 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
             />
           )}
           {/* Client board selector */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 mb-2">
             <span className="text-xs text-slate-500 whitespace-nowrap">Client:</span>
             <select
               value={selectedBoardId}
@@ -324,6 +352,23 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
               ))}
             </select>
           </div>
+          {/* Category/Group selector - only show when a client is selected */}
+          {selectedBoardId && availableGroups.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500 whitespace-nowrap">Category:</span>
+              <select
+                value={selectedGroupId}
+                onChange={e => setSelectedGroupId(e.target.value)}
+                className="flex-1 px-2 py-1 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-violet-300"
+              >
+                {availableGroups.map(group => (
+                  <option key={group.id} value={group.id}>
+                    {group.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         {/* Filter tabs */}
@@ -426,6 +471,12 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-violet-100 text-violet-700 rounded text-[11px] font-medium">
                         <ArrowRight className="w-3 h-3" />
                         {todo.client_board_name}
+                      </span>
+                    )}
+                    {todo.group_name && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[11px] font-medium">
+                        <FolderOpen className="w-3 h-3" />
+                        {todo.group_name}
                       </span>
                     )}
                     {todo.is_completed && todo.completed_at && (
