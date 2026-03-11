@@ -331,7 +331,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       {/* Brand Header */}
       <div className="p-3 pt-8 border-b border-white/[0.07] flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-2 overflow-hidden min-w-0 flex-1">
-            <img src={logoUrl} alt="BrightForge" className="w-[150px] flex-shrink-0" />
+            <img src={logoUrl} alt="BrightForge" className="w-[200px] flex-shrink-0" />
         </div>
         {/* Mobile close button */}
         <button
