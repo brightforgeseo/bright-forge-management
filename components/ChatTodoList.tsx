@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Plus, Check, Trash2, ChevronDown, Loader2, ListTodo, ArrowRight, FileText, ChevronUp, FolderOpen } from 'lucide-react';
-import { supabase } from '../lib/supabaseClient';
+import { supabase, supabaseAdmin } from '../lib/supabaseClient';
 import { ClientBoard, TaskGroup, User, ToastType } from '../types';
-import { fetchClientBoards, saveClientBoard } from '../services/databaseService';
+import { fetchClientBoards } from '../services/databaseService';
 
 export interface ChatTodo {
   id: string;
@@ -172,39 +172,50 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
 
   const createTaskInClientBoard = async (todo: ChatTodo) => {
     try {
-      const boards = await fetchClientBoards();
-      const board = boards.find(b => b.id === todo.client_board_id);
-      if (!board) {
-        console.error('[ChatTodoList] Board not found:', todo.client_board_id);
+      // Fetch the raw DB row directly to avoid any data corruption
+      const { data: rows, error: fetchError } = await supabaseAdmin
+        .from('client_boards')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (fetchError || !rows) {
+        console.error('[ChatTodoList] Error fetching boards:', fetchError?.message);
         return;
       }
 
-      // Use the saved group_id to find the correct group
-      let targetGroup: TaskGroup | undefined;
+      // Find the matching row by board_data.id
+      const row = rows.find((r: any) => r.board_data?.id === todo.client_board_id);
+      if (!row) {
+        console.error('[ChatTodoList] Board row not found for:', todo.client_board_id);
+        return;
+      }
 
+      const boardData = { ...row.board_data } as ClientBoard;
+
+      // Find the target group by saved group_id
+      let targetGroupIndex = -1;
       if (todo.group_id) {
-        targetGroup = board.groups.find(g => g.id === todo.group_id);
+        targetGroupIndex = boardData.groups.findIndex(g => g.id === todo.group_id);
+      }
+      // Fallback to first group
+      if (targetGroupIndex === -1 && boardData.groups.length > 0) {
+        targetGroupIndex = 0;
       }
 
-      // Fallback: first group if saved group no longer exists
-      if (!targetGroup) {
-        targetGroup = board.groups[0];
-      }
-
-      if (!targetGroup) {
-        // Create a new group if board has no groups at all
-        targetGroup = {
+      if (targetGroupIndex === -1) {
+        // No groups at all - create one
+        boardData.groups.push({
           id: `grp-${Date.now()}`,
           title: 'From Reminders',
           color: '#8B5CF6',
           tasks: [],
-        };
-        board.groups.push(targetGroup);
+        });
+        targetGroupIndex = boardData.groups.length - 1;
       }
 
       const newTaskId = `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const defaultStatus = board.statusDefs?.[0]?.label || 'Not Started';
-      const defaultPriority = board.priorityDefs?.[0]?.label || 'Medium';
+      const defaultStatus = boardData.statusDefs?.[0]?.label || 'Not Started';
+      const defaultPriority = boardData.priorityDefs?.[0]?.label || 'Medium';
 
       const description = todo.notes
         ? `${todo.notes}\n\n— Created from chat reminder by ${todo.created_by_name}`
@@ -221,8 +232,20 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
         comments: [],
       };
 
-      targetGroup.tasks.push(newTask);
-      await saveClientBoard(board);
+      // Add task to the correct group
+      boardData.groups[targetGroupIndex].tasks.push(newTask);
+
+      // Save directly using the row's primary key with admin client
+      const { error: updateError } = await supabaseAdmin
+        .from('client_boards')
+        .update({ board_data: boardData, updated_at: new Date().toISOString() })
+        .eq('id', row.id);
+
+      if (updateError) {
+        console.error('[ChatTodoList] Error saving board:', updateError.message);
+      } else {
+        console.log('[ChatTodoList] Task added to group:', boardData.groups[targetGroupIndex].title, 'in board:', boardData.name);
+      }
 
     } catch (err) {
       console.error('[ChatTodoList] Error creating task in board:', err);
