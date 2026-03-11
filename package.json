@@ -8,7 +8,7 @@
   },
   "scripts": {
     "start": "parcel index.html",
-    "build": "parcel build index.html --public-url ./",
+    "build": "rm -rf .parcel-cache dist && parcel build index.html --public-url ./",
     "electron:dev": "concurrently \"cross-env BROWSER=none npm start\" \"wait-on http://localhost:1234 && electron .\"",
     "electron:build": "npm run build && electron-builder",
     "cap:sync": "npx cap sync",
