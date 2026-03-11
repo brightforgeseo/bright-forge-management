@@ -113,8 +113,8 @@ const OAuthCallback: React.FC<OAuthCallbackProps> = ({ onComplete }) => {
       <div className="bg-zinc-900 rounded-2xl border border-zinc-800 p-8 max-w-md w-full text-center">
         {status === 'processing' && (
           <>
-            <div className="w-16 h-16 rounded-full bg-amber-400/20 flex items-center justify-center mx-auto mb-6">
-              <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
+            <div className="w-16 h-16 rounded-full bg-orange-400/20 flex items-center justify-center mx-auto mb-6">
+              <Loader2 className="w-8 h-8 text-orange-400 animate-spin" />
             </div>
             <h2 className="text-xl font-semibold text-white mb-2">Connecting Email</h2>
             <p className="text-zinc-400">{message}</p>

@@ -158,7 +158,7 @@ const ClientPortalSettings: React.FC<ClientPortalSettingsProps> = ({
       <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
         <div className="p-6 border-b border-zinc-800">
           <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-            <User className="w-5 h-5 text-amber-400" />
+            <User className="w-5 h-5 text-orange-400" />
             Profile
           </h2>
         </div>
@@ -188,7 +188,7 @@ const ClientPortalSettings: React.FC<ClientPortalSettingsProps> = ({
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isUploadingAvatar}
-                className="absolute -bottom-2 -right-2 w-8 h-8 bg-amber-400 rounded-lg flex items-center justify-center text-zinc-900 hover:bg-amber-500 transition-colors disabled:opacity-50"
+                className="absolute -bottom-2 -right-2 w-8 h-8 bg-orange-400 rounded-lg flex items-center justify-center text-zinc-900 hover:bg-orange-500 transition-colors disabled:opacity-50"
               >
                 {isUploadingAvatar ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -213,7 +213,7 @@ const ClientPortalSettings: React.FC<ClientPortalSettingsProps> = ({
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400 transition-colors"
+                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-orange-400 transition-colors"
               />
             </div>
             <div>
@@ -224,7 +224,7 @@ const ClientPortalSettings: React.FC<ClientPortalSettingsProps> = ({
                 type="text"
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
-                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400 transition-colors"
+                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-orange-400 transition-colors"
               />
             </div>
           </div>
@@ -232,7 +232,7 @@ const ClientPortalSettings: React.FC<ClientPortalSettingsProps> = ({
           <button
             onClick={handleSave}
             disabled={isSaving}
-            className="flex items-center gap-2 px-6 py-2.5 bg-amber-400 hover:bg-amber-500 text-zinc-900 font-semibold rounded-xl transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-6 py-2.5 bg-orange-400 hover:bg-orange-500 text-zinc-900 font-semibold rounded-xl transition-colors disabled:opacity-50"
           >
             {isSaving ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -248,7 +248,7 @@ const ClientPortalSettings: React.FC<ClientPortalSettingsProps> = ({
       <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
         <div className="p-6 border-b border-zinc-800">
           <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-            <Mail className="w-5 h-5 text-amber-400" />
+            <Mail className="w-5 h-5 text-orange-400" />
             Email Integration
           </h2>
         </div>
@@ -296,11 +296,11 @@ const ClientPortalSettings: React.FC<ClientPortalSettingsProps> = ({
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+              <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-xl flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-amber-400 font-medium">No email connected</p>
-                  <p className="text-sm text-amber-400/70 mt-1">
+                  <p className="text-orange-400 font-medium">No email connected</p>
+                  <p className="text-sm text-orange-400/70 mt-1">
                     Connect your Gmail or Outlook account to send emails directly to clients.
                   </p>
                 </div>
@@ -322,7 +322,7 @@ const ClientPortalSettings: React.FC<ClientPortalSettingsProps> = ({
       <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
         <div className="p-6 border-b border-zinc-800">
           <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-amber-400" />
+            <Building2 className="w-5 h-5 text-orange-400" />
             Account Information
           </h2>
         </div>

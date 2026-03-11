@@ -178,8 +178,8 @@ const PartnerTaskDetailModal: React.FC<PartnerTaskDetailModalProps> = ({
 
           {/* Notes from Team */}
           {task.visible_notes && (
-            <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
-              <h3 className="text-sm font-semibold text-amber-400 mb-2">Notes from Team</h3>
+            <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-4">
+              <h3 className="text-sm font-semibold text-orange-400 mb-2">Notes from Team</h3>
               <p className="text-sm text-zinc-300 whitespace-pre-wrap">{task.visible_notes}</p>
             </div>
           )}
@@ -192,7 +192,7 @@ const PartnerTaskDetailModal: React.FC<PartnerTaskDetailModalProps> = ({
                   href={task.task.worksheet}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-4 py-2 bg-amber-500/20 text-amber-400 rounded-lg hover:bg-amber-500/30 transition-colors text-sm font-medium"
+                  className="flex items-center gap-2 px-4 py-2 bg-orange-500/20 text-orange-400 rounded-lg hover:bg-orange-500/30 transition-colors text-sm font-medium"
                 >
                   <ExternalLink className="w-4 h-4" />
                   Open Worksheet
@@ -234,8 +234,8 @@ const PartnerTaskDetailModal: React.FC<PartnerTaskDetailModalProps> = ({
                         className="w-8 h-8 rounded-full object-cover flex-shrink-0"
                       />
                     ) : (
-                      <div className="w-8 h-8 rounded-full bg-amber-400/20 flex items-center justify-center flex-shrink-0">
-                        <span className="text-xs font-semibold text-amber-400">
+                      <div className="w-8 h-8 rounded-full bg-orange-400/20 flex items-center justify-center flex-shrink-0">
+                        <span className="text-xs font-semibold text-orange-400">
                           {comment.author.charAt(0).toUpperCase()}
                         </span>
                       </div>
@@ -265,8 +265,8 @@ const PartnerTaskDetailModal: React.FC<PartnerTaskDetailModalProps> = ({
 
             {/* Add Comment Input */}
             <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-full bg-amber-400/20 flex items-center justify-center flex-shrink-0">
-                <span className="text-xs font-semibold text-amber-400">
+              <div className="w-8 h-8 rounded-full bg-orange-400/20 flex items-center justify-center flex-shrink-0">
+                <span className="text-xs font-semibold text-orange-400">
                   {partnerAccount.full_name.charAt(0).toUpperCase()}
                 </span>
               </div>
@@ -282,12 +282,12 @@ const PartnerTaskDetailModal: React.FC<PartnerTaskDetailModalProps> = ({
                   }}
                   placeholder="Add a comment..."
                   rows={2}
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400 resize-none text-sm"
+                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-orange-400 resize-none text-sm"
                 />
                 <button
                   onClick={handleAddComment}
                   disabled={!newComment.trim() || isSubmitting}
-                  className="absolute right-2 bottom-2 p-2 bg-amber-400 text-zinc-900 rounded-lg hover:bg-amber-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="absolute right-2 bottom-2 p-2 bg-orange-400 text-zinc-900 rounded-lg hover:bg-orange-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Send className="w-4 h-4" />
                 </button>

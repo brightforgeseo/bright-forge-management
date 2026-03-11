@@ -63,18 +63,18 @@ const ClientPortalLogin: React.FC<ClientPortalLoginProps> = ({ onLoginSuccess, a
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
       {/* Background gradient */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-amber-500/5 rounded-full blur-3xl"></div>
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-orange-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-orange-500/5 rounded-full blur-3xl"></div>
       </div>
 
       <div className="w-full max-w-md relative z-10">
         {/* Logo and Title */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 mb-4 shadow-lg shadow-amber-500/20">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-400 to-orange-600 mb-4 shadow-lg shadow-orange-500/20">
             <Hexagon className="w-8 h-8 text-zinc-900" strokeWidth={2.5} />
           </div>
           <h1 className="text-2xl font-bold text-white mb-1">Client Portal</h1>
-          <p className="text-zinc-400">Bright Forge Management</p>
+          <p className="text-zinc-400">BrightForge SEO</p>
         </div>
 
         {/* Login Card */}
@@ -108,7 +108,7 @@ const ClientPortalLogin: React.FC<ClientPortalLoginProps> = ({ onLoginSuccess, a
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@company.com"
-                  className="w-full pl-12 pr-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition-colors"
+                  className="w-full pl-12 pr-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400 transition-colors"
                   required
                   disabled={loading}
                 />
@@ -127,7 +127,7 @@ const ClientPortalLogin: React.FC<ClientPortalLoginProps> = ({ onLoginSuccess, a
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
-                    className="w-full pl-12 pr-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition-colors"
+                    className="w-full pl-12 pr-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400 transition-colors"
                     required
                     disabled={loading}
                   />
@@ -138,7 +138,7 @@ const ClientPortalLogin: React.FC<ClientPortalLoginProps> = ({ onLoginSuccess, a
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 px-4 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-zinc-900 font-semibold rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-amber-500/20"
+              className="w-full py-3 px-4 bg-gradient-to-r from-orange-400 to-orange-500 hover:from-orange-500 hover:to-orange-600 text-zinc-900 font-semibold rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-orange-500/20"
             >
               {loading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -159,7 +159,7 @@ const ClientPortalLogin: React.FC<ClientPortalLoginProps> = ({ onLoginSuccess, a
                   setError('');
                   setSuccessMsg('');
                 }}
-                className="text-sm text-zinc-400 hover:text-amber-400 transition-colors"
+                className="text-sm text-zinc-400 hover:text-orange-400 transition-colors"
               >
                 Forgot your password?
               </button>
@@ -170,7 +170,7 @@ const ClientPortalLogin: React.FC<ClientPortalLoginProps> = ({ onLoginSuccess, a
                   setError('');
                   setSuccessMsg('');
                 }}
-                className="text-sm text-zinc-400 hover:text-amber-400 transition-colors"
+                className="text-sm text-zinc-400 hover:text-orange-400 transition-colors"
               >
                 Back to sign in
               </button>

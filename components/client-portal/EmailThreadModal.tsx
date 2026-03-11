@@ -208,7 +208,7 @@ const EmailThreadModal: React.FC<EmailThreadModalProps> = ({
         <div className="flex-1 overflow-y-auto p-4">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
+              <Loader2 className="w-8 h-8 text-orange-400 animate-spin" />
             </div>
           ) : !hasThread ? (
             <div className="text-center py-12">
@@ -222,18 +222,18 @@ const EmailThreadModal: React.FC<EmailThreadModalProps> = ({
                   key={msg.id}
                   className={`p-4 rounded-xl ${
                     msg.isFromPartner
-                      ? 'bg-amber-500/10 border border-amber-500/20 ml-8'
+                      ? 'bg-orange-500/10 border border-orange-500/20 ml-8'
                       : 'bg-zinc-800 border border-zinc-700 mr-8'
                   }`}
                 >
                   <div className="flex items-center gap-2 mb-2">
                     <div
                       className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                        msg.isFromPartner ? 'bg-amber-500/20' : 'bg-blue-500/20'
+                        msg.isFromPartner ? 'bg-orange-500/20' : 'bg-blue-500/20'
                       }`}
                     >
                       {msg.isFromPartner ? (
-                        <Send className="w-4 h-4 text-amber-400" />
+                        <Send className="w-4 h-4 text-orange-400" />
                       ) : (
                         <User className="w-4 h-4 text-blue-400" />
                       )}
@@ -257,8 +257,8 @@ const EmailThreadModal: React.FC<EmailThreadModalProps> = ({
               {/* Reply indicator if last message is from client */}
               {messages.length > 0 && !messages[messages.length - 1].isFromPartner && (
                 <div className="flex items-center justify-center gap-2 py-4">
-                  <ArrowRight className="w-4 h-4 text-amber-400" />
-                  <span className="text-sm text-amber-400">Client replied - generate a response below</span>
+                  <ArrowRight className="w-4 h-4 text-orange-400" />
+                  <span className="text-sm text-orange-400">Client replied - generate a response below</span>
                 </div>
               )}
             </div>
@@ -274,7 +274,7 @@ const EmailThreadModal: React.FC<EmailThreadModalProps> = ({
                   value={replyBody}
                   onChange={(e) => setReplyBody(e.target.value)}
                   placeholder="Write your reply..."
-                  className="w-full h-32 px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400 resize-none"
+                  className="w-full h-32 px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-orange-400 resize-none"
                 />
                 <div className="flex items-center justify-between">
                   <button
@@ -287,7 +287,7 @@ const EmailThreadModal: React.FC<EmailThreadModalProps> = ({
                     <button
                       onClick={generateAIResponse}
                       disabled={isGenerating}
-                      className="flex items-center gap-2 px-4 py-2 bg-zinc-800 text-amber-400 border border-amber-400/30 rounded-lg hover:bg-amber-400/10 transition-colors disabled:opacity-50"
+                      className="flex items-center gap-2 px-4 py-2 bg-zinc-800 text-orange-400 border border-orange-400/30 rounded-lg hover:bg-orange-400/10 transition-colors disabled:opacity-50"
                     >
                       {isGenerating ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -299,7 +299,7 @@ const EmailThreadModal: React.FC<EmailThreadModalProps> = ({
                     <button
                       onClick={sendReply}
                       disabled={isSending || !replyBody.trim()}
-                      className="flex items-center gap-2 px-4 py-2 bg-amber-400 text-black font-medium rounded-lg hover:bg-amber-300 transition-colors disabled:opacity-50"
+                      className="flex items-center gap-2 px-4 py-2 bg-orange-400 text-black font-medium rounded-lg hover:bg-orange-300 transition-colors disabled:opacity-50"
                     >
                       {isSending ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -316,7 +316,7 @@ const EmailThreadModal: React.FC<EmailThreadModalProps> = ({
                 <button
                   onClick={generateAIResponse}
                   disabled={isGenerating || messages.length === 0}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-amber-400 text-black font-medium rounded-xl hover:bg-amber-300 transition-colors disabled:opacity-50"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-orange-400 text-black font-medium rounded-xl hover:bg-orange-300 transition-colors disabled:opacity-50"
                 >
                   {isGenerating ? (
                     <Loader2 className="w-5 h-5 animate-spin" />

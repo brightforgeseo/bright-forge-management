@@ -286,7 +286,7 @@ const ClientPortalTaskBoard: React.FC<ClientPortalTaskBoardProps> = ({
                 placeholder="Search tasks..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 pr-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400 w-48 lg:w-64"
+                className="pl-9 pr-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-orange-400 w-48 lg:w-64"
               />
               {searchQuery && (
                 <button
@@ -317,7 +317,7 @@ const ClientPortalTaskBoard: React.FC<ClientPortalTaskBoardProps> = ({
                       setShowClientDropdown(false);
                     }}
                     className={`w-full px-4 py-3 text-left hover:bg-zinc-700 transition-colors ${
-                      !selectedClient ? 'bg-zinc-700 text-amber-400' : 'text-white'
+                      !selectedClient ? 'bg-zinc-700 text-orange-400' : 'text-white'
                     }`}
                   >
                     All Clients
@@ -330,7 +330,7 @@ const ClientPortalTaskBoard: React.FC<ClientPortalTaskBoardProps> = ({
                         setShowClientDropdown(false);
                       }}
                       className={`w-full px-4 py-3 text-left hover:bg-zinc-700 transition-colors flex items-center gap-3 ${
-                        selectedClient === client.id ? 'bg-zinc-700 text-amber-400' : 'text-white'
+                        selectedClient === client.id ? 'bg-zinc-700 text-orange-400' : 'text-white'
                       }`}
                     >
                       <div
@@ -361,7 +361,7 @@ const ClientPortalTaskBoard: React.FC<ClientPortalTaskBoardProps> = ({
               <div
                 key={column.id}
                 className={`w-72 flex-shrink-0 bg-zinc-900 rounded-xl border transition-all ${
-                  isOver ? 'border-amber-400 bg-amber-950' : 'border-zinc-800'
+                  isOver ? 'border-orange-400 bg-orange-950' : 'border-zinc-800'
                 }`}
                 onDragOver={(e) => handleDragOver(e, column.id)}
                 onDragLeave={handleDragLeave}
@@ -392,7 +392,7 @@ const ClientPortalTaskBoard: React.FC<ClientPortalTaskBoardProps> = ({
                         onDragStart={(e) => handleDragStart(e, task)}
                         onDragEnd={handleDragEnd}
                         onClick={() => handleTaskClick(task)}
-                        className={`bg-zinc-800 rounded-xl p-4 cursor-grab border border-zinc-700 hover:border-amber-400/50 hover:bg-zinc-700 transition-all select-none ${
+                        className={`bg-zinc-800 rounded-xl p-4 cursor-grab border border-zinc-700 hover:border-orange-400/50 hover:bg-zinc-700 transition-all select-none ${
                           draggedTask?.id === task.id ? 'opacity-50 cursor-grabbing' : ''
                         }`}
                       >
@@ -431,7 +431,7 @@ const ClientPortalTaskBoard: React.FC<ClientPortalTaskBoardProps> = ({
                                 href={task.task.worksheet}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300"
+                                className="flex items-center gap-1 text-xs text-orange-400 hover:text-orange-300"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <ExternalLink className="w-3 h-3" />

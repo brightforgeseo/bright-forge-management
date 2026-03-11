@@ -124,8 +124,8 @@ const ClientPortalDashboard: React.FC<ClientPortalDashboardProps> = ({
 
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
-              <CheckSquare className="w-6 h-6 text-amber-400" />
+            <div className="w-12 h-12 rounded-xl bg-orange-500/20 flex items-center justify-center">
+              <CheckSquare className="w-6 h-6 text-orange-400" />
             </div>
             <div>
               <p className="text-sm text-zinc-400">Open Tasks</p>
@@ -167,7 +167,7 @@ const ClientPortalDashboard: React.FC<ClientPortalDashboardProps> = ({
             <h2 className="text-lg font-semibold text-white">Your Clients</h2>
             <button
               onClick={() => onNavigateToTasks()}
-              className="text-sm text-amber-400 hover:text-amber-300 flex items-center gap-1 transition-colors"
+              className="text-sm text-orange-400 hover:text-orange-300 flex items-center gap-1 transition-colors"
             >
               View All Tasks
               <ArrowRight className="w-4 h-4" />
@@ -267,10 +267,10 @@ const ClientPortalDashboard: React.FC<ClientPortalDashboardProps> = ({
 
       {/* Quick Actions */}
       {stats && stats.unreadMessages > 0 && (
-        <div className="bg-gradient-to-r from-amber-500/10 to-amber-600/10 rounded-xl border border-amber-500/20 p-6">
+        <div className="bg-gradient-to-r from-orange-500/10 to-orange-600/10 rounded-xl border border-orange-500/20 p-6">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-amber-400/20 flex items-center justify-center">
-              <MessageCircle className="w-6 h-6 text-amber-400" />
+            <div className="w-12 h-12 rounded-xl bg-orange-400/20 flex items-center justify-center">
+              <MessageCircle className="w-6 h-6 text-orange-400" />
             </div>
             <div className="flex-1">
               <p className="font-medium text-white">
@@ -280,7 +280,7 @@ const ClientPortalDashboard: React.FC<ClientPortalDashboardProps> = ({
             </div>
             <button
               onClick={() => onNavigateToTasks()}
-              className="px-4 py-2 bg-amber-400 text-zinc-900 font-semibold rounded-lg hover:bg-amber-500 transition-colors"
+              className="px-4 py-2 bg-orange-400 text-zinc-900 font-semibold rounded-lg hover:bg-orange-500 transition-colors"
             >
               View Messages
             </button>

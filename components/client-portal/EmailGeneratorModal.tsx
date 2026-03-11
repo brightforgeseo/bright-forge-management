@@ -195,7 +195,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {isGenerating ? (
             <div className="py-12 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-amber-500 flex items-center justify-center mx-auto mb-4 animate-pulse">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-orange-500 flex items-center justify-center mx-auto mb-4 animate-pulse">
                 <Sparkles className="w-8 h-8 text-white" />
               </div>
               <p className="text-white font-medium">AI is crafting your email...</p>
@@ -211,11 +211,11 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({
               )}
 
               {!hasEmailConnected && (
-                <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-xl flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
-                    <p className="text-amber-400 text-sm font-medium">No email connected</p>
-                    <p className="text-amber-400/70 text-sm mt-1">
+                    <p className="text-orange-400 text-sm font-medium">No email connected</p>
+                    <p className="text-orange-400/70 text-sm mt-1">
                       Connect your Gmail or Outlook account in Settings to send emails.
                     </p>
                   </div>
@@ -224,7 +224,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({
                       onClose();
                       // Navigate to settings - this would need to be passed through props
                     }}
-                    className="px-3 py-1.5 bg-amber-400/20 text-amber-400 text-sm font-medium rounded-lg hover:bg-amber-400/30 transition-colors flex items-center gap-1"
+                    className="px-3 py-1.5 bg-orange-400/20 text-orange-400 text-sm font-medium rounded-lg hover:bg-orange-400/30 transition-colors flex items-center gap-1"
                   >
                     <Settings className="w-4 h-4" />
                     Settings
@@ -248,7 +248,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({
                   value={recipientEmail}
                   onChange={(e) => setRecipientEmail(e.target.value)}
                   placeholder="client@example.com"
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400 transition-colors"
+                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-orange-400 transition-colors"
                 />
               </div>
 
@@ -260,7 +260,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
                   disabled={!isEditing}
-                  className={`w-full px-4 py-3 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400 transition-colors ${
+                  className={`w-full px-4 py-3 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-orange-400 transition-colors ${
                     isEditing ? 'bg-zinc-800' : 'bg-zinc-800/50'
                   }`}
                 />
@@ -274,7 +274,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({
                     onClick={() => setIsEditing(!isEditing)}
                     className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors ${
                       isEditing
-                        ? 'bg-amber-400/20 text-amber-400'
+                        ? 'bg-orange-400/20 text-orange-400'
                         : 'bg-zinc-800 text-zinc-400 hover:text-white'
                     }`}
                   >
@@ -287,7 +287,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({
                   onChange={(e) => setBody(e.target.value)}
                   disabled={!isEditing}
                   rows={10}
-                  className={`w-full px-4 py-3 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400 transition-colors resize-none ${
+                  className={`w-full px-4 py-3 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-orange-400 transition-colors resize-none ${
                     isEditing ? 'bg-zinc-800' : 'bg-zinc-800/50'
                   }`}
                 />
@@ -318,7 +318,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({
               <button
                 onClick={handleSend}
                 disabled={isSending || !hasEmailConnected}
-                className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-zinc-900 font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-amber-500/20"
+                className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-orange-400 to-orange-500 hover:from-orange-500 hover:to-orange-600 text-zinc-900 font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-orange-500/20"
               >
                 {isSending ? (
                   <Loader2 className="w-4 h-4 animate-spin" />

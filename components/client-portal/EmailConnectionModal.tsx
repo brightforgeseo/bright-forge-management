@@ -101,8 +101,8 @@ const EmailConnectionModal: React.FC<EmailConnectionModalProps> = ({
         {/* Header */}
         <div className="p-6 border-b border-zinc-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-400/20 flex items-center justify-center">
-              <Mail className="w-5 h-5 text-amber-400" />
+            <div className="w-10 h-10 rounded-xl bg-orange-400/20 flex items-center justify-center">
+              <Mail className="w-5 h-5 text-orange-400" />
             </div>
             <h2 className="text-lg font-semibold text-white">Connect Email</h2>
           </div>
@@ -190,11 +190,11 @@ const EmailConnectionModal: React.FC<EmailConnectionModalProps> = ({
 
           {/* Not Configured Warning */}
           {(!GMAIL_CLIENT_ID && !OUTLOOK_CLIENT_ID) && (
-            <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+            <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-xl flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-amber-400 text-sm font-medium">Email integration not configured</p>
-                <p className="text-amber-400/70 text-sm mt-1">
+                <p className="text-orange-400 text-sm font-medium">Email integration not configured</p>
+                <p className="text-orange-400/70 text-sm mt-1">
                   Please contact your account manager to set up email integration.
                 </p>
               </div>

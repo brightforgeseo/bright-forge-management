@@ -66,7 +66,7 @@ const ClientPortalLayout: React.FC<ClientPortalLayoutProps> = ({
           <Menu className="w-6 h-6" />
         </button>
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center">
             <Hexagon className="w-4 h-4 text-zinc-900" strokeWidth={2.5} />
           </div>
           <span className="font-semibold text-white">Client Portal</span>
@@ -92,12 +92,12 @@ const ClientPortalLayout: React.FC<ClientPortalLayoutProps> = ({
         <div className="p-6 border-b border-zinc-800">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-500/20">
                 <Hexagon className="w-5 h-5 text-zinc-900" strokeWidth={2.5} />
               </div>
               <div>
                 <h1 className="font-bold text-white">Client Portal</h1>
-                <span className="text-xs text-amber-400 font-medium">Bright Forge</span>
+                <span className="text-xs text-orange-400 font-medium">BrightForge SEO</span>
               </div>
             </div>
             <button
@@ -142,14 +142,14 @@ const ClientPortalLayout: React.FC<ClientPortalLayoutProps> = ({
                 onClick={() => handleNavClick(item.view)}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
                   isActive
-                    ? 'bg-amber-400/10 text-amber-400 border border-amber-400/20'
+                    ? 'bg-orange-400/10 text-orange-400 border border-orange-400/20'
                     : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
                 }`}
               >
                 <Icon className="w-5 h-5" />
                 <span className="font-medium">{item.label}</span>
                 {item.badge !== undefined && item.badge > 0 && (
-                  <span className="ml-auto px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-400 text-zinc-900">
+                  <span className="ml-auto px-2 py-0.5 text-xs font-semibold rounded-full bg-orange-400 text-zinc-900">
                     {item.badge}
                   </span>
                 )}

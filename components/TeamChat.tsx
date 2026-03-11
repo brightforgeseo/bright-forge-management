@@ -2446,16 +2446,31 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                 <div
                   key={msg.id}
                   className="p-3 bg-white rounded-lg border border-amber-200 hover:border-amber-300 transition-colors cursor-pointer"
-                  onClick={() => {
+                  onClick={async () => {
                     setShowPinnedMessages(false);
-                    setTimeout(() => {
-                      const messageEl = document.getElementById(`msg-${msg.id}`);
-                      if (messageEl) {
-                        messageEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        messageEl.classList.add('bg-yellow-100');
-                        setTimeout(() => messageEl.classList.remove('bg-yellow-100'), 2000);
+
+                    // Check if the message is already in the loaded messages
+                    let messageEl = document.getElementById(`msg-${msg.id}`);
+
+                    if (!messageEl) {
+                      // Message not loaded yet — load all messages from beginning up to and including the pinned one
+                      try {
+                        const allMsgs = await fetchChatMessages(activeChannelId, 5000);
+                        setMessages(allMsgs);
+                        setHasMoreMessages(false);
+                        // Wait for DOM to update
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                        messageEl = document.getElementById(`msg-${msg.id}`);
+                      } catch (e) {
+                        console.error('[TeamChat] Failed to load messages for pinned scroll:', e);
                       }
-                    }, 300);
+                    }
+
+                    if (messageEl) {
+                      messageEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      messageEl.classList.add('bg-yellow-100');
+                      setTimeout(() => messageEl!.classList.remove('bg-yellow-100'), 2000);
+                    }
                   }}
                 >
                   <div className="flex items-center justify-between mb-1">
@@ -2672,7 +2687,15 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                         .join(', ')}
                     >
                       <span>{reaction.emoji}</span>
-                      <span className="text-xs font-medium text-slate-600">{reaction.count}</span>
+                      <span className="text-xs font-medium text-slate-600">
+                        {reaction.userIds
+                          .map(uid => {
+                            if (uid === currentUser.id) return 'You';
+                            const profile = profiles.find(p => p.id === uid);
+                            return profile?.full_name?.split(' ')[0] || 'Unknown';
+                          })
+                          .join(', ')}
+                      </span>
                     </button>
                   ))}
 
