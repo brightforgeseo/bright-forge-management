@@ -428,7 +428,7 @@ const ChatTodoList: React.FC<ChatTodoListProps> = ({ currentUser, addToast, onCl
               onChange={e => setNewTodoText(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && !adding) addTodo(); }}
               placeholder="Add a reminder..."
-              className="flex-1 px-3 py-2 text-sm border border-white/[0.07] rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-300 focus:border-violet-400"
+              className="flex-1 px-3 py-2 text-sm text-black border border-white/[0.07] rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-300 focus:border-violet-400"
             />
             <button
               onClick={addTodo}
