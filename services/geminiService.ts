@@ -1,6 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { KeywordResult, AuditResult, ContentResult, Task } from "../types";
 import { getClaudeChatResponse, generateClaudeContent, generateClaudeKeywords, analyzeClaudeText, generateSEOStrategy } from "./claudeService";
+import { runEchoAgent } from "./echoAgent";
 
 // Re-export Claude SEO strategy function for use in projects
 export { generateSEOStrategy };
@@ -207,9 +208,17 @@ export const generateProjectTasks = async (goal: string): Promise<Task[]> => {
   }
 };
 
-export const getChatResponse = async (history: string, message: string): Promise<string> => {
-  // Use Claude Haiku 4 for chat (fast and cost-effective)
+export const getChatResponse = async (
+  history: string,
+  message: string,
+  executingUser?: { id: string; name: string }
+): Promise<string> => {
+  // Prefer the agent (tool-use enabled) when we know who's chatting.
+  // Falls back to plain chat -> Gemini chain on any failure.
   try {
+    if (executingUser?.id) {
+      return await runEchoAgent(history, message, executingUser);
+    }
     return await getClaudeChatResponse(history, message);
   } catch (claudeError) {
     console.warn("Claude chat failed, falling back to Gemini:", claudeError);

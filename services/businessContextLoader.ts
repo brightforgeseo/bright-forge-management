@@ -12,6 +12,28 @@ export interface BusinessContext {
   recentComments: CommentSummary[];
   teamMembers: TeamMemberSummary[];
   statistics: BusinessStats;
+  // Auto-detected risks Echo can flag without being asked
+  risks: RiskSummary;
+  // Recent chat activity across channels
+  recentChat: ChatSummary[];
+}
+
+export interface RiskSummary {
+  // Tasks due in next 3 days that aren't started yet
+  imminentNotStarted: TaskSummary[];
+  // Tasks with no comment activity in 14+ days but still open
+  staleTasks: TaskSummary[];
+  // Members with > 8 active tasks OR > 2 overdue
+  overloadedMembers: TeamMemberSummary[];
+  // Clients with > 5 overdue tasks
+  atRiskClients: ClientSummary[];
+}
+
+export interface ChatSummary {
+  channelName: string;
+  sender: string;
+  text: string;
+  timestamp: string;
 }
 
 export interface ClientSummary {
@@ -76,13 +98,20 @@ export const loadBusinessContext = async (forceRefresh = false): Promise<Busines
 
   try {
     // Fetch all data in parallel for efficiency
-    const [boardsResult, profilesResult] = await Promise.all([
+    const [boardsResult, profilesResult, chatResult] = await Promise.all([
       supabase.from('client_boards').select('*'),
-      supabase.from('profiles').select('id, full_name')
+      supabase.from('profiles').select('id, full_name'),
+      // Last 30 chat messages across all channels — gives Echo conversation awareness
+      supabase
+        .from('chat_messages')
+        .select('text, sender, created_at, channel_id, channels(name)')
+        .order('created_at', { ascending: false })
+        .limit(30)
     ]);
 
     const boards = boardsResult.data || [];
     const profiles = profilesResult.data || [];
+    const chatRows = chatResult.data || [];
 
     // Build profile lookup map
     const profileMap = new Map<string, string>();
@@ -101,6 +130,17 @@ export const loadBusinessContext = async (forceRefresh = false): Promise<Busines
     const weekAgo = new Date(today);
     weekAgo.setDate(weekAgo.getDate() - 7);
 
+    // Status keywords/colors that mean a task is done. Used because status IDs
+    // are per-client (e.g. "s1") while label/color tells the real story.
+    const completedKeywords = ['done', 'complete', 'finished', 'closed', 'approved', 'shipped', 'delivered', 'resolved', 'sent to client', 'archived'];
+    const completedColors = ['#00c875', '#00ca72', '#22c55e', '#16a34a', '#15803d', '#166534', '#4ade80', '#86efac', 'green'];
+    const isCompletedStatusInfo = (label?: string, color?: string): boolean => {
+      const l = (label || '').toLowerCase();
+      if (completedKeywords.some(k => l.includes(k))) return true;
+      if (color && completedColors.includes(color.toLowerCase())) return true;
+      return false;
+    };
+
     const clients: ClientSummary[] = [];
     const recentTasks: TaskSummary[] = [];
     const recentComments: CommentSummary[] = [];
@@ -116,6 +156,18 @@ export const loadBusinessContext = async (forceRefresh = false): Promise<Busines
       const board = row.board_data as ClientBoard;
       if (!board || !board.groups) continue;
 
+      // Build a status-id -> { label, color } lookup for THIS client's custom statuses
+      const statusMap = new Map<string, { label: string; color?: string }>();
+      const statusDefs = (board as any).statusDefs || [];
+      for (const def of statusDefs) {
+        if (def?.id) statusMap.set(def.id, { label: def.label || '', color: def.color });
+      }
+      const priorityMap = new Map<string, { label: string; color?: string }>();
+      const priorityDefs = (board as any).priorityDefs || [];
+      for (const def of priorityDefs) {
+        if (def?.id) priorityMap.set(def.id, { label: def.label || '', color: def.color });
+      }
+
       let clientTaskCount = 0;
       let clientOverdueCount = 0;
       let clientCompletedCount = 0;
@@ -128,9 +180,18 @@ export const loadBusinessContext = async (forceRefresh = false): Promise<Busines
           totalTasks++;
           clientTaskCount++;
 
+          // Resolve the human-readable status + completion using client's own status defs
+          const statusInfo = statusMap.get(task.status as string);
+          const statusLabel = statusInfo?.label || task.status || 'Unknown';
+          const isDone = isCompletedStatusInfo(statusInfo?.label, statusInfo?.color)
+            || (task as any).archived === true
+            || (task as any).isArchived === true;
+
+          const priorityInfo = priorityMap.get(task.priority as string);
+          const priorityLabel = priorityInfo?.label || task.priority || '';
+
           const dueDate = task.dueDate ? new Date(task.dueDate) : null;
-          const isOverdue = dueDate ? dueDate < today && task.status !== 'Done' && task.status !== 'Completed' : false;
-          const isDone = task.status === 'Done' || task.status === 'Completed';
+          const isOverdue = dueDate ? dueDate < today && !isDone : false;
 
           if (isOverdue) {
             overdueTasks++;
@@ -156,12 +217,12 @@ export const loadBusinessContext = async (forceRefresh = false): Promise<Busines
           }
 
           // Add to recent tasks (limit to non-completed, prioritize by due date)
-          if (!isDone && recentTasks.length < 25) {
+          if (!isDone && recentTasks.length < 30) {
             recentTasks.push({
               title: task.title,
               clientName: board.name,
-              status: task.status,
-              priority: task.priority,
+              status: statusLabel,        // human-readable label, not the ID
+              priority: priorityLabel,    // human-readable label, not the ID
               dueDate: task.dueDate || 'No date',
               assignedTo: assignedIds.map(id => profileMap.get(id) || 'Unknown'),
               commentCount: task.comments?.length || 0,
@@ -226,6 +287,48 @@ export const loadBusinessContext = async (forceRefresh = false): Promise<Busines
 
     teamMembers.sort((a, b) => b.taskCount - a.taskCount);
 
+    // ---- Auto-detected risks ---------------------------------------------------
+    // Imminent: due within 3 days but not yet "in progress" or "done"
+    const threeDaysOut = new Date(today);
+    threeDaysOut.setDate(threeDaysOut.getDate() + 3);
+    const imminentNotStarted = recentTasks.filter(t => {
+      if (t.dueDate === 'No date') return false;
+      const due = new Date(t.dueDate);
+      const status = (t.status || '').toLowerCase();
+      const notStarted = status.includes('not started') || status.includes('todo') || status === '';
+      return due >= today && due <= threeDaysOut && notStarted;
+    }).slice(0, 10);
+
+    // Stale: no comment in 14+ days but task still open
+    const fourteenDaysAgo = new Date(today);
+    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+    const fourteenIso = fourteenDaysAgo.toISOString();
+    const taskLastCommentMap = new Map<string, string>();
+    for (const c of recentComments) {
+      const key = `${c.clientName}|${c.taskTitle}`;
+      const existing = taskLastCommentMap.get(key);
+      if (!existing || c.timestamp > existing) taskLastCommentMap.set(key, c.timestamp);
+    }
+    const staleTasks = recentTasks.filter(t => {
+      const last = taskLastCommentMap.get(`${t.clientName}|${t.title}`);
+      // No activity recorded OR last comment older than cutoff
+      return !last || last < fourteenIso;
+    }).slice(0, 10);
+
+    // Overloaded: > 8 active tasks OR > 2 overdue
+    const overloadedMembers = teamMembers.filter(m => m.taskCount > 8 || m.overdueCount > 2);
+
+    // At-risk clients: > 5 overdue tasks
+    const atRiskClients = clients.filter(c => c.overdueCount > 5);
+
+    // ---- Recent chat across channels ------------------------------------------
+    const recentChat: ChatSummary[] = chatRows.map((m: any) => ({
+      channelName: m.channels?.name || 'unknown',
+      sender: m.sender || 'unknown',
+      text: (m.text || '').substring(0, 160),
+      timestamp: m.created_at
+    })).slice(0, 25);
+
     const context: BusinessContext = {
       clients,
       recentTasks: recentTasks.slice(0, 20), // Limit for token efficiency
@@ -237,7 +340,14 @@ export const loadBusinessContext = async (forceRefresh = false): Promise<Busines
         overdueTasks,
         tasksCompletedThisWeek,
         tasksDueThisWeek
-      }
+      },
+      risks: {
+        imminentNotStarted,
+        staleTasks,
+        overloadedMembers,
+        atRiskClients
+      },
+      recentChat
     };
 
     // Cache the result
@@ -259,7 +369,9 @@ export const loadBusinessContext = async (forceRefresh = false): Promise<Busines
         overdueTasks: 0,
         tasksCompletedThisWeek: 0,
         tasksDueThisWeek: 0
-      }
+      },
+      risks: { imminentNotStarted: [], staleTasks: [], overloadedMembers: [], atRiskClients: [] },
+      recentChat: []
     };
   }
 };
@@ -269,31 +381,50 @@ export const loadBusinessContext = async (forceRefresh = false): Promise<Busines
  * Optimized for token efficiency while maintaining quality
  */
 export const formatBusinessContextForPrompt = (context: BusinessContext): string => {
-  const { clients, recentTasks, recentComments, teamMembers, statistics } = context;
+  const { clients, recentTasks, recentComments, teamMembers, statistics, risks, recentChat } = context;
 
-  // Build concise client list
   const clientList = clients.length > 0
-    ? clients.map(c => `- ${c.name}${c.website ? ` (${c.website})` : ''}: ${c.taskCount} tasks, ${c.overdueCount} overdue`).join('\n')
+    ? clients.map(c => `- ${c.name}${c.website ? ` (${c.website})` : ''}: ${c.taskCount} tasks, ${c.overdueCount} overdue, ${c.completedCount} done`).join('\n')
     : 'No clients loaded';
 
-  // Build priority tasks (overdue + upcoming)
-  const priorityTasks = recentTasks.slice(0, 10);
+  const priorityTasks = recentTasks.slice(0, 12);
   const taskList = priorityTasks.length > 0
     ? priorityTasks.map(t => {
-        const flag = t.isOverdue ? '[OVERDUE]' : '';
-        return `- ${flag} "${t.title}" for ${t.clientName} | ${t.status} | Due: ${t.dueDate}`;
+        const flag = t.isOverdue ? '[OVERDUE] ' : '';
+        const who = t.assignedTo.length ? ` | Assigned: ${t.assignedTo.join(', ')}` : ' | Unassigned';
+        return `- ${flag}"${t.title}" (${t.clientName}) | ${t.status} | ${t.priority || 'no priority'} | Due: ${t.dueDate}${who}`;
       }).join('\n')
     : 'No pending tasks';
 
-  // Build recent activity from comments
-  const activityList = recentComments.slice(0, 8)
-    .map(c => `- ${c.author} on "${c.taskTitle}" (${c.clientName}): "${c.text.substring(0, 100)}..."`)
+  const activityList = recentComments.slice(0, 10)
+    .map(c => `- ${c.author} on "${c.taskTitle}" (${c.clientName}): "${c.text.substring(0, 120)}"`)
     .join('\n');
 
-  // Build team workload
-  const teamList = teamMembers.slice(0, 8)
+  const teamList = teamMembers.slice(0, 10)
     .map(m => `- ${m.name}: ${m.taskCount} tasks${m.overdueCount > 0 ? ` (${m.overdueCount} overdue)` : ''}`)
     .join('\n');
+
+  // Auto-detected risks block — Echo can flag these without being asked
+  const fmtRiskTask = (t: TaskSummary) =>
+    `  - "${t.title}" (${t.clientName}) | ${t.status} | Due: ${t.dueDate}${t.assignedTo.length ? ` | ${t.assignedTo.join(', ')}` : ' | unassigned'}`;
+  const risksBlock = `
+### Auto-Detected Risks
+**Imminent (due ≤3 days, not started):** ${risks.imminentNotStarted.length || 0}
+${risks.imminentNotStarted.map(fmtRiskTask).join('\n') || '  (none)'}
+
+**Stale (no comment in 14+ days, still open):** ${risks.staleTasks.length || 0}
+${risks.staleTasks.slice(0, 6).map(fmtRiskTask).join('\n') || '  (none)'}
+
+**Overloaded team members (>8 tasks or >2 overdue):** ${risks.overloadedMembers.length || 0}
+${risks.overloadedMembers.map(m => `  - ${m.name}: ${m.taskCount} tasks (${m.overdueCount} overdue)`).join('\n') || '  (none)'}
+
+**At-risk clients (>5 overdue):** ${risks.atRiskClients.length || 0}
+${risks.atRiskClients.map(c => `  - ${c.name}: ${c.overdueCount} overdue`).join('\n') || '  (none)'}`;
+
+  // Recent chat across channels — Echo is conversation-aware
+  const chatList = recentChat.length > 0
+    ? recentChat.slice(0, 12).map(m => `- #${m.channelName} | ${m.sender}: "${m.text}"`).join('\n')
+    : '(no recent chat)';
 
   return `
 ## LIVE BUSINESS DATA (Updated: ${new Date().toLocaleString()})
@@ -307,11 +438,15 @@ export const formatBusinessContextForPrompt = (context: BusinessContext): string
 ### Active Clients
 ${clientList}
 
-### Priority Tasks
+### Priority Tasks (open, sorted overdue → upcoming)
 ${taskList}
+${risksBlock}
 
-### Recent Activity
+### Recent Task Comments
 ${activityList || 'No recent comments'}
+
+### Recent Team Chat (last 12 messages)
+${chatList}
 
 ### Team Workload
 ${teamList || 'No team data'}

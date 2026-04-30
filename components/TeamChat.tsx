@@ -1673,7 +1673,10 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
         }
 
         const fullHistory = pastContext + '\n\n' + recentHistory;
-        const response = await getChatResponse(fullHistory, userMsg.text);
+        const response = await getChatResponse(fullHistory, userMsg.text, {
+          id: currentUser.id,
+          name: currentUser.name
+        });
 
         // Send Echo's response - let real-time listener add it to UI
         const aiMsg: ChatMessage = {
