@@ -1242,8 +1242,10 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
               // Toggle person in/out of assignedTo array
               const currentAssigned = Array.isArray(task.assignedTo) ? task.assignedTo : (task.assignedTo ? [task.assignedTo] : []);
 
+              const isAdding = !currentAssigned.includes(profileId);
+
               let newAssigned: string | string[];
-              if (currentAssigned.includes(profileId)) {
+              if (!isAdding) {
                   // Remove person
                   const filtered = currentAssigned.filter(id => id !== profileId);
                   newAssigned = filtered.length === 0 ? '' : (filtered.length === 1 ? filtered[0] : filtered);
@@ -1254,6 +1256,23 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
               }
 
               updateTaskField(activePersonPicker.clientId, activePersonPicker.groupId, activePersonPicker.taskId, 'assignedTo', newAssigned as string);
+
+              // Notify the newly-assigned person (skip self-assignment)
+              if (isAdding && profileId !== currentUser.id && client) {
+                  createNotification(
+                      profileId,
+                      `${currentUser.name} assigned you a task`,
+                      `"${task.title}" on ${client.name}`,
+                      'message',
+                      'TASKS',
+                      {
+                          taskId: task.id,
+                          boardId: client.id,
+                          groupId: activePersonPicker.groupId,
+                          boardName: client.name
+                      }
+                  ).catch(err => console.error('[Notification] task assignment insert failed', err));
+              }
 
               // Update modal if it's open for this task
               if (taskModal && taskModal.task.id === activePersonPicker.taskId) {

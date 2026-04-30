@@ -216,6 +216,29 @@ export const deleteNotification = async (notificationId: string) => {
   if (error) console.error('Error deleting notification:', error);
 };
 
+// Notify a list of recipients in parallel, skipping the sender and de-duplicating IDs.
+// Errors on individual recipients are swallowed so one bad insert can't block the rest.
+export const notifyUsers = async (
+  recipientIds: (string | null | undefined)[],
+  excludeUserId: string,
+  title: string,
+  message: string,
+  type: 'info' | 'success' | 'alert' | 'message',
+  linkView?: string,
+  linkData?: any
+) => {
+  const unique = Array.from(new Set(
+    recipientIds.filter((id): id is string => !!id && id !== excludeUserId)
+  ));
+  await Promise.all(unique.map(async (uid) => {
+    try {
+      await createNotification(uid, title, message, type, linkView, linkData);
+    } catch (e) {
+      console.error('[notifyUsers] Failed to notify', uid, e);
+    }
+  }));
+};
+
 
 // --- Profiles ---
 
@@ -1018,6 +1041,26 @@ export const checkDueDateNotifications = async (currentUserId: string) => {
               userId,
               'Task Due Today',
               taskMessage,
+              task.id,
+              boardData.id,
+              group.id,
+              boardData.name,
+              today
+            );
+          }
+        }
+
+        // Notification 1b: Projected / upcoming tasks - 3 days and 1 day before due
+        // daysOverdue is negative when the task is in the future, so daysUntilDue = -daysOverdue
+        const daysUntilDue = -daysOverdue;
+        if (daysUntilDue === 3 || daysUntilDue === 1) {
+          for (const userId of assignedIds) {
+            const dueLabel = daysUntilDue === 1 ? 'tomorrow' : `in ${daysUntilDue} days`;
+            const upcomingMessage = `"${task.title}" is due ${dueLabel} on ${boardData.name}`;
+            await createNotificationIfNotDuplicate(
+              userId,
+              'Upcoming Task',
+              upcomingMessage,
               task.id,
               boardData.id,
               group.id,

@@ -153,71 +153,170 @@ const Sidebar: React.FC<SidebarProps> = ({
   useEffect(() => {
     if (!currentUser || currentUser.id === 'guest') return;
 
-    const loadNotifications = async () => {
-      const data = await fetchNotifications(currentUser.id);
-      setNotifications(data);
-    };
-    loadNotifications();
+    let isMounted = true;
+    let activeChannel: ReturnType<typeof supabase.channel> | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+    const seenIds = new Set<string>();
 
-    const channel = supabase
-      .channel('notifications')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'notifications',
-        filter: `user_id=eq.${currentUser.id}`
-      }, (payload) => {
-        const newNote = payload.new as any;
-        setNotifications(prev => [{
-          id: newNote.id,
-          userId: newNote.user_id,
-          title: newNote.title,
-          message: newNote.message,
-          type: newNote.type,
-          linkView: newNote.link_view,
-          linkData: newNote.link_data,
-          isRead: newNote.is_read,
-          createdAt: newNote.created_at
-        }, ...prev]);
+    // Push a notification into local state + show OS toast + sound + favicon flash.
+    // De-duplicates by id so realtime + polling can't double-fire.
+    const ingestNotification = (raw: any) => {
+      if (!raw || !raw.id) return;
+      if (seenIds.has(raw.id)) return;
+      seenIds.add(raw.id);
 
-        // Show native browser/OS notification (works even when tab is not focused)
-        if (window.electronAPI?.showNotification) {
-          // Electron app
-          window.electronAPI.showNotification(newNote.title, newNote.message);
-        } else if ('Notification' in window && Notification.permission === 'granted') {
-          // Web browser - show native notification like Slack/Monday
-          const notification = new Notification(newNote.title, {
-            body: newNote.message,
-            icon: '/vite.svg',
-            tag: newNote.id, // Prevent duplicate notifications
-            requireInteraction: false,
-            silent: false // Allow system sound
-          });
+      const note: AppNotification = {
+        id: raw.id,
+        userId: raw.user_id ?? raw.userId,
+        title: raw.title,
+        message: raw.message,
+        type: raw.type,
+        linkView: raw.link_view ?? raw.linkView,
+        linkData: raw.link_data ?? raw.linkData,
+        isRead: raw.is_read ?? raw.isRead ?? false,
+        createdAt: raw.created_at ?? raw.createdAt
+      };
 
-          // Click notification to focus the app
-          notification.onclick = () => {
-            window.focus();
-            notification.close();
-          };
-
-          // Auto-close after 5 seconds
-          setTimeout(() => notification.close(), 5000);
-        }
-
-        // Play in-app notification sound
-        playNotificationSound();
-
-        // Flash favicon if window is not focused
-        if (!document.hasFocus()) {
-          startFaviconFlash();
-        }
-      })
-      .subscribe((status) => {
-        console.log('[Notifications] Realtime subscription status:', status);
+      setNotifications(prev => {
+        if (prev.some(n => n.id === note.id)) return prev;
+        return [note, ...prev];
       });
 
+      // Don't pop OS toast for notifications the user already read (covers polling backfill)
+      if (note.isRead) return;
+
+      if (window.electronAPI?.showNotification) {
+        window.electronAPI.showNotification(note.title, note.message);
+      } else if ('Notification' in window && Notification.permission === 'granted') {
+        try {
+          const browserNote = new Notification(note.title, {
+            body: note.message,
+            icon: '/vite.svg',
+            tag: note.id,
+            requireInteraction: false,
+            silent: false
+          });
+          browserNote.onclick = () => {
+            window.focus();
+            browserNote.close();
+          };
+          setTimeout(() => browserNote.close(), 5000);
+        } catch (e) {
+          console.error('[Notifications] OS toast failed:', e);
+        }
+      }
+
+      playNotificationSound();
+      if (!document.hasFocus()) startFaviconFlash();
+    };
+
+    // Initial load + seed seenIds so we don't re-pop on first paint.
+    const loadNotifications = async () => {
+      const data = await fetchNotifications(currentUser.id);
+      if (!isMounted) return;
+      data.forEach(n => seenIds.add(n.id));
+      setNotifications(data);
+    };
+
+    // Polling fallback: even if realtime drops we still surface new rows within ~20s.
+    const pollForNew = async () => {
+      try {
+        const data = await fetchNotifications(currentUser.id);
+        if (!isMounted) return;
+        // Replace state to also pick up reads/deletes from other tabs
+        setNotifications(prev => {
+          const prevMap = new Map<string, AppNotification>(prev.map(n => [n.id, n]));
+          return data.map(n => {
+            const existing = prevMap.get(n.id);
+            return existing ? { ...existing, ...n } : n;
+          });
+        });
+        // Pop OS toasts for any genuinely new unread rows
+        for (const n of data) {
+          if (!seenIds.has(n.id) && !n.isRead) ingestNotification(n);
+          else seenIds.add(n.id);
+        }
+      } catch (e) {
+        console.error('[Notifications] Poll failed:', e);
+      }
+    };
+
+    const subscribe = () => {
+      // Per-user channel name avoids collisions when multiple tabs/users share state
+      const channelName = `notifications-${currentUser.id}-${Date.now()}`;
+      const ch = supabase
+        .channel(channelName)
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${currentUser.id}`
+        }, (payload) => {
+          ingestNotification(payload.new);
+        })
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${currentUser.id}`
+        }, (payload) => {
+          const updated = payload.new as any;
+          setNotifications(prev => prev.map(n => n.id === updated.id ? {
+            ...n,
+            isRead: updated.is_read,
+            title: updated.title,
+            message: updated.message
+          } : n));
+        })
+        .on('postgres_changes', {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${currentUser.id}`
+        }, (payload) => {
+          const deleted = payload.old as any;
+          if (deleted?.id) {
+            setNotifications(prev => prev.filter(n => n.id !== deleted.id));
+          }
+        })
+        .subscribe((status) => {
+          console.log('[Notifications] Realtime status:', status, channelName);
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            // Tear down and reconnect with backoff. Polling keeps users covered in the meantime.
+            if (!isMounted) return;
+            if (reconnectTimer) clearTimeout(reconnectTimer);
+            reconnectTimer = setTimeout(() => {
+              if (!isMounted) return;
+              try { supabase.removeChannel(ch); } catch {}
+              activeChannel = null;
+              subscribe();
+            }, 3000);
+          }
+          if (status === 'SUBSCRIBED') {
+            // Catch any rows that landed during the reconnect gap
+            pollForNew();
+          }
+        });
+      activeChannel = ch;
+    };
+
+    loadNotifications();
+    subscribe();
+    // Poll every 20s as a safety net (no realtime / dropped sockets / mobile sleep)
+    pollTimer = setInterval(pollForNew, 20000);
+    // Also re-check whenever the tab regains focus
+    const onFocus = () => pollForNew();
+    window.addEventListener('focus', onFocus);
+
     return () => {
-      supabase.removeChannel(channel);
+      isMounted = false;
+      window.removeEventListener('focus', onFocus);
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (pollTimer) clearInterval(pollTimer);
+      if (activeChannel) {
+        try { supabase.removeChannel(activeChannel); } catch {}
+      }
       // Clean up favicon flash resources on unmount
       stopFaviconFlash();
     };

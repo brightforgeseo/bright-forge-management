@@ -1582,31 +1582,66 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       }
     }
 
-    // Create notifications for @mentions (only for members of private channels)
-    if (currentCh?.type === 'channel' && mentions.length > 0) {
-      for (const mentionedId of mentions) {
-        if (mentionedId !== currentUser.id) {
-          // For private channels, verify the mentioned user is actually a member
-          if (currentCh.is_private) {
-            const isMember = await isChannelMember(currentCh.id, mentionedId);
-            if (!isMember) {
-              console.log(`[Notification] Skipping notification for non-member ${mentionedId} in private channel ${currentCh.name}`);
-              continue; // Skip notification if not a member
-            }
+    // Create notifications for @mentions and live-chat activity in channels (skip Echo AI)
+    if (currentCh?.type === 'channel' && !isEchoAIChannel(currentCh)) {
+      const mentionedSet = new Set(mentions.filter(id => id !== currentUser.id));
+
+      // 1) Mentions get a high-signal notification
+      for (const mentionedId of mentionedSet) {
+        if (currentCh.is_private) {
+          const isMember = await isChannelMember(currentCh.id, mentionedId);
+          if (!isMember) {
+            console.log(`[Notification] Skipping mention for non-member ${mentionedId} in private channel ${currentCh.name}`);
+            mentionedSet.delete(mentionedId);
+            continue;
           }
+        }
+        try {
           await createNotification(
             mentionedId,
             `${currentUser.name} mentioned you in #${currentCh.name}`,
             userMsg.text.substring(0, 100),
             'message',
             'TEAM_CHAT',
-            {
-              channelId: activeChannelId,
-              channelName: currentCh.name,
-              channelType: 'channel'
-            }
+            { channelId: activeChannelId, channelName: currentCh.name, channelType: 'channel' }
           );
+        } catch (e) {
+          console.error('[Notification] mention insert failed', e);
         }
+      }
+
+      // 2) Notify other channel members about the new message (excluding sender + already-mentioned).
+      // Private channel: members table. Public channel: notify all profiles (so the team sees activity).
+      try {
+        let recipientIds: string[] = [];
+        if (currentCh.is_private) {
+          const members = await fetchChannelMembers(currentCh.id);
+          recipientIds = (members || []).map((m: any) => m.user_id);
+        } else {
+          const allProfiles = await fetchProfiles();
+          recipientIds = allProfiles.map(p => p.id);
+        }
+
+        const toNotify = recipientIds.filter(uid =>
+          uid && uid !== currentUser.id && !mentionedSet.has(uid)
+        );
+
+        await Promise.all(toNotify.map(async (uid) => {
+          try {
+            await createNotification(
+              uid,
+              `New message in #${currentCh.name}`,
+              `${currentUser.name}: ${userMsg.text.substring(0, 100)}`,
+              'message',
+              'TEAM_CHAT',
+              { channelId: activeChannelId, channelName: currentCh.name, channelType: 'channel' }
+            );
+          } catch (e) {
+            console.error('[Notification] channel-member insert failed for', uid, e);
+          }
+        }));
+      } catch (e) {
+        console.error('[Notification] channel broadcast failed', e);
       }
     }
 
