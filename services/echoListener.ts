@@ -11,20 +11,30 @@
  */
 
 import { supabase } from '../lib/supabaseClient';
-import { sendChatMessage, fetchChannels } from './databaseService';
+import { sendChatMessage, fetchChannels, editChatMessage } from './databaseService';
 import { runEchoAgent } from './echoAgent';
-import { ChatChannel, ChatMessage, User } from '../types';
+import { ChatChannel, User } from '../types';
 
 const ECHO_TRIGGER_REGEX = /(^|[\s,.])(@echo|@ai|hey\s+echo|echo[,?!]|echo\s)/i;
+
+// "Echo off" commands: explicit mute. Matched BEFORE the wake trigger so saying
+// "echo turn off" mutes instead of waking. Any subsequent wake trigger unmutes.
+const ECHO_OFF_REGEX = /(?:^|\s)(?:echo[,]?\s+(?:turn\s+)?off|echo[,]?\s+stop|echo[,]?\s+quiet|echo[,]?\s+shut\s*up|echo\s+go\s+away|stop\s+echo|mute\s+echo|shut\s*up\s+echo)\b/i;
+
 const PER_CHANNEL_COOLDOWN_MS = 30_000;        // don't reply to the same channel more than once per 30s
 const RECENT_HISTORY_WINDOW = 8;               // last N messages we feed Echo for context
 const MAX_QUEUE = 20;                          // guard against runaway
 
 const lastReplyAt = new Map<string, number>();
+const mutedChannels = new Set<string>();       // channels where the user told Echo to shut up
 let activeChannel: any = null;
 let processingIds = new Set<string>();
 
-const shouldEchoRespond = (text: string): boolean => {
+const isOffCommand = (text: string): boolean => {
+  if (!text) return false;
+  return ECHO_OFF_REGEX.test(text);
+};
+const isWakeMention = (text: string): boolean => {
   if (!text) return false;
   return ECHO_TRIGGER_REGEX.test(text);
 };
@@ -77,7 +87,42 @@ export const startEchoListener = ({ user, channels, echoBotId, isEchoAIChannel }
       const isDM = channel.type === 'dm';
 
       const text: string = raw.text || '';
-      if (!shouldEchoRespond(text)) return;
+
+      // Detect "echo off" BEFORE wake-trigger so saying "echo turn off" mutes
+      // instead of waking. Acknowledge once, then go silent until next mention.
+      if (isOffCommand(text)) {
+        if (!mutedChannels.has(channel.id)) {
+          mutedChannels.add(channel.id);
+          processingIds.add(raw.id);
+          // Use the sender's name from the message (matches who actually said "echo off"),
+          // not the listener-runner's name.
+          const muteAck = `Okay ${raw.sender || 'boss'}, I will wait for your next command oh mighty one. 🤖🙇 Mention me with @echo or "hey echo" when you need me.`;
+          try {
+            await sendChatMessage({
+              id: '',
+              channelId: channel.id,
+              sender: 'Echo AI',
+              senderId: user.id,
+              text: muteAck,
+              timestamp: new Date().toISOString(),
+              isAi: true,
+              avatar: 'bot'
+            });
+          } catch (e) {
+            console.error('[EchoListener] mute-ack send failed:', e);
+          }
+        }
+        return;
+      }
+
+      if (!isWakeMention(text)) return;
+
+      // Wake-trigger detected. If we were muted, this turns us back on.
+      if (mutedChannels.has(channel.id)) {
+        mutedChannels.delete(channel.id);
+        // Reset cooldown so the wake reply isn't blocked
+        lastReplyAt.delete(channel.id);
+      }
 
       // Cooldown per channel
       const now = Date.now();
@@ -99,23 +144,68 @@ export const startEchoListener = ({ user, channels, echoBotId, isEchoAIChannel }
       const formattedHistory = (history || []).reverse()
         .map((m: any) => `${m.sender}: ${m.text}`).join('\n');
 
-      // Hand off to the agent — full tool access included
-      const reply = await runEchoAgent(formattedHistory, text, { id: user.id, name: user.name });
+      // Post a placeholder so the team SEES Echo is working (no more "complete darkness").
+      // We'll edit this same row with the real reply once the agent finishes.
+      let placeholderId: string | null = null;
+      try {
+        const placeholder = await sendChatMessage({
+          id: '',
+          channelId: channel.id,
+          sender: 'Echo AI',
+          senderId: user.id,
+          text: '⏳ Echo is thinking... (reading boards, tasks, comments)',
+          timestamp: new Date().toISOString(),
+          isAi: true,
+          avatar: 'bot'
+        });
+        placeholderId = placeholder?.id || null;
+      } catch (e) {
+        console.error('[EchoListener] placeholder send failed:', e);
+      }
 
-      if (!reply || !reply.trim()) return;
-      const trimmed = reply.length > 1500 ? reply.slice(0, 1500) + '…' : reply;
+      let reply = '';
+      try {
+        // Hand off to the agent — full tool access included
+        reply = await runEchoAgent(formattedHistory, text, { id: user.id, name: user.name });
+      } catch (e: any) {
+        console.error('[EchoListener] agent failed:', e);
+        reply = `Hit an error: ${e?.message || 'unknown'}. Try again in a sec.`;
+      }
 
-      const aiMsg: ChatMessage = {
-        id: '',
-        channelId: channel.id,
-        sender: 'Echo AI',
-        senderId: user.id,        // FK constraint — must be a real auth user
-        text: trimmed,
-        timestamp: new Date().toISOString(),
-        isAi: true,
-        avatar: 'bot'
-      };
-      await sendChatMessage(aiMsg);
+      const trimmed = (reply && reply.trim())
+        ? (reply.length > 1500 ? reply.slice(0, 1500) + '…' : reply)
+        : 'Done — but I had nothing to add.';
+
+      // Edit the placeholder with the final reply (one row, no clutter).
+      // Falls back to a fresh insert if the edit fails for some reason.
+      if (placeholderId) {
+        try {
+          await editChatMessage(placeholderId, trimmed);
+        } catch (e) {
+          console.error('[EchoListener] edit-placeholder failed, sending fresh message:', e);
+          await sendChatMessage({
+            id: '',
+            channelId: channel.id,
+            sender: 'Echo AI',
+            senderId: user.id,
+            text: trimmed,
+            timestamp: new Date().toISOString(),
+            isAi: true,
+            avatar: 'bot'
+          });
+        }
+      } else {
+        await sendChatMessage({
+          id: '',
+          channelId: channel.id,
+          sender: 'Echo AI',
+          senderId: user.id,
+          text: trimmed,
+          timestamp: new Date().toISOString(),
+          isAi: true,
+          avatar: 'bot'
+        });
+      }
       console.log('[EchoListener] replied in', channel.name, isDM ? '(dm)' : '(channel)');
     } catch (e) {
       console.error('[EchoListener] handleNewMessage error:', e);
