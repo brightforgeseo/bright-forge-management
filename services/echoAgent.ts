@@ -20,10 +20,12 @@ import { getChatSystemPrompt } from './skillsLoader';
 // API key parts (matches the rest of the codebase)
 const K1 = 'sk-ant-api03-FM3mh6FtduBlSZR63Sdx8zM2xsKNtuE';
 const K2 = '_IxCsXAgHA-QFdT-0P2Ip3Tpypg7SVQAPr8TA7p0S2dvHyFi9D0mpjQ-z388AAAA';
-const CLAUDE_HAIKU = 'claude-haiku-4-5-20251001';
+// Sonnet 4.5 — strong reasoning + tool-use planning. Haiku was too eager to
+// hallucinate numbers when the data was noisy. Sonnet handles risk analysis better.
+const CLAUDE_SONNET = 'claude-sonnet-4-5-20250929';
 
 const MAX_HOPS = 6;        // safety cap on tool-use iterations
-const MAX_TOKENS = 2048;
+const MAX_TOKENS = 3072;   // higher ceiling so multi-step plans don't get truncated
 
 const getClient = () => new Anthropic({ apiKey: K1 + K2, dangerouslyAllowBrowser: true });
 
@@ -402,6 +404,23 @@ When the user asks you to ANALYZE (e.g. "what's at risk this week?", "who's over
 - Use the LIVE BUSINESS DATA above plus the Auto-Detected Risks section.
 - Be specific: cite task names, client names, dates, owners. Never invent.
 
+# SANITY-CHECK NUMBERS BEFORE QUOTING THEM
+The data you receive is already deduped, but if a number looks wrong (per the
+MASTER KNOWLEDGE BASE: agency runs ~40+ active clients, ~6-8 specialists, ~₱1.1M/mo
+revenue, white-label-heavy), call it out instead of repeating it. Counts that
+deviate by >2x from those baselines almost always indicate stale data or
+duplicate rows — say so explicitly.
+
+# AUTHORITATIVE KNOWLEDGE
+The MASTER KNOWLEDGE BASE in your knowledge section is Ben's own operating doc
+for Bright Forge SEO. When voice, methodology, pricing, processes, or
+positioning come up, quote/apply that doc, not generic SEO best practices.
+Voice rules from that doc apply to everything you write or say:
+- British English (organise, optimise, programme, behaviour)
+- Direct, opinionated, light dry humour, never robotic
+- No filler ("crucial", "leverage", "delve", "in today's digital landscape")
+- Lead with the answer, not preamble
+
 The acting user is **${executingUser.name}** — attribute actions and notifications to them.`;
 
   const messages: Anthropic.MessageParam[] = [
@@ -416,7 +435,7 @@ User Message: ${userMessage}`
 
   for (let hop = 0; hop < MAX_HOPS; hop++) {
     const response = await client.messages.create({
-      model: CLAUDE_HAIKU,
+      model: CLAUDE_SONNET,
       max_tokens: MAX_TOKENS,
       system: [{ type: 'text', text: fullSystemPrompt, cache_control: { type: 'ephemeral' } }],
       tools: TOOLS,

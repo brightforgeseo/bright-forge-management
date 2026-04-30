@@ -5,6 +5,7 @@
 
 import { supabase } from '../lib/supabaseClient';
 import { ClientBoard, Task, TaskComment, Profile } from '../types';
+import { fetchClientBoards } from './databaseService';
 
 export interface BusinessContext {
   clients: ClientSummary[];
@@ -97,9 +98,11 @@ export const loadBusinessContext = async (forceRefresh = false): Promise<Busines
   }
 
   try {
-    // Fetch all data in parallel for efficiency
-    const [boardsResult, profilesResult, chatResult] = await Promise.all([
-      supabase.from('client_boards').select('*'),
+    // IMPORTANT: use fetchClientBoards (which dedupes by board_data.id) — the
+    // raw client_boards table contains historical duplicates. Hitting it directly
+    // inflates client/task counts and makes Echo report nonsense numbers.
+    const [dedupedBoards, profilesResult, chatResult] = await Promise.all([
+      fetchClientBoards(),
       supabase.from('profiles').select('id, full_name'),
       // Last 30 chat messages across all channels — gives Echo conversation awareness
       supabase
@@ -109,7 +112,8 @@ export const loadBusinessContext = async (forceRefresh = false): Promise<Busines
         .limit(30)
     ]);
 
-    const boards = boardsResult.data || [];
+    // Wrap the deduped boards in the {board_data} shape the rest of this function expects
+    const boards = dedupedBoards.map(b => ({ board_data: b }));
     const profiles = profilesResult.data || [];
     const chatRows = chatResult.data || [];
 

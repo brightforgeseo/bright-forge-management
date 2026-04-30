@@ -4,6 +4,11 @@
  */
 
 // Import all skill files as raw text using Parcel's raw transformer
+// MASTER KNOWLEDGE BASE — primary source of truth, loaded first.
+// Single comprehensive doc covering agency identity, philosophy, services,
+// pricing, white-label model, content standards, SEO methodology, GEO/AEO,
+// industry playbooks, reporting, voice, QC, tooling, risk, and Ben's notes.
+import masterKnowledge from 'bundle-text:../skills/master-knowledge-base.md';
 import brightForgeMain from 'bundle-text:../skills/bright-forge-seo-main.md';
 import apiSystemPrompt from 'bundle-text:../skills/api-system-prompt.md';
 import articleEditing from 'bundle-text:../skills/article-editing-optimization.md';
@@ -27,8 +32,19 @@ import technicalSEO from 'bundle-text:../skills/technical-seo-audit.md';
 // Export all skills as a single knowledge base
 export const getAllSkills = (): string => {
   return `
-# BRIGHT FORGE SEO - COMPLETE KNOWLEDGE BASE
-# This is the full agency documentation, guidelines, and processes
+# BRIGHT FORGE SEO — COMPLETE OPERATING KNOWLEDGE BASE
+# Single source of truth. The MASTER KNOWLEDGE BASE below is authoritative —
+# when other skill docs disagree, the master doc wins.
+
+# ============================================================================
+# MASTER KNOWLEDGE BASE (authoritative — read this first)
+# ============================================================================
+
+${masterKnowledge}
+
+# ============================================================================
+# SUPPORTING SKILL DOCS (templates, checklists, process detail)
+# ============================================================================
 
 ---
 
@@ -114,6 +130,7 @@ ${technicalSEO}
 
 // Export individual skills for targeted use
 export const skills = {
+  masterKnowledge,
   brightForgeMain,
   apiSystemPrompt,
   articleEditing,
