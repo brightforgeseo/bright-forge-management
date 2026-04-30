@@ -753,9 +753,21 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       })
       .subscribe();
 
+    // Same-tab notification click handler — keeps deep-linking working when user
+    // is already on the TeamChat view (init() above only runs once on mount).
+    const handleOpenChatNotification = (e: Event) => {
+      const data = (e as CustomEvent).detail
+        || (() => { try { return JSON.parse(localStorage.getItem('openChatNotification') || '{}'); } catch { return {}; } })();
+      if (!data || !data.channelId) return;
+      setActiveChannelId(data.channelId);
+      localStorage.removeItem('openChatNotification');
+    };
+    window.addEventListener('openChatNotification', handleOpenChatNotification as EventListener);
+
     return () => {
       supabase.removeChannel(channelSub);
       supabase.removeChannel(profileSub);
+      window.removeEventListener('openChatNotification', handleOpenChatNotification as EventListener);
     };
   }, []);
 

@@ -15,6 +15,7 @@ import Login from './components/Login';
 import { ToolView, BrandingConfig, User, ToastNotification, ToastType } from './types';
 import { supabase } from './lib/supabaseClient';
 import { addToAllowlist, updateUserProfile, checkDueDateNotifications } from './services/databaseService';
+import { listenForPushClicks } from './lib/pushNotifications';
 import { Copy, X, UserPlus, Check, Mail, RefreshCw, AlertTriangle, MessageSquare } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -141,6 +142,55 @@ const App: React.FC = () => {
   if (!branding.companyName) branding.companyName = 'BrightForge';
 
   useEffect(() => { localStorage.setItem('bf_branding', JSON.stringify(branding)); document.title = branding.companyName; }, [branding]);
+
+  // Handle web-push notification clicks: route to the right view + replay the deep-link
+  // events that the Sidebar click flow already wires up.
+  const applyPushDeepLink = React.useCallback((linkView: string, linkData: any) => {
+    if (!linkView) return;
+    const view = linkView as ToolView;
+    setCurrentView(view);
+    if (linkView === 'TASKS' && linkData?.taskId) {
+      try { localStorage.setItem('openTaskModal', JSON.stringify(linkData)); } catch {}
+      window.dispatchEvent(new CustomEvent('openTaskModal', { detail: linkData }));
+    } else if (linkView === 'TEAM_CHAT' && linkData?.channelId) {
+      try { localStorage.setItem('openChatNotification', JSON.stringify(linkData)); } catch {}
+      window.dispatchEvent(new CustomEvent('openChatNotification', { detail: linkData }));
+    } else if (linkView === 'MY_WORK' && linkData?.taskId) {
+      try { localStorage.setItem('openMyWorkTask', JSON.stringify(linkData)); } catch {}
+      window.dispatchEvent(new CustomEvent('openMyWorkTask', { detail: linkData }));
+    }
+  }, []);
+
+  // 1) Cold-start: SW writes deep-link to URL hash when opening a new tab from a push.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const hash = window.location.hash;
+    const idx = hash.indexOf('push=');
+    if (idx === -1) return;
+    try {
+      const raw = decodeURIComponent(hash.slice(idx + 5));
+      const { linkView, linkData } = JSON.parse(raw);
+      applyPushDeepLink(linkView, linkData);
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+    } catch (e) {
+      console.error('[App] Failed to parse push hash:', e);
+    }
+  }, [applyPushDeepLink]);
+
+  // 2) Warm-tab: SW posts a message when the user clicks a push and we already had a tab open.
+  useEffect(() => {
+    return listenForPushClicks((url) => {
+      const idx = url.indexOf('push=');
+      if (idx === -1) return;
+      try {
+        const raw = decodeURIComponent(url.slice(idx + 5));
+        const { linkView, linkData } = JSON.parse(raw);
+        applyPushDeepLink(linkView, linkData);
+      } catch (e) {
+        console.error('[App] Failed to parse push-click message:', e);
+      }
+    });
+  }, [applyPushDeepLink]);
 
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
   const userSessionDebounceRef = React.useRef<NodeJS.Timeout | null>(null);

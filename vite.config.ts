@@ -17,6 +17,7 @@ export default defineConfig(({ mode }) => {
         'process.env.GIPHY_API_KEY': JSON.stringify(process.env.GIPHY_API_KEY || env.GIPHY_API_KEY),
         'process.env.GOOGLE_CLIENT_ID': JSON.stringify(process.env.GOOGLE_CLIENT_ID || env.GOOGLE_CLIENT_ID),
         'process.env.MICROSOFT_CLIENT_ID': JSON.stringify(process.env.MICROSOFT_CLIENT_ID || env.MICROSOFT_CLIENT_ID),
+        'process.env.VAPID_PUBLIC_KEY': JSON.stringify(process.env.VAPID_PUBLIC_KEY || env.VAPID_PUBLIC_KEY),
       },
       resolve: {
         alias: {

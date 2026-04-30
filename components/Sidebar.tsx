@@ -4,6 +4,7 @@ import { LayoutDashboard, Search, PenTool, BarChart, Settings, TableProperties, 
 import { ToolView, BrandingConfig, User, AppNotification } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { fetchNotifications, markNotificationRead, markAllNotificationsRead, deleteAllNotifications, deleteNotification } from '../services/databaseService';
+import { enableWebPush } from '../lib/pushNotifications';
 import { version } from '../package.json';
 import logoUrl from '../logo';
 
@@ -66,15 +67,53 @@ const startFaviconFlash = () => {
   }, 30000);
 };
 
-// Play notification sound when receiving notifications
+// Notification sound — uses one shared AudioContext, primed on first user interaction
+// so browser autoplay policies don't block it. Falls back silently if AudioContext is
+// unavailable (e.g. older browsers or extreme permission settings).
+let sharedAudioContext: AudioContext | null = null;
+let audioPrimed = false;
+
+const getAudioContext = (): AudioContext | null => {
+  if (typeof window === 'undefined') return null;
+  if (sharedAudioContext) return sharedAudioContext;
+  try {
+    const Ctor = window.AudioContext || (window as any).webkitAudioContext;
+    if (!Ctor) return null;
+    sharedAudioContext = new Ctor();
+    return sharedAudioContext;
+  } catch (e) {
+    console.error('[Notifications] AudioContext init failed:', e);
+    return null;
+  }
+};
+
+// Resume on first user gesture so autoplay policy doesn't silence the first push.
+const primeAudioOnce = () => {
+  if (audioPrimed) return;
+  audioPrimed = true;
+  const ctx = getAudioContext();
+  if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
+};
+
+if (typeof window !== 'undefined') {
+  const onFirstGesture = () => {
+    primeAudioOnce();
+    window.removeEventListener('pointerdown', onFirstGesture);
+    window.removeEventListener('keydown', onFirstGesture);
+  };
+  window.addEventListener('pointerdown', onFirstGesture, { once: true, passive: true });
+  window.addEventListener('keydown', onFirstGesture, { once: true });
+}
+
 const playNotificationSound = async () => {
   try {
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-
+    const audioContext = getAudioContext();
+    if (!audioContext) return;
     if (audioContext.state === 'suspended') {
-      await audioContext.resume();
+      try { await audioContext.resume(); } catch {}
     }
 
+    const now = audioContext.currentTime;
     const oscillator1 = audioContext.createOscillator();
     const oscillator2 = audioContext.createOscillator();
     const oscillator3 = audioContext.createOscillator();
@@ -83,28 +122,26 @@ const playNotificationSound = async () => {
     oscillator1.frequency.value = 800;
     oscillator2.frequency.value = 1000;
     oscillator3.frequency.value = 1200;
-
     oscillator1.type = 'sine';
     oscillator2.type = 'sine';
     oscillator3.type = 'sine';
 
-    gainNode.gain.setValueAtTime(0.15, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+    gainNode.gain.setValueAtTime(0.18, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
 
     oscillator1.connect(gainNode);
     oscillator2.connect(gainNode);
     oscillator3.connect(gainNode);
     gainNode.connect(audioContext.destination);
 
-    oscillator1.start(audioContext.currentTime);
-    oscillator2.start(audioContext.currentTime + 0.1);
-    oscillator3.start(audioContext.currentTime + 0.2);
-
-    oscillator1.stop(audioContext.currentTime + 0.3);
-    oscillator2.stop(audioContext.currentTime + 0.4);
-    oscillator3.stop(audioContext.currentTime + 0.5);
+    oscillator1.start(now);
+    oscillator2.start(now + 0.1);
+    oscillator3.start(now + 0.2);
+    oscillator1.stop(now + 0.3);
+    oscillator2.stop(now + 0.4);
+    oscillator3.stop(now + 0.5);
   } catch (error) {
-    console.error('Failed to play notification sound:', error);
+    console.error('[Notifications] Failed to play sound:', error);
   }
 };
 
@@ -138,17 +175,18 @@ const Sidebar: React.FC<SidebarProps> = ({
     setIsMobileMenuOpen(false);
   };
 
-  // Request notification permission on mount
+  // Request notification permission + register web push subscription on mount.
+  // enableWebPush handles permission, SW registration, PushManager.subscribe, and persistence.
   useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      // Request permission immediately for better UX
-      Notification.requestPermission().then(permission => {
-        console.log('[Notifications] Browser permission:', permission);
-      });
-    } else if ('Notification' in window) {
-      console.log('[Notifications] Browser permission already:', Notification.permission);
-    }
-  }, []);
+    if (!currentUser || currentUser.id === 'guest') return;
+    if (!('Notification' in window)) return;
+
+    enableWebPush(currentUser.id).then(result => {
+      console.log('[Notifications] Web push enable result:', result);
+    }).catch(err => {
+      console.error('[Notifications] enableWebPush threw:', err);
+    });
+  }, [currentUser?.id]);
 
   useEffect(() => {
     if (!currentUser || currentUser.id === 'guest') return;
@@ -347,56 +385,37 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const handleNotificationClick = (notification: AppNotification) => {
-    console.log('[Sidebar] Notification clicked:', notification);
-    console.log('[Sidebar] linkView:', notification.linkView);
-    console.log('[Sidebar] linkData:', notification.linkData);
-    console.log('[Sidebar] linkData type:', typeof notification.linkData);
-
     if (!notification.isRead) handleMarkRead(notification.id);
-    if (notification.linkView) {
-      onChangeView(notification.linkView as ToolView);
-      setIsNotificationsOpen(false);
+    setIsNotificationsOpen(false);
 
-      if (notification.linkData) {
-        let linkData;
+    if (!notification.linkView) return;
+    onChangeView(notification.linkView as ToolView);
 
-        // Parse linkData if it's a string
-        if (typeof notification.linkData === 'string') {
-          try {
-            linkData = JSON.parse(notification.linkData);
-            console.log('[Sidebar] Parsed linkData from string:', linkData);
-          } catch (e) {
-            console.error('[Sidebar] Failed to parse linkData:', e);
-            return;
-          }
-        } else {
-          linkData = notification.linkData;
-          console.log('[Sidebar] Using linkData as object:', linkData);
-        }
+    // Normalize linkData (Supabase returns JSONB as object; some old rows are strings).
+    let linkData: any = notification.linkData;
+    if (typeof linkData === 'string') {
+      try { linkData = JSON.parse(linkData); }
+      catch (e) { console.error('[Sidebar] Failed to parse linkData:', e); return; }
+    }
+    if (!linkData) return;
 
-        // Handle task notifications
-        if (notification.linkView === 'TASKS' && linkData.taskId) {
-          console.log('[Sidebar] Setting openTaskModal:', linkData);
-          localStorage.setItem('openTaskModal', JSON.stringify(linkData));
-          // Dispatch custom event for same-tab detection
-          window.dispatchEvent(new CustomEvent('openTaskModal', { detail: linkData }));
-        }
-
-        // Handle chat notifications (DMs and mentions)
-        if (notification.linkView === 'TEAM_CHAT' && linkData.channelId) {
-          console.log('[Sidebar] Setting openChatNotification:', linkData);
-          localStorage.setItem('openChatNotification', JSON.stringify(linkData));
-        }
-
-        // Handle MY_WORK task notifications
-        if (notification.linkView === 'MY_WORK' && linkData.taskId) {
-          console.log('[Sidebar] Setting openMyWorkTask:', linkData);
-          localStorage.setItem('openMyWorkTask', JSON.stringify(linkData));
-          window.dispatchEvent(new CustomEvent('openMyWorkTask', { detail: linkData }));
-        }
-      } else {
-        console.warn('[Sidebar] No linkData found in notification');
+    // Persist + dispatch for each known target. localStorage handles fresh mounts;
+    // CustomEvent handles same-view clicks.
+    const persistAndDispatch = (key: string, eventName: string) => {
+      try {
+        localStorage.setItem(key, JSON.stringify(linkData));
+        window.dispatchEvent(new CustomEvent(eventName, { detail: linkData }));
+      } catch (e) {
+        console.error(`[Sidebar] persist/dispatch failed for ${eventName}:`, e);
       }
+    };
+
+    if (notification.linkView === 'TASKS' && linkData.taskId) {
+      persistAndDispatch('openTaskModal', 'openTaskModal');
+    } else if (notification.linkView === 'TEAM_CHAT' && linkData.channelId) {
+      persistAndDispatch('openChatNotification', 'openChatNotification');
+    } else if (notification.linkView === 'MY_WORK' && linkData.taskId) {
+      persistAndDispatch('openMyWorkTask', 'openMyWorkTask');
     }
   };
 

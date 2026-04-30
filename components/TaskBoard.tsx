@@ -317,45 +317,26 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
     // Also check whenever clients change
   }, [clients]);
 
-  // Also check when component becomes visible or when localStorage changes
+  // Same-tab + cross-tab listener for deep-link clicks.
+  // The other useEffect (above, on [clients]) re-runs when clients load, so we just
+  // need to nudge it whenever a new openTaskModal entry shows up.
   useEffect(() => {
-    // Check immediately on mount
     const checkAndOpen = () => {
-      const data = localStorage.getItem('openTaskModal');
-      if (data && clients.length > 0) {
-        // Trigger the clients effect to process the deep link
+      if (localStorage.getItem('openTaskModal') && clients.length > 0) {
+        // Touch state to retrigger the deep-link effect
         setClients(prev => [...prev]);
       }
     };
 
-    // Initial check
-    checkAndOpen();
-
-    // Set up interval for cases where the data arrives after mount
-    const interval = setInterval(checkAndOpen, 250);
-
-    // Listen for storage changes (in case notification is clicked in another tab)
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'openTaskModal' && e.newValue) {
-        checkAndOpen();
-      }
+      if (e.key === 'openTaskModal' && e.newValue) checkAndOpen();
     };
     window.addEventListener('storage', handleStorageChange);
-
-    // Listen for custom event (in case notification is clicked in same tab)
-    const handleOpenTaskModal = () => {
-      checkAndOpen();
-    };
-    window.addEventListener('openTaskModal', handleOpenTaskModal);
-
-    // Clean up after 5 seconds (for the interval only)
-    const timeout = setTimeout(() => clearInterval(interval), 5000);
+    window.addEventListener('openTaskModal', checkAndOpen);
 
     return () => {
-      clearInterval(interval);
-      clearTimeout(timeout);
       window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('openTaskModal', handleOpenTaskModal);
+      window.removeEventListener('openTaskModal', checkAndOpen);
     };
   }, [clients.length]);
 
