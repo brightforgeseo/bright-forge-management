@@ -1679,6 +1679,26 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     // AI Response for Echo AI DM channels
     if (currentCh && isEchoAIChannel(currentCh)) {
       setLoading(true);
+
+      // Post a "thinking" placeholder immediately so the user sees Echo is working
+      // (no more silent lag). We'll edit it with the real reply when ready.
+      let placeholderMsgId: string | null = null;
+      try {
+        const placeholder = await sendChatMessage({
+          id: '',
+          channelId: activeChannelId,
+          sender: 'Echo AI',
+          senderId: currentUser.id,
+          text: '⏳ Echo is thinking…',
+          timestamp: new Date().toISOString(),
+          isAi: true,
+          avatar: 'bot'
+        });
+        placeholderMsgId = placeholder?.id || null;
+      } catch (e) {
+        console.error('[Echo] placeholder failed:', e);
+      }
+
       try {
         // Build context from conversation history
         const recentHistory = messages.slice(-10).map(m => `${m.sender}: ${m.text}`).join('\n');
@@ -1696,6 +1716,21 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
           id: currentUser.id,
           name: currentUser.name
         });
+
+        // If we have a placeholder, edit it in place; otherwise insert fresh.
+        if (placeholderMsgId) {
+          try {
+            await editChatMessage(placeholderMsgId, response);
+            // Update local state to reflect the edit
+            setMessages(prev => prev.map(m => m.id === placeholderMsgId
+              ? { ...m, text: response, isEdited: true, editedAt: new Date().toISOString() }
+              : m
+            ));
+            return;
+          } catch (e) {
+            console.error('[Echo] edit-placeholder failed, falling through to insert:', e);
+          }
+        }
 
         // Send Echo's response - let real-time listener add it to UI
         const aiMsg: ChatMessage = {

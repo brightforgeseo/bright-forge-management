@@ -72,18 +72,19 @@ const isOffCommand = (text: string): boolean => {
 };
 
 // Strict wake detection — must be an EXPLICIT address. Avoids false triggers
-// on incidental uses of the word "echo" (e.g. "the echo is loud", "echo back").
+// on incidental uses of the word "echo" (e.g. "the echo is loud").
 //
 // Triggers on:
 //   - @echo / @ai (preferred — unambiguous)
 //   - "hey/yo/oi/hi/hello echo" (greeting form)
-//   - Message starts with "Echo," / "Echo:" / "Echo!" / "Echo?" (vocative)
+//   - Message STARTS with "echo" as a word (catches "Echo,", "Echo!", and
+//     casual "echo what time is it", "echo u weirdo what time is it")
 const isWakeMention = (text: string): boolean => {
   if (!text) return false;
   const t = text.trim();
   if (/(?:^|\s)@(?:echo|ai)\b/i.test(t)) return true;
   if (/(?:^|\s)(?:hey|yo|oi|hi|hello)\s+echo\b/i.test(t)) return true;
-  if (/^echo[,.:?!]/i.test(t)) return true;
+  if (/^echo\b/i.test(t)) return true;
   return false;
 };
 
@@ -202,10 +203,13 @@ export const startEchoListener = ({ user, channels, echoBotId, isEchoAIChannel }
         lastReplyAt.delete(channel.id);
       }
 
-      // Cooldown per channel
+      // Cooldown per channel — but skip the cooldown when we're in an active
+      // back-and-forth conversation (Echo just spoke). The cooldown is meant
+      // to stop spam, not interrupt a real dialogue.
       const now = Date.now();
       const last = lastReplyAt.get(channel.id) || 0;
-      if (now - last < PER_CHANNEL_COOLDOWN_MS) {
+      const inActiveConversation = (now - echoSpokeAt) < FOLLOWUP_WINDOW_MS;
+      if (!inActiveConversation && now - last < PER_CHANNEL_COOLDOWN_MS) {
         console.log('[EchoListener] cooldown active for channel', channel.name);
         return;
       }
