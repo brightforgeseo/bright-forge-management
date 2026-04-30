@@ -33,7 +33,11 @@ async function ensureServiceWorker(): Promise<ServiceWorkerRegistration | null> 
   try {
     const existing = await navigator.serviceWorker.getRegistration('/');
     if (existing) return existing;
-    return await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+    // Parcel rejects literal-string register() calls. Build the path dynamically
+    // so static analysis can't latch onto it — the SW lives at /sw.js (copied
+    // into dist/ via the build script).
+    const swPath = ['/', 'sw.js'].join('');
+    return await navigator.serviceWorker.register(swPath, { scope: '/' });
   } catch (e) {
     console.error('[Push] Service worker registration failed:', e);
     return null;
