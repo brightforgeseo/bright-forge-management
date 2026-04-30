@@ -1,17 +1,26 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import Sidebar from './components/Sidebar';
-import KeywordTool from './components/KeywordTool';
-import ContentTool from './components/ContentTool';
-import AuditTool from './components/AuditTool';
-import QAChecker from './components/QAChecker';
-import TaskBoard from './components/TaskBoard';
-import MyWork from './components/MyWork';
-import TeamChat from './components/TeamChat';
-import Settings from './components/Settings';
 import Dashboard from './components/Dashboard';
 import ToastContainer from './components/ToastContainer';
 import Login from './components/Login';
+
+// Heavy tools are code-split — they only download when the user navigates to that view.
+// Initial bundle drops dramatically because TaskBoard + TeamChat alone are most of the weight.
+const KeywordTool = lazy(() => import('./components/KeywordTool'));
+const ContentTool = lazy(() => import('./components/ContentTool'));
+const AuditTool = lazy(() => import('./components/AuditTool'));
+const QAChecker = lazy(() => import('./components/QAChecker'));
+const TaskBoard = lazy(() => import('./components/TaskBoard'));
+const MyWork = lazy(() => import('./components/MyWork'));
+const TeamChat = lazy(() => import('./components/TeamChat'));
+const Settings = lazy(() => import('./components/Settings'));
+
+const ViewFallback: React.FC = () => (
+  <div className="flex h-full items-center justify-center">
+    <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+  </div>
+);
 import { ToolView, BrandingConfig, User, ToastNotification, ToastType } from './types';
 import { supabase } from './lib/supabaseClient';
 import { addToAllowlist, updateUserProfile, checkDueDateNotifications } from './services/databaseService';
@@ -247,17 +256,20 @@ ${currentUser.name}`;
   };
 
   const renderContent = () => {
-    switch (currentView) {
-      case ToolView.KEYWORD_RESEARCH: return <KeywordTool />;
-      case ToolView.CONTENT_GENERATOR: return <ContentTool />;
-      case ToolView.SITE_AUDIT: return <AuditTool />;
-      case ToolView.QA_CHECKER: return <QAChecker />;
-      case ToolView.TASKS: return <TaskBoard currentUser={currentUser} addToast={addToast} />;
-      case ToolView.MY_WORK: return <MyWork currentUser={currentUser} addToast={addToast} onNavigateToTasks={() => setCurrentView(ToolView.TASKS)} />;
-      case ToolView.TEAM_CHAT: return <TeamChat currentUser={currentUser} addToast={addToast} onNavigateToTask={() => setCurrentView(ToolView.TASKS)} />;
-      case ToolView.SETTINGS: return <Settings branding={branding} setBranding={setBranding} addToast={addToast} currentUser={currentUser} />;
-      default: return <Dashboard currentUser={currentUser} setCurrentView={setCurrentView} />;
-    }
+    const view = (() => {
+      switch (currentView) {
+        case ToolView.KEYWORD_RESEARCH: return <KeywordTool />;
+        case ToolView.CONTENT_GENERATOR: return <ContentTool />;
+        case ToolView.SITE_AUDIT: return <AuditTool />;
+        case ToolView.QA_CHECKER: return <QAChecker />;
+        case ToolView.TASKS: return <TaskBoard currentUser={currentUser} addToast={addToast} />;
+        case ToolView.MY_WORK: return <MyWork currentUser={currentUser} addToast={addToast} onNavigateToTasks={() => setCurrentView(ToolView.TASKS)} />;
+        case ToolView.TEAM_CHAT: return <TeamChat currentUser={currentUser} addToast={addToast} onNavigateToTask={() => setCurrentView(ToolView.TASKS)} />;
+        case ToolView.SETTINGS: return <Settings branding={branding} setBranding={setBranding} addToast={addToast} currentUser={currentUser} />;
+        default: return <Dashboard currentUser={currentUser} setCurrentView={setCurrentView} />;
+      }
+    })();
+    return <Suspense fallback={<ViewFallback />}>{view}</Suspense>;
   };
 
   if (!isAuthenticated) return <Login onLogin={(email) => {
