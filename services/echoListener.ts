@@ -15,8 +15,6 @@ import { sendChatMessage, fetchChannels, editChatMessage } from './databaseServi
 import { runEchoAgent } from './echoAgent';
 import { ChatChannel, User } from '../types';
 
-const ECHO_TRIGGER_REGEX = /(^|[\s,.])(@echo|@ai|hey\s+echo|echo[,?!]|echo\s)/i;
-
 // "Echo off" commands: explicit mute. Matched BEFORE the wake trigger so saying
 // "echo turn off" mutes instead of waking. Any subsequent wake trigger unmutes.
 const ECHO_OFF_REGEX = /(?:^|\s)(?:echo[,]?\s+(?:turn\s+)?off|echo[,]?\s+stop|echo[,]?\s+quiet|echo[,]?\s+shut\s*up|echo\s+go\s+away|stop\s+echo|mute\s+echo|shut\s*up\s+echo)\b/i;
@@ -34,9 +32,21 @@ const isOffCommand = (text: string): boolean => {
   if (!text) return false;
   return ECHO_OFF_REGEX.test(text);
 };
+
+// Strict wake detection — must be an EXPLICIT address. Avoids false triggers
+// on incidental uses of the word "echo" (e.g. "the echo is loud", "echo back").
+//
+// Triggers on:
+//   - @echo / @ai (preferred — unambiguous)
+//   - "hey/yo/oi/hi/hello echo" (greeting form)
+//   - Message starts with "Echo," / "Echo:" / "Echo!" / "Echo?" (vocative)
 const isWakeMention = (text: string): boolean => {
   if (!text) return false;
-  return ECHO_TRIGGER_REGEX.test(text);
+  const t = text.trim();
+  if (/(?:^|\s)@(?:echo|ai)\b/i.test(t)) return true;
+  if (/(?:^|\s)(?:hey|yo|oi|hi|hello)\s+echo\b/i.test(t)) return true;
+  if (/^echo[,.:?!]/i.test(t)) return true;
+  return false;
 };
 
 const isOwner = (user: User): boolean => {
