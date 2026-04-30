@@ -4,6 +4,7 @@ import { ChatChannel, ChatMessage, User, ToastType, Profile, MessageReaction } f
 import { getChatResponse } from '../services/geminiService';
 import { storeEchoConversation, buildConversationContext } from '../services/echoMemory';
 import { fetchChatMessages, sendChatMessage, clearChatHistory, uploadFile, fetchChannels, createChannel, deleteChannel, fetchProfiles, getOrCreateDMChannel, createNotification, editChatMessage, fetchMessageReactions, addMessageReaction, removeMessageReaction, fetchChannelMembers, addChannelMember, removeChannelMember, deleteChatMessage, isChannelMember, searchChatMessages, SearchResult, pinMessage, unpinMessage, fetchPinnedMessages, sendReplyMessage, fetchThreadReplies } from '../services/databaseService';
+import { startEchoListener } from '../services/echoListener';
 import { fetchAllPartners, fetchPartnerMessages, sendPartnerMessage, markPartnerMessagesRead } from '../services/clientPortalService';
 import { PartnerWithStats, PartnerMessage } from '../types-portal';
 import { supabase } from '../lib/supabaseClient';
@@ -764,10 +765,28 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     };
     window.addEventListener('openChatNotification', handleOpenChatNotification as EventListener);
 
+    // Boot the live Echo listener (owner-only — no-op for other roles).
+    // Lets Echo respond when @echo / @ai is mentioned in any public channel.
+    let stopEchoListener: (() => void) | null = null;
+    (async () => {
+      try {
+        const chans = await fetchChannels();
+        stopEchoListener = startEchoListener({
+          user: currentUser,
+          channels: chans,
+          echoBotId: ECHO_BOT_ID,
+          isEchoAIChannel
+        });
+      } catch (e) {
+        console.error('[TeamChat] failed to start echo listener:', e);
+      }
+    })();
+
     return () => {
       supabase.removeChannel(channelSub);
       supabase.removeChannel(profileSub);
       window.removeEventListener('openChatNotification', handleOpenChatNotification as EventListener);
+      if (stopEchoListener) stopEchoListener();
     };
   }, []);
 

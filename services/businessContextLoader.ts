@@ -408,6 +408,28 @@ export const formatBusinessContextForPrompt = (context: BusinessContext): string
     .map(m => `- ${m.name}: ${m.taskCount} tasks${m.overdueCount > 0 ? ` (${m.overdueCount} overdue)` : ''}`)
     .join('\n');
 
+  // Projected / upcoming = open tasks due in the next 7 days (incl today).
+  // This is what the user means by "projected tasks".
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const sevenAhead = new Date(todayStart);
+  sevenAhead.setDate(sevenAhead.getDate() + 7);
+  const projectedTasks = recentTasks.filter(t => {
+    if (t.dueDate === 'No date') return false;
+    const due = new Date(t.dueDate);
+    return !t.isOverdue && due >= todayStart && due <= sevenAhead;
+  });
+  // Group projected by assignee so Echo can answer "what's projected for X?"
+  const projectedByAssignee = new Map<string, TaskSummary[]>();
+  for (const t of projectedTasks) {
+    const owners = t.assignedTo.length ? t.assignedTo : ['Unassigned'];
+    for (const o of owners) {
+      const list = projectedByAssignee.get(o) || [];
+      list.push(t);
+      projectedByAssignee.set(o, list);
+    }
+  }
+
   // Auto-detected risks block — Echo can flag these without being asked
   const fmtRiskTask = (t: TaskSummary) =>
     `  - "${t.title}" (${t.clientName}) | ${t.status} | Due: ${t.dueDate}${t.assignedTo.length ? ` | ${t.assignedTo.join(', ')}` : ' | unassigned'}`;
@@ -444,6 +466,14 @@ ${clientList}
 
 ### Priority Tasks (open, sorted overdue → upcoming)
 ${taskList}
+
+### Projected / Upcoming Tasks (next 7 days, by assignee)
+${projectedTasks.length === 0 ? '(nothing projected — quiet week)' :
+  Array.from(projectedByAssignee.entries())
+    .sort((a, b) => b[1].length - a[1].length)
+    .map(([owner, tasks]) =>
+      `**${owner}** — ${tasks.length} due:\n${tasks.map(t => `  - "${t.title}" (${t.clientName}) | due ${t.dueDate} | ${t.status}`).join('\n')}`
+    ).join('\n\n')}
 ${risksBlock}
 
 ### Recent Task Comments

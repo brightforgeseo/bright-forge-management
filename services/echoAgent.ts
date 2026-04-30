@@ -20,9 +20,10 @@ import { getChatSystemPrompt } from './skillsLoader';
 // API key parts (matches the rest of the codebase)
 const K1 = 'sk-ant-api03-FM3mh6FtduBlSZR63Sdx8zM2xsKNtuE';
 const K2 = '_IxCsXAgHA-QFdT-0P2Ip3Tpypg7SVQAPr8TA7p0S2dvHyFi9D0mpjQ-z388AAAA';
-// Sonnet 4.5 — strong reasoning + tool-use planning. Haiku was too eager to
-// hallucinate numbers when the data was noisy. Sonnet handles risk analysis better.
-const CLAUDE_SONNET = 'claude-sonnet-4-5-20250929';
+// Sonnet 4.6 — best reasoning/speed combo, strong tool-use planning.
+// Haiku was too eager to hallucinate numbers when data was noisy; Sonnet handles
+// risk analysis, multi-step reasoning, and follow-through on tools better.
+const CLAUDE_SONNET = 'claude-sonnet-4-6';
 
 const MAX_HOPS = 6;        // safety cap on tool-use iterations
 const MAX_TOKENS = 3072;   // higher ceiling so multi-step plans don't get truncated
@@ -136,17 +137,6 @@ const TOOLS: Anthropic.Tool[] = [
 // =============================================================================
 
 interface ToolResult { ok: boolean; data?: any; error?: string }
-
-const findTaskOnBoards = (boards: ClientBoard[], taskId: string) => {
-  for (const board of boards) {
-    for (const group of board.groups || []) {
-      for (const task of group.tasks || []) {
-        if (task.id === taskId) return { board, group, task };
-      }
-    }
-  }
-  return null;
-};
 
 const resolveStatusOrPriorityId = (board: ClientBoard, type: 'status' | 'priority', label: string): string | null => {
   const defs = type === 'status' ? board.statusDefs : board.priorityDefs;

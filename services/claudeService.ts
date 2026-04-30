@@ -9,8 +9,8 @@ const K1 = 'sk-ant-api03-FM3mh6FtduBlSZR63Sdx8zM2xsKNtuE';
 const K2 = '_IxCsXAgHA-QFdT-0P2Ip3Tpypg7SVQAPr8TA7p0S2dvHyFi9D0mpjQ-z388AAAA';
 
 // Model IDs - Latest Claude 4.5 models
-const CLAUDE_HAIKU = 'claude-haiku-4-5-20251001'; // Claude 4.5 Haiku - fast, efficient for chat
-const CLAUDE_SONNET = 'claude-sonnet-4-5-20250929'; // Claude 4.5 Sonnet - high-quality for content generation
+const CLAUDE_HAIKU = 'claude-haiku-4-5-20251001'; // 4.5 Haiku — fast, used for cheap classification
+const CLAUDE_SONNET = 'claude-sonnet-4-6';        // 4.6 Sonnet — high-quality content + reasoning
 
 const getClaudeClient = () => {
   const apiKey = K1 + K2;
