@@ -10,10 +10,48 @@
  * the user with role === 'Owner'. Other roles get a no-op.
  */
 
+import Anthropic from '@anthropic-ai/sdk';
 import { supabase } from '../lib/supabaseClient';
 import { sendChatMessage, fetchChannels, editChatMessage } from './databaseService';
 import { runEchoAgent } from './echoAgent';
 import { ChatChannel, User } from '../types';
+
+// Tiny, cheap classifier — Haiku. Only used when Echo just spoke and the next
+// message MIGHT be a follow-up. Avoids running on every chat message.
+const K1 = 'sk-ant-api03-FM3mh6FtduBlSZR63Sdx8zM2xsKNtuE';
+const K2 = '_IxCsXAgHA-QFdT-0P2Ip3Tpypg7SVQAPr8TA7p0S2dvHyFi9D0mpjQ-z388AAAA';
+const CLASSIFIER_MODEL = 'claude-haiku-4-5-20251001';
+const FOLLOWUP_WINDOW_MS = 5 * 60 * 1000;       // 5 min after Echo speaks, treat next msgs as possibly addressed to him
+
+const classifierClient = new Anthropic({ apiKey: K1 + K2, dangerouslyAllowBrowser: true });
+
+const lastEchoMessageAt = new Map<string, number>();   // channel.id -> ts
+
+/**
+ * Cheap classifier: "Is this human talking to Echo, or to other humans?"
+ * Only invoked when the prior Echo activity makes it plausible.
+ */
+async function isAddressedToEcho(opts: {
+  currentMessage: string;
+  recentHistory: string;
+}): Promise<boolean> {
+  try {
+    const resp = await classifierClient.messages.create({
+      model: CLASSIFIER_MODEL,
+      max_tokens: 6,                              // single token answer
+      system: 'You decide if a chat message is addressed to "Echo" (the AI assistant) or to other humans in the channel. Reply with EXACTLY "YES" or "NO" — nothing else. Default to NO if ambiguous; only say YES if the message is clearly directed at Echo (a follow-up question/instruction, a reply to something Echo said, asking the AI to do something).',
+      messages: [{
+        role: 'user',
+        content: `Recent channel messages (oldest -> newest):\n${opts.recentHistory}\n\nCURRENT MESSAGE:\n${opts.currentMessage}\n\nIs the CURRENT MESSAGE addressed to Echo? YES or NO.`
+      }]
+    });
+    const text = resp.content[0]?.type === 'text' ? resp.content[0].text.trim().toUpperCase() : '';
+    return text.startsWith('YES');
+  } catch (e) {
+    console.error('[EchoListener] classifier failed:', e);
+    return false; // err on the side of silence
+  }
+}
 
 // "Echo off" commands: explicit mute. Matched BEFORE the wake trigger so saying
 // "echo turn off" mutes instead of waking. Any subsequent wake trigger unmutes.
@@ -83,10 +121,12 @@ export const startEchoListener = ({ user, channels, echoBotId, isEchoAIChannel }
       if (!raw || !raw.id) return;
       if (processingIds.has(raw.id) || processingIds.size > MAX_QUEUE) return;
 
-      // Skip Echo's own messages or any AI-flagged message
-      if (raw.is_ai === true) return;
-      if (raw.sender_id === echoBotId) return;
-      if (raw.sender === 'Echo AI') return;
+      // Skip Echo's own messages — but track when he last spoke per channel
+      // so the soft classifier knows we're inside a follow-up window.
+      if (raw.is_ai === true || raw.sender === 'Echo AI' || raw.sender_id === echoBotId) {
+        if (raw.channel_id) lastEchoMessageAt.set(raw.channel_id, Date.now());
+        return;
+      }
 
       // Skip the dedicated Echo DM channel — handled by TeamChat's own AI flow
       const channel = channelsRef.current.find(c => c.id === raw.channel_id);
@@ -125,7 +165,35 @@ export const startEchoListener = ({ user, channels, echoBotId, isEchoAIChannel }
         return;
       }
 
-      if (!isWakeMention(text)) return;
+      // Two paths to wake Echo:
+      //   1) Strict address (@echo / "hey echo" / "Echo,") — fast path, no LLM call
+      //   2) Soft path: Echo recently spoke in this channel + current message
+      //      looks like a follow-up. We run a cheap classifier to confirm.
+      let shouldRespond = isWakeMention(text);
+      const echoSpokeAt = lastEchoMessageAt.get(channel.id) || 0;
+      const inFollowupWindow = (Date.now() - echoSpokeAt) < FOLLOWUP_WINDOW_MS;
+
+      if (!shouldRespond && inFollowupWindow) {
+        // Pull a short history window for the classifier to reason about
+        const { data: hist } = await supabase
+          .from('chat_messages')
+          .select('sender, text, created_at, is_ai')
+          .eq('channel_id', channel.id)
+          .order('created_at', { ascending: false })
+          .limit(6);
+        const histStr = (hist || []).reverse()
+          .filter((m: any) => m.id !== raw.id)
+          .map((m: any) => `${m.is_ai ? 'Echo' : m.sender}: ${m.text}`)
+          .join('\n');
+
+        shouldRespond = await isAddressedToEcho({
+          currentMessage: text,
+          recentHistory: histStr || '(none)'
+        });
+        if (shouldRespond) console.log('[EchoListener] classifier: addressed to Echo');
+      }
+
+      if (!shouldRespond) return;
 
       // Wake-trigger detected. If we were muted, this turns us back on.
       if (mutedChannels.has(channel.id)) {
@@ -181,6 +249,10 @@ export const startEchoListener = ({ user, channels, echoBotId, isEchoAIChannel }
         console.error('[EchoListener] agent failed:', e);
         reply = `Hit an error: ${e?.message || 'unknown'}. Try again in a sec.`;
       }
+
+      // Mark Echo as having spoken so the next message in this channel
+      // gets the soft classifier path, not just strict regex.
+      lastEchoMessageAt.set(channel.id, Date.now());
 
       const trimmed = (reply && reply.trim())
         ? (reply.length > 1500 ? reply.slice(0, 1500) + '…' : reply)
@@ -242,6 +314,8 @@ export const startEchoListener = ({ user, channels, echoBotId, isEchoAIChannel }
     clearInterval(refreshInterval);
     lastReplyAt.clear();
     processingIds.clear();
+    lastEchoMessageAt.clear();
+    mutedChannels.clear();
     console.log('[EchoListener] stopped');
   };
 };
