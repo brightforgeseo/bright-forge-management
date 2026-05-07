@@ -342,11 +342,16 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
 
   // Debounced Save Logic
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveCounterRef = useRef(0);
 
   const triggerSave = useCallback((updatedClients: ClientBoard[], changedClientId: string) => {
     console.log('[TaskBoard] triggerSave called for:', changedClientId);
     setClients(updatedClients);
     clientsRef.current = updatedClients; // Update ref immediately for subsequent changes
+    // Block realtime overwrites for the entire edit-debounce-save window.
+    // Cleared only when the latest save's promise resolves (see counter check below).
+    pendingSaveRef.current = { taskId: '', boardId: changedClientId };
+    const myCounter = ++saveCounterRef.current;
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(async () => {
       // Use ref to get the latest data at save time
@@ -356,6 +361,9 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
         await saveClientBoard(clientToSave);
       } else {
         console.error('[TaskBoard] Board not found for save:', changedClientId);
+      }
+      if (myCounter === saveCounterRef.current) {
+        pendingSaveRef.current = null;
       }
     }, 1500);
   }, []);
@@ -765,13 +773,8 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
       setNewItemText(prev => ({ ...prev, [gid]: '' }));
   };
   const updateTaskField = (cid: string, gid: string, tid: string, f: keyof Task, v: string) => {
-    // Mark this task as having a pending save to prevent realtime from overwriting
-    pendingSaveRef.current = { taskId: tid, boardId: cid };
-
-    // Clear the pending save ref after the debounce period plus buffer
-    setTimeout(() => {
-      pendingSaveRef.current = null;
-    }, 2500); // 1500ms debounce + 500ms buffer + 500ms for save
+    // pendingSaveRef is set by triggerSave (called via updateClient below) and
+    // cleared when the actual save promise resolves — no manual handling needed.
 
     // Find client and task info for activity logging BEFORE state update
     const client = clients.find(c => c.id === cid);

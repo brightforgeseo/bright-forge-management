@@ -43,6 +43,9 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [activeChannelId, setActiveChannelId] = useState<string>('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // Bumped to force the realtime subscription effect to re-run after a dropped
+  // connection (CHANNEL_ERROR / TIMED_OUT / CLOSED) so messages keep flowing.
+  const [subscriptionGen, setSubscriptionGen] = useState(0);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -960,6 +963,10 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       })
       .subscribe((status) => {
         console.log('[TeamChat] Message subscription status:', status);
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          // Reconnect after a short delay to avoid tight loops
+          setTimeout(() => setSubscriptionGen(g => g + 1), 1500);
+        }
       });
 
     // Real-time reactions subscription
@@ -982,7 +989,44 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       supabase.removeChannel(msgSub);
       supabase.removeChannel(reactionsSub);
     };
-  }, [currentUser.id, currentUser.name]); // Removed 'channels' to prevent subscription recreation on every unread update
+  }, [currentUser.id, currentUser.name, subscriptionGen]); // subscriptionGen bumps force a fresh channel after disconnect
+
+  // Catch-up on tab focus / network recovery: refetch the active channel and
+  // merge by ID so any messages missed while the socket was disconnected
+  // appear without disrupting paginated history.
+  useEffect(() => {
+    const catchUp = async () => {
+      const channelId = activeChannelRef.current;
+      if (!channelId) return;
+      try {
+        const fresh = await fetchChatMessages(channelId);
+        setMessages(prev => {
+          const byId = new Map(prev.map(m => [m.id, m]));
+          fresh.forEach(m => byId.set(m.id, m));
+          return Array.from(byId.values()).sort(
+            (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+          );
+        });
+      } catch (e) {
+        console.error('[TeamChat] catch-up refetch failed:', e);
+      }
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') catchUp();
+    };
+    const onOnline = () => {
+      setSubscriptionGen(g => g + 1);
+      catchUp();
+    };
+
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('online', onOnline);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('online', onOnline);
+    };
+  }, []);
 
   // SIMPLIFIED CHANNEL SWITCH - Always fetch fresh from database
   useEffect(() => {
