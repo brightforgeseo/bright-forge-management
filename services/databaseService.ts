@@ -383,10 +383,24 @@ export const deleteChannel = async (id: string) => {
 
 // --- Client Boards ---
 
+const parseBoardRows = (data: any[]): ClientBoard[] => {
+  const seen = new Set<string>();
+  const boards: ClientBoard[] = [];
+  for (const row of data) {
+    const boardId = row.board_data?.id;
+    if (boardId && !seen.has(boardId)) {
+      seen.add(boardId);
+      boards.push({ ...row.board_data, db_id: row.id });
+    }
+  }
+  return boards;
+};
+
 export const fetchClientBoards = async (): Promise<ClientBoard[]> => {
   const { data, error } = await supabase
     .from('client_boards')
     .select('*')
+    .not('archived', 'eq', true)
     .order('created_at', { ascending: true });
 
   if (error) {
@@ -394,30 +408,44 @@ export const fetchClientBoards = async (): Promise<ClientBoard[]> => {
     return [];
   }
 
-  // Deduplicate by board_data.id - keep only the first occurrence (oldest by created_at)
-  const seen = new Set<string>();
-  const uniqueBoards: ClientBoard[] = [];
+  return parseBoardRows(data);
+};
 
-  for (const row of data) {
-    const boardId = row.board_data?.id;
-    if (boardId && !seen.has(boardId)) {
-      seen.add(boardId);
-      uniqueBoards.push({
-        ...row.board_data,
-        db_id: row.id
-      });
-    }
+export const fetchArchivedBoards = async (): Promise<ClientBoard[]> => {
+  const { data, error } = await supabase
+    .from('client_boards')
+    .select('*')
+    .eq('archived', true)
+    .order('updated_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching archived boards:', error);
+    return [];
   }
 
-  return uniqueBoards;
+  return parseBoardRows(data);
+};
+
+export const archiveBoardById = async (dbId: string) => {
+  const { error } = await supabase
+    .from('client_boards')
+    .update({ archived: true, updated_at: new Date().toISOString() })
+    .eq('id', dbId);
+  if (error) console.error('Error archiving board:', error);
+};
+
+export const restoreBoardById = async (dbId: string) => {
+  const { error } = await supabase
+    .from('client_boards')
+    .update({ archived: false, updated_at: new Date().toISOString() })
+    .eq('id', dbId);
+  if (error) console.error('Error restoring board:', error);
 };
 
 export const saveClientBoard = async (board: ClientBoard) => {
-  // Use db_id if available (set when board was loaded from database)
   const dbId = (board as any).db_id;
 
   if (dbId) {
-    // Update existing board using the database row ID
     const { error: updateError } = await supabase
       .from('client_boards')
       .update({ board_data: board, updated_at: new Date().toISOString() })
@@ -429,7 +457,6 @@ export const saveClientBoard = async (board: ClientBoard) => {
       console.log('Board updated successfully:', board.id, board.name);
     }
   } else {
-    // New board - insert it
     const { error: insertError } = await supabase
       .from('client_boards')
       .insert({ board_data: board });
@@ -447,6 +474,10 @@ export const deleteClientBoard = async (boardId: string) => {
     .from('client_boards')
     .delete()
     .filter('board_data->>id', 'eq', boardId);
+};
+
+export const deleteBoardByDbId = async (dbId: string) => {
+  await supabase.from('client_boards').delete().eq('id', dbId);
 };
 
 // --- Chat ---

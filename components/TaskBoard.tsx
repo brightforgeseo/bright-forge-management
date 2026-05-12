@@ -4,7 +4,7 @@ import { Plus, Sparkles, ChevronDown, ChevronUp, ChevronRight, Trash2, Briefcase
 import AssignToPartnerModal from './client-portal/AssignToPartnerModal';
 import { Task, TaskGroup, User, ClientBoard, ToastType, LabelDefinition, Profile, TaskComment, ChatChannel, ChatMessage, ArchivedTask } from '../types';
 import { generateProjectTasks } from '../services/geminiService';
-import { fetchClientBoards, saveClientBoard, deleteClientBoard, uploadFile, fetchProfiles, createNotification, fetchChannels, sendChatMessage, logActivity } from '../services/databaseService';
+import { fetchClientBoards, fetchArchivedBoards, archiveBoardById, restoreBoardById, deleteBoardByDbId, saveClientBoard, deleteClientBoard, uploadFile, fetchProfiles, createNotification, fetchChannels, sendChatMessage, logActivity } from '../services/databaseService';
 import { supabase } from '../lib/supabaseClient';
 
 interface TaskBoardProps {
@@ -224,15 +224,15 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   useEffect(() => {
     const loadData = async () => {
       setIsLoadingData(true);
-      const [boards, profiles] = await Promise.all([fetchClientBoards(), fetchProfiles()]);
-      // Just set default board
+      const [boards, archived, profiles] = await Promise.all([fetchClientBoards(), fetchArchivedBoards(), fetchProfiles()]);
       const defaultBoardId = boards.length > 0 ? boards[0].id : '';
 
       if (boards.length > 0) {
         setClients(boards);
-        clientsRef.current = boards; // Initialize ref with loaded data
+        clientsRef.current = boards;
         setSelectedClientId(defaultBoardId);
       }
+      setArchivedBoards(archived);
       setTeamProfiles(profiles);
       setIsLoadingData(false);
     };
@@ -401,8 +401,12 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   const [shareMentionDropdown, setShareMentionDropdown] = useState<{ show: boolean, search: string, position: number } | null>(null);
   const shareMessageRef = useRef<HTMLTextAreaElement>(null);
 
-  // Archive panel state
+  // Archive panel state (task-level)
   const [showArchivePanel, setShowArchivePanel] = useState(false);
+
+  // Board archive state
+  const [archivedBoards, setArchivedBoards] = useState<ClientBoard[]>([]);
+  const [showBoardArchivePanel, setShowBoardArchivePanel] = useState(false);
 
   // Partner assignment modal state
   const [partnerAssignModal, setPartnerAssignModal] = useState<{
@@ -697,6 +701,42 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
       else setSelectedClientId('');
       setIsEditingClient(false);
       addToast('info', 'Client deleted.');
+  };
+
+  const handleArchiveBoard = async () => {
+    if (!activeClient) return;
+    const dbId = (activeClient as any).db_id;
+    if (!dbId) return;
+    await archiveBoardById(dbId);
+    const newClients = clients.filter(c => c.id !== activeClient.id);
+    setClients(newClients);
+    clientsRef.current = newClients;
+    setArchivedBoards(prev => [{ ...activeClient }, ...prev]);
+    if (newClients.length > 0) setSelectedClientId(newClients[0].id);
+    else setSelectedClientId('');
+    setIsEditingClient(false);
+    addToast('info', `"${activeClient.name}" archived.`);
+  };
+
+  const handleRestoreBoard = async (board: ClientBoard) => {
+    const dbId = (board as any).db_id;
+    if (!dbId) return;
+    await restoreBoardById(dbId);
+    setArchivedBoards(prev => prev.filter(b => (b as any).db_id !== dbId));
+    const newClients = [...clients, board].sort((a, b) => a.name.localeCompare(b.name));
+    setClients(newClients);
+    clientsRef.current = newClients;
+    setSelectedClientId(board.id);
+    setShowBoardArchivePanel(false);
+    addToast('success', `"${board.name}" restored.`);
+  };
+
+  const handleDeleteArchivedBoard = async (board: ClientBoard) => {
+    if (!window.confirm(`Permanently delete "${board.name}"? This cannot be undone.`)) return;
+    const dbId = (board as any).db_id;
+    if (dbId) await deleteBoardByDbId(dbId);
+    setArchivedBoards(prev => prev.filter(b => (b as any).db_id !== dbId));
+    addToast('info', `"${board.name}" permanently deleted.`);
   };
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1411,7 +1451,17 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                       </button>
                     ))}
                  </div>
-                 <div className="p-2 border-t border-white/[0.07] bg-portal-dark">
+                 <div className="p-2 border-t border-white/[0.07] bg-portal-dark space-y-1">
+                    <button
+                      onClick={() => { setShowBoardArchivePanel(true); setIsClientDropdownOpen(false); }}
+                      className="w-full py-2 flex items-center justify-center gap-2 text-sm font-semibold text-amber-600 hover:bg-amber-50 rounded-lg border border-transparent hover:border-amber-200 transition-all"
+                    >
+                      <Archive className="w-4 h-4" />
+                      Archived Boards
+                      {archivedBoards.length > 0 && (
+                        <span className="bg-amber-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">{archivedBoards.length}</span>
+                      )}
+                    </button>
                     {!isAddingClient ? (
                       <button onClick={() => setIsAddingClient(true)} className="w-full py-2 flex items-center justify-center gap-2 text-sm font-semibold text-brand-600 hover:bg-portal-surface rounded-lg border border-transparent hover:border-white/[0.07] transition-all">
                         <Plus className="w-4 h-4" /> Add Client
@@ -2368,7 +2418,12 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                    </div>
                 </div>
                 <div className="p-6 bg-portal-dark border-t border-white/[0.07] flex justify-between items-center">
-                   <button onClick={handleDeleteClient} className="text-red-500 hover:text-red-600 text-sm font-medium px-3 py-2 hover:bg-red-50 rounded-lg transition-colors">Delete Client</button>
+                   <div className="flex items-center gap-2">
+                     <button onClick={handleDeleteClient} className="text-red-500 hover:text-red-600 text-sm font-medium px-3 py-2 hover:bg-red-50 rounded-lg transition-colors">Delete</button>
+                     <button onClick={handleArchiveBoard} className="text-amber-600 hover:text-amber-700 text-sm font-medium px-3 py-2 hover:bg-amber-50 rounded-lg transition-colors flex items-center gap-1.5">
+                       <Archive className="w-4 h-4" /> Archive
+                     </button>
+                   </div>
                    <button onClick={handleUpdateClient} className="bg-slate-900 text-white px-6 py-2 rounded-lg font-bold hover:bg-slate-800 shadow-lg shadow-slate-900/10">Save Changes</button>
                 </div>
              </div>
@@ -2567,6 +2622,70 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
           onAssigned={() => setPartnerAssignModal({ isOpen: false, task: null, groupId: '', boardId: '', boardName: '' })}
           addToast={addToast}
         />
+      )}
+
+      {/* Board Archive Panel */}
+      {showBoardArchivePanel && (
+        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 animate-fadeIn" onClick={() => setShowBoardArchivePanel(false)}>
+          <div className="bg-portal-surface rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="p-5 border-b border-white/[0.07] bg-portal-dark flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Archive className="w-5 h-5 text-amber-500" />
+                <div>
+                  <h3 className="font-bold text-lg text-white">Archived Boards</h3>
+                  <p className="text-sm text-portal-soft">{archivedBoards.length} archived {archivedBoards.length === 1 ? 'board' : 'boards'}</p>
+                </div>
+              </div>
+              <button onClick={() => setShowBoardArchivePanel(false)} className="text-portal-soft hover:text-white p-2 hover:bg-portal-surface2 rounded-lg transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 max-h-[60vh] overflow-y-auto space-y-3">
+              {archivedBoards.length === 0 ? (
+                <div className="text-center py-12 text-portal-soft">
+                  <Archive className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                  <p className="font-medium">No archived boards</p>
+                </div>
+              ) : (
+                archivedBoards.map(board => (
+                  <div key={(board as any).db_id || board.id} className="bg-portal-dark border border-white/[0.07] rounded-xl p-4 flex items-center gap-4">
+                    <div
+                      className="w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
+                      style={{ backgroundColor: board.color || '#64748b' }}
+                    >
+                      {board.logoUrl ? <img src={board.logoUrl} className="w-full h-full object-cover rounded-lg" /> : board.initials}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-white truncate">{board.name}</p>
+                      {board.email && <p className="text-xs text-portal-soft truncate">{board.email}</p>}
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => handleRestoreBoard(board)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors"
+                        title="Restore to main boards"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" /> Restore
+                      </button>
+                      <button
+                        onClick={() => handleDeleteArchivedBoard(board)}
+                        className="p-1.5 text-portal-soft hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Permanently delete"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="p-4 border-t border-white/[0.07] bg-portal-dark text-xs text-portal-soft text-center">
+              Restore a board to bring it back to the main view, or delete it permanently.
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Archive Panel Modal */}
