@@ -240,6 +240,19 @@ const TOOLS: Anthropic.Tool[] = [
     input_schema: { type: 'object', properties: {}, required: [] }
   },
   {
+    name: 'rename_board',
+    description:
+      'Rename a client board (the top-level client/project name). Use list_clients_and_groups to find the boardId. This is NOT Monday.com — it operates on the portal\'s own Supabase-backed boards.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        boardId: { type: 'string' },
+        newName: { type: 'string', description: 'The new name for the board.' }
+      },
+      required: ['boardId', 'newName']
+    }
+  },
+  {
     name: 'rename_group',
     description:
       'Rename a task group (section/column) within a client board. Use list_clients_and_groups to find the boardId and groupId first.',
@@ -642,6 +655,18 @@ async function executeTool(
         clearBusinessContextCache();
         const fresh = await loadBusinessContext(true);
         return { ok: true, data: { totalClients: fresh.statistics.totalClients, totalTasks: fresh.statistics.totalTasks } };
+      }
+
+      case 'rename_board': {
+        const { boardId, newName } = input;
+        const boards = await fetchClientBoards();
+        const board = boards.find(b => b.id === boardId);
+        if (!board) return { ok: false, error: `Board ${boardId} not found` };
+        const oldName = board.name;
+        board.name = newName;
+        await saveClientBoard(board);
+        clearBusinessContextCache();
+        return { ok: true, data: { oldName, newName, boardId } };
       }
 
       case 'rename_group': {
