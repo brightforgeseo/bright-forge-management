@@ -238,6 +238,34 @@ const TOOLS: Anthropic.Tool[] = [
     description:
       'Force-refresh the cached business context. Use if the user says data looks stale or after making several updates.',
     input_schema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'rename_group',
+    description:
+      'Rename a task group (section/column) within a client board. Use list_clients_and_groups to find the boardId and groupId first.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        boardId: { type: 'string' },
+        groupId: { type: 'string' },
+        newTitle: { type: 'string', description: 'The new name for the group.' }
+      },
+      required: ['boardId', 'groupId', 'newTitle']
+    }
+  },
+  {
+    name: 'archive_task',
+    description:
+      'Move a task to the board\'s archive (soft-delete). The task is removed from its group and stored in archivedTasks. Use find_tasks to get the IDs first.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        boardId: { type: 'string' },
+        groupId: { type: 'string' },
+        taskId: { type: 'string' }
+      },
+      required: ['boardId', 'groupId', 'taskId']
+    }
   }
 ];
 
@@ -614,6 +642,36 @@ async function executeTool(
         clearBusinessContextCache();
         const fresh = await loadBusinessContext(true);
         return { ok: true, data: { totalClients: fresh.statistics.totalClients, totalTasks: fresh.statistics.totalTasks } };
+      }
+
+      case 'rename_group': {
+        const { boardId, groupId, newTitle } = input;
+        const boards = await fetchClientBoards();
+        const board = boards.find(b => b.id === boardId);
+        if (!board) return { ok: false, error: `Board ${boardId} not found` };
+        const group = board.groups?.find(g => g.id === groupId);
+        if (!group) return { ok: false, error: `Group ${groupId} not found` };
+        const oldTitle = group.title;
+        group.title = newTitle;
+        await saveClientBoard(board);
+        clearBusinessContextCache();
+        return { ok: true, data: { boardName: board.name, oldTitle, newTitle } };
+      }
+
+      case 'archive_task': {
+        const { boardId, groupId, taskId } = input;
+        const boards = await fetchClientBoards();
+        const board = boards.find(b => b.id === boardId);
+        if (!board) return { ok: false, error: `Board ${boardId} not found` };
+        const group = board.groups?.find(g => g.id === groupId);
+        if (!group) return { ok: false, error: `Group ${groupId} not found` };
+        const taskIndex = group.tasks?.findIndex(t => t.id === taskId) ?? -1;
+        if (taskIndex === -1) return { ok: false, error: `Task ${taskId} not found` };
+        const [task] = group.tasks!.splice(taskIndex, 1);
+        board.archivedTasks = [...(board.archivedTasks || []), { ...task, archivedAt: new Date().toISOString() }];
+        await saveClientBoard(board);
+        clearBusinessContextCache();
+        return { ok: true, data: { archived: taskId, taskTitle: task.title, boardName: board.name } };
       }
 
       default:
