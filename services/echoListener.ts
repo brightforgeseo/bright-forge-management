@@ -13,7 +13,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { supabase } from '../lib/supabaseClient';
 import { sendChatMessage, fetchChannels, editChatMessage } from './databaseService';
-import { runEchoAgent } from './echoAgent';
+import { getChatResponse } from './geminiService';
 import { ChatChannel, User } from '../types';
 
 // Tiny, cheap classifier — Haiku. Only used when Echo just spoke and the next
@@ -247,8 +247,8 @@ export const startEchoListener = ({ user, channels, echoBotId, isEchoAIChannel }
 
       let reply = '';
       try {
-        // Hand off to the agent — full tool access included
-        reply = await runEchoAgent(formattedHistory, text, { id: user.id, name: user.name });
+        // Route through bridge (OpenClaw) → falls back to echoAgent → Gemini
+        reply = await getChatResponse(formattedHistory, text, { id: user.id, name: user.name });
       } catch (e: any) {
         console.error('[EchoListener] agent failed:', e);
         reply = `Hit an error: ${e?.message || 'unknown'}. Try again in a sec.`;
@@ -317,7 +317,7 @@ export const startEchoListener = ({ user, channels, echoBotId, isEchoAIChannel }
     activeChannel = null;
     clearInterval(refreshInterval);
     lastReplyAt.clear();
-    processingIds.clear();
+    // processingIds intentionally NOT cleared — prevents re-mounts from replaying the same message
     lastEchoMessageAt.clear();
     mutedChannels.clear();
     console.log('[EchoListener] stopped');
