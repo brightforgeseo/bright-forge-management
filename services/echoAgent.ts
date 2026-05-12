@@ -279,6 +279,25 @@ const TOOLS: Anthropic.Tool[] = [
       },
       required: ['boardId', 'groupId', 'taskId']
     }
+  },
+  {
+    name: 'get_rankings',
+    description:
+      'Fetch live keyword rankings from SE Ranking for a client project. Use this for any question about keyword positions, ranking movements, or SEO performance. Returns current positions, search volumes, and changes since the previous check.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        client_name: {
+          type: 'string',
+          description: 'Client or project name to look up (e.g. "Hotwash Australia", "Aquip")'
+        },
+        date: {
+          type: 'string',
+          description: 'Date in YYYY-MM-DD format. Defaults to today.'
+        }
+      },
+      required: ['client_name']
+    }
   }
 ];
 
@@ -697,6 +716,18 @@ async function executeTool(
         await saveClientBoard(board);
         clearBusinessContextCache();
         return { ok: true, data: { archived: taskId, taskTitle: task.title, boardName: board.name } };
+      }
+
+      case 'get_rankings': {
+        const targetDate = input.date || new Date().toISOString().slice(0, 10);
+        const bridgeUrl = `https://echo-ai.tailfdbc33.ts.net:8443/rankings?client=${encodeURIComponent(input.client_name)}&date=${targetDate}`;
+        const res = await fetch(bridgeUrl);
+        if (!res.ok) {
+          const errText = await res.text().catch(() => res.statusText);
+          throw new Error(`Rankings fetch failed (${res.status}): ${errText.slice(0, 200)}`);
+        }
+        const data = await res.json();
+        return { ok: true, data };
       }
 
       default:
