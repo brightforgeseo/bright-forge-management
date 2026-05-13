@@ -32,7 +32,7 @@ const K2 = '_IxCsXAgHA-QFdT-0P2Ip3Tpypg7SVQAPr8TA7p0S2dvHyFi9D0mpjQ-z388AAAA';
 const CLAUDE_SONNET = 'claude-sonnet-4-6';
 
 const MAX_HOPS = 12;
-const MAX_TOKENS = 8192;
+const MAX_TOKENS = 16000;
 
 const getClient = () => new Anthropic({ apiKey: K1 + K2, dangerouslyAllowBrowser: true });
 
@@ -1097,6 +1097,9 @@ find_tasks, update_task_field, bulk_update_tasks, add_task_comment, create_task,
 - Always use find_tasks before update/delete — never guess IDs.
 - After bulk operations, confirm the count updated, not a list of each one.
 - After any updates, clearBusinessContextCache is handled internally.
+
+## Response length
+Keep responses concise. Avoid long formatted tables unless explicitly requested. For team members asking operational questions, give a clear direct answer — bullet points over tables, summary over exhaustive lists. If the full answer would be very long, give the key points and offer to go deeper. Never truncate mid-sentence — if you are running long, wrap up cleanly.
 
 ## When asked to analyse
 Use the LIVE BUSINESS DATA above. Be specific: cite task names, client names, dates, owners. Never invent.
