@@ -298,6 +298,89 @@ const TOOLS: Anthropic.Tool[] = [
       },
       required: ['client_name']
     }
+  },
+  {
+    name: 'search_chat_messages',
+    description:
+      'Search chat messages across all channels or a specific channel. Use for questions like "what has Ben said about X", "find messages mentioning Polar DC", "what did the team say about client Y", or "review messages from the last N days". Can filter by keyword, sender, channel, or date range. Also searches DM channels between team members.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        keyword: { type: 'string', description: 'Text to search for in message content (case-insensitive).' },
+        channel_name: { type: 'string', description: 'Channel name to restrict search to (e.g. "general", "technical-chat"). Omit to search all channels.' },
+        sender_name: { type: 'string', description: 'Filter by sender name (partial match, e.g. "Ben", "Dee").' },
+        days_back: { type: 'number', description: 'How many days back to search. Default 7.' },
+        limit: { type: 'number', description: 'Max messages to return. Default 50, max 200.' },
+        include_ai: { type: 'boolean', description: 'Include Echo AI messages in results. Default false.' }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'get_channel_history',
+    description:
+      'Get recent messages from a specific channel in chronological order. Use when someone asks to see what was discussed in a channel, or to review a conversation thread.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        channel_name: { type: 'string', description: 'Channel name (e.g. "general", "technical-chat", "non-10xr-clients-private").' },
+        limit: { type: 'number', description: 'Number of recent messages to fetch. Default 30, max 100.' },
+        days_back: { type: 'number', description: 'Limit to messages from the last N days. Default no limit.' }
+      },
+      required: ['channel_name']
+    }
+  },
+  {
+    name: 'get_activity_log',
+    description:
+      'Get recent team activity log entries — task updates, status changes, logins, and other portal events. Use to answer "what has X been working on", "what happened on client Y recently", or to get a general activity overview.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        days_back: { type: 'number', description: 'How many days back. Default 2.' },
+        user_name: { type: 'string', description: 'Filter by user name (partial match). Omit for all users.' },
+        limit: { type: 'number', description: 'Max entries to return. Default 100.' }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'get_chat_todos',
+    description:
+      'Get outstanding chat to-dos logged in the portal. Use when asked about pending action items, follow-ups, or outstanding to-dos.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        assigned_to: { type: 'string', description: 'Filter by assignee name (partial match). Omit for all.' },
+        limit: { type: 'number', description: 'Max entries. Default 50.' }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'update_chat_message',
+    description:
+      'Edit the text of an existing chat message. Owner-only. Use search_chat_messages or get_channel_history to find the message ID first.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        message_id: { type: 'string', description: 'UUID of the message to edit.' },
+        new_text: { type: 'string', description: 'The replacement message text.' }
+      },
+      required: ['message_id', 'new_text']
+    }
+  },
+  {
+    name: 'delete_chat_message',
+    description:
+      'Permanently delete a chat message. Owner-only. Use search_chat_messages to find the message ID first.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        message_id: { type: 'string', description: 'UUID of the message to delete.' }
+      },
+      required: ['message_id']
+    }
   }
 ];
 
@@ -730,6 +813,139 @@ async function executeTool(
         return { ok: true, data };
       }
 
+      case 'search_chat_messages': {
+        const { keyword, channel_name, sender_name, days_back = 7, limit = 50, include_ai = false } = input;
+
+        // Resolve channel name to IDs if provided
+        let channelIds: string[] | null = null;
+        if (channel_name) {
+          const { data: chans } = await supabase
+            .from('channels')
+            .select('id, name')
+            .ilike('name', `%${channel_name.replace(/^#/, '')}%`);
+          channelIds = (chans || []).map((c: any) => c.id);
+          if (channelIds.length === 0) return { ok: false, error: `No channel found matching "${channel_name}"` };
+        }
+
+        let q = supabase
+          .from('chat_messages')
+          .select('id, text, created_at, sender, sender_id, channel_id, is_ai')
+          .order('created_at', { ascending: false })
+          .limit(Math.min(limit, 200));
+
+        if (keyword) q = q.ilike('text', `%${keyword}%`);
+        if (sender_name) q = q.ilike('sender', `%${sender_name}%`);
+        if (!include_ai) q = q.eq('is_ai', false);
+        if (days_back) {
+          const since = new Date();
+          since.setDate(since.getDate() - days_back);
+          q = q.gte('created_at', since.toISOString());
+        }
+        if (channelIds) q = q.in('channel_id', channelIds);
+
+        const { data: msgs, error } = await q;
+        if (error) return { ok: false, error: error.message };
+
+        // Enrich with channel names
+        const { data: allChans } = await supabase.from('channels').select('id, name');
+        const chanMap = new Map((allChans || []).map((c: any) => [c.id, c.name]));
+        const enriched = (msgs || []).map((m: any) => ({
+          id: m.id,
+          sender: m.sender,
+          channel: chanMap.get(m.channel_id) || m.channel_id,
+          text: m.text,
+          created_at: m.created_at
+        }));
+        return { ok: true, data: enriched };
+      }
+
+      case 'get_channel_history': {
+        const { channel_name, limit = 30, days_back } = input;
+        const { data: chans } = await supabase
+          .from('channels')
+          .select('id, name')
+          .ilike('name', `%${channel_name.replace(/^#/, '')}%`);
+        if (!chans?.length) return { ok: false, error: `Channel "${channel_name}" not found` };
+        const channelId = chans[0].id;
+
+        let q = supabase
+          .from('chat_messages')
+          .select('id, text, created_at, sender, is_ai')
+          .eq('channel_id', channelId)
+          .order('created_at', { ascending: false })
+          .limit(Math.min(limit, 100));
+
+        if (days_back) {
+          const since = new Date();
+          since.setDate(since.getDate() - days_back);
+          q = q.gte('created_at', since.toISOString());
+        }
+
+        const { data: msgs, error } = await q;
+        if (error) return { ok: false, error: error.message };
+        return { ok: true, data: { channel: chans[0].name, messages: (msgs || []).reverse() } };
+      }
+
+      case 'get_activity_log': {
+        const { days_back = 2, user_name, limit = 100 } = input;
+        const since = new Date();
+        since.setDate(since.getDate() - days_back);
+
+        let q = supabase
+          .from('activity_log')
+          .select('*')
+          .gte('created_at', since.toISOString())
+          .order('created_at', { ascending: false })
+          .limit(Math.min(limit, 200));
+
+        if (user_name) q = q.ilike('user_name', `%${user_name}%`);
+
+        const { data, error } = await q;
+        if (error) return { ok: false, error: error.message };
+        return { ok: true, data: data || [] };
+      }
+
+      case 'get_chat_todos': {
+        const { assigned_to, limit = 50 } = input;
+        let q = supabase
+          .from('chat_todos')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(Math.min(limit, 100));
+
+        if (assigned_to) q = q.ilike('assigned_to', `%${assigned_to}%`);
+
+        const { data, error } = await q;
+        if (error) return { ok: false, error: error.message };
+        return { ok: true, data: data || [] };
+      }
+
+      case 'update_chat_message': {
+        if (executingUserId !== 'f9f11222-d2a9-4ae8-a327-8c4621d90b7c') {
+          return { ok: false, error: 'Editing messages requires owner sign-off. Ask Ben.' };
+        }
+        const { message_id, new_text } = input;
+        const { error } = await supabase
+          .from('chat_messages')
+          .update({ text: new_text, is_edited: true, edited_at: new Date().toISOString() })
+          .eq('id', message_id);
+        if (error) return { ok: false, error: error.message };
+        return { ok: true, data: { message_id, updated: true } };
+      }
+
+      case 'delete_chat_message': {
+        if (executingUserId !== 'f9f11222-d2a9-4ae8-a327-8c4621d90b7c') {
+          return { ok: false, error: 'Deleting messages requires owner sign-off. Ask Ben.' };
+        }
+        const { message_id } = input;
+        const { error } = await supabase
+          .from('chat_messages')
+          .delete()
+          .eq('id', message_id);
+        if (error) return { ok: false, error: error.message };
+        return { ok: true, data: { message_id, deleted: true } };
+      }
+
       default:
         return { ok: false, error: `Unknown tool: ${name}` };
     }
@@ -865,7 +1081,14 @@ ${baseSystemPrompt}
 ${businessContextPrompt}
 
 # TOOLS — WHAT ECHO CAN DO
-find_tasks, update_task_field, bulk_update_tasks, add_task_comment, create_task, bulk_create_tasks, delete_task, move_task, get_client_detail, list_clients_and_groups, list_team_members, post_chat_message, refresh_business_context.
+find_tasks, update_task_field, bulk_update_tasks, add_task_comment, create_task, bulk_create_tasks, delete_task, move_task, get_client_detail, list_clients_and_groups, list_team_members, post_chat_message, refresh_business_context, search_chat_messages, get_channel_history, get_activity_log, get_chat_todos, update_chat_message, delete_chat_message, get_rankings.
+
+## Chat and activity tools
+- search_chat_messages: search across all channels by keyword, sender, channel, or date. Use whenever asked about what someone said, messages mentioning a topic, or to review recent chat.
+- get_channel_history: get the recent message thread from a specific channel in order.
+- get_activity_log: get team activity events (task updates, logins, status changes). Use when asked what someone has been working on.
+- get_chat_todos: get outstanding portal to-dos.
+- update_chat_message / delete_chat_message: edit or remove a message by ID. Owner-only.
 
 ## Tool use rules
 - For single updates: update_task_field.
