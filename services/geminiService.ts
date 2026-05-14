@@ -215,9 +215,8 @@ export const generateProjectTasks = async (goal: string): Promise<Task[]> => {
   }
 };
 
-// Bridge URL and secret — set VITE_ECHO_BRIDGE_URL and VITE_ECHO_BRIDGE_SECRET
-// in your .env.local to enable the OpenClaw Echo bridge.
-const ECHO_BRIDGE_URL = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_ECHO_BRIDGE_URL) || '';
+// Bridge URL — defaults to localhost for dev. Set VITE_ECHO_BRIDGE_URL in Vercel for prod (Tailscale Funnel URL).
+const ECHO_BRIDGE_URL = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_ECHO_BRIDGE_URL) || 'http://localhost:18790';
 const ECHO_BRIDGE_SECRET = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_ECHO_BRIDGE_SECRET) || 'brightforge-echo-bridge-2026';
 
 async function callEchoBridge(
@@ -252,19 +251,22 @@ export const getChatResponse = async (
   message: string,
   executingUser?: { id: string; name: string }
 ): Promise<string> => {
-  // Route through the OpenClaw Echo bridge when configured — this makes the
-  // portal chat go through the live Echo agent session instead of a stateless
-  // API call. Falls back to the local echoAgent if the bridge is unavailable.
+  // Route through portal bridge (Little Sassin + live Supabase context) first.
+  // Falls back to Claude for complex/write tasks if bridge is unavailable.
+  const bridgeUser = executingUser || { id: 'portal', name: 'Portal User' };
   try {
-    if (executingUser?.id && ECHO_BRIDGE_URL) {
-      return await callEchoBridge(history, message, executingUser);
-    }
+    return await callEchoBridge(history, message, bridgeUser);
+  } catch (bridgeError) {
+    console.warn("Portal bridge unavailable, falling back to Claude:", bridgeError);
+  }
+
+  try {
     if (executingUser?.id) {
       return await runEchoAgent(history, message, executingUser);
     }
     return await getClaudeChatResponse(history, message);
   } catch (claudeError) {
-    console.warn("Echo bridge/agent failed, falling back to Gemini:", claudeError);
+    console.warn("Claude chat failed, falling back to Gemini:", claudeError);
 
     // Fallback to Gemini if Claude fails
     const ai = getAiClient();
