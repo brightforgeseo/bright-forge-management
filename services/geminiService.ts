@@ -1,6 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { KeywordResult, AuditResult, ContentResult, Task } from "../types";
 import { getClaudeChatResponse, generateClaudeContent, generateClaudeKeywords, analyzeClaudeText, generateSEOStrategy } from "./claudeService";
+import { generateLittleEchoContent } from "./littleEchoService";
 import { runEchoAgent } from "./echoAgent";
 
 // Re-export Claude SEO strategy function for use in projects
@@ -72,7 +73,13 @@ export const generateKeywords = async (seedKeyword: string): Promise<KeywordResu
 };
 
 export const generateContent = async (topic: string, tone: string, keywords: string): Promise<ContentResult> => {
-  // Use Claude Sonnet 4.5 for high-quality content generation
+  // Try Little Echo first (local, zero cost), fall back to Claude, then Gemini
+  try {
+    return await generateLittleEchoContent(topic, tone, keywords);
+  } catch (echoError) {
+    console.warn("Little Echo unavailable, falling back to Claude:", echoError);
+  }
+
   try {
     return await generateClaudeContent(topic, tone, keywords);
   } catch (claudeError) {
