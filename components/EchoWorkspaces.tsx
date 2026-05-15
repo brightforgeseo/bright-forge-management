@@ -84,8 +84,22 @@ interface Props {
 const MAX_WORKSPACES = 10;
 
 const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([makeWorkspace('Workspace 1')]);
-  const [activeId, setActiveId] = useState<string>(() => workspaces[0]?.id ?? '');
+  const [workspaces, setWorkspaces] = useState<Workspace[]>(() => {
+    try {
+      const saved = localStorage.getItem('echo-workspaces');
+      if (saved) {
+        const parsed = JSON.parse(saved) as Workspace[];
+        // Reset any in-progress state from previous session
+        return parsed.map(w => ({ ...w, isThinking: false, input: '' }));
+      }
+    } catch {}
+    return [makeWorkspace('Workspace 1')];
+  });
+  const [activeId, setActiveId] = useState<string>(() => {
+    try {
+      return localStorage.getItem('echo-workspaces-active') || '';
+    } catch { return ''; }
+  });
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [editingTabName, setEditingTabName] = useState('');
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
@@ -109,6 +123,19 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
       setActiveId(workspaces[workspaces.length - 1].id);
     }
   }, [workspaces, activeId]);
+
+  // Persist to localStorage on change
+  useEffect(() => {
+    try {
+      // Cap messages at 50 per workspace to avoid blowing up storage
+      const toSave = workspaces.map(w => ({ ...w, messages: w.messages.slice(-50), isThinking: false, input: '' }));
+      localStorage.setItem('echo-workspaces', JSON.stringify(toSave));
+    } catch {}
+  }, [workspaces]);
+
+  useEffect(() => {
+    try { localStorage.setItem('echo-workspaces-active', activeId); } catch {}
+  }, [activeId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
