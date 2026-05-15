@@ -1,16 +1,48 @@
 /**
  * Echo Workspaces
  * Multiple independent AI chat sessions running in parallel.
- * Each workspace has its own history and bridge session — completely isolated.
+ * Each workspace has its own history, bridge session, and model selection.
  * Talks directly to the portal bridge (localhost:18790) via littleEchoService pattern.
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Plus, X, Bot, Send, Loader2, Trash2, Edit2, Check, Zap } from 'lucide-react';
+import { Plus, X, Bot, Send, Loader2, Trash2, Edit2, Check, Zap, ChevronDown } from 'lucide-react';
 import { User, ToastType } from '../types';
 
 const BRIDGE_URL = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_BRIDGE_URL) || 'http://localhost:18790';
 const BRIDGE_SECRET = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_ECHO_BRIDGE_SECRET) || 'brightforge-echo-bridge-2026';
+
+type WorkspaceModel = 'sassin' | 'claude' | 'gemini';
+
+const MODEL_CONFIG: Record<WorkspaceModel, {
+  label: string;
+  badge: string;
+  badgeClass: string;
+  dot: string;
+  description: string;
+}> = {
+  sassin: {
+    label: 'Little Sassin',
+    badge: 'Local',
+    badgeClass: 'bg-purple-500/20 text-purple-300',
+    dot: 'bg-purple-400',
+    description: 'Local model — fast, free, no API cost',
+  },
+  claude: {
+    label: 'Claude',
+    badge: 'Cloud',
+    badgeClass: 'bg-blue-500/20 text-blue-300',
+    dot: 'bg-blue-400',
+    description: 'Claude via Hermes — best quality, uses API credits',
+  },
+  gemini: {
+    label: 'Gemini',
+    badge: 'Cloud',
+    badgeClass: 'bg-emerald-500/20 text-emerald-300',
+    dot: 'bg-emerald-400',
+    description: 'Gemini Flash — cloud, fast, requires Gemini key',
+  },
+};
 
 interface WorkspaceMessage {
   id: string;
@@ -23,6 +55,7 @@ interface WorkspaceMessage {
 interface Workspace {
   id: string;
   name: string;
+  model: WorkspaceModel;
   messages: WorkspaceMessage[];
   isThinking: boolean;
   input: string;
@@ -32,10 +65,11 @@ function makeId() {
   return Math.random().toString(36).slice(2, 10);
 }
 
-function makeWorkspace(name?: string): Workspace {
+function makeWorkspace(name?: string, model: WorkspaceModel = 'sassin'): Workspace {
   return {
     id: makeId(),
     name: name || 'New workspace',
+    model,
     messages: [],
     isThinking: false,
     input: '',
@@ -54,17 +88,28 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
   const [activeId, setActiveId] = useState<string>(() => workspaces[0]?.id ?? '');
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [editingTabName, setEditingTabName] = useState('');
+  const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const pickerRef = useRef<HTMLDivElement>(null);
 
-  // Keep activeId in sync if workspaces change
+  // Close picker on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setModelPickerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
   useEffect(() => {
     if (!workspaces.find(w => w.id === activeId) && workspaces.length > 0) {
       setActiveId(workspaces[workspaces.length - 1].id);
     }
   }, [workspaces, activeId]);
 
-  // Scroll to bottom when active workspace messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [workspaces, activeId]);
@@ -89,7 +134,6 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
   const closeWorkspace = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (workspaces.length === 1) {
-      // Reset rather than close last one
       setWorkspaces([makeWorkspace('Workspace 1')]);
       return;
     }
@@ -101,6 +145,11 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
 
   const clearWorkspace = (id: string) => {
     updateWorkspace(id, w => ({ ...w, messages: [] }));
+  };
+
+  const setWorkspaceModel = (id: string, model: WorkspaceModel) => {
+    updateWorkspace(id, w => ({ ...w, model }));
+    setModelPickerOpen(false);
   };
 
   const sendMessage = async (workspaceId: string) => {
@@ -115,7 +164,6 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
       timestamp: new Date().toISOString(),
     };
 
-    // Add user message, clear input, set thinking
     updateWorkspace(workspaceId, w => ({
       ...w,
       messages: [...w.messages, userMsg],
@@ -124,9 +172,6 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
     }));
 
     try {
-      // Session ID is userId + workspaceId — keeps each workspace isolated on bridge
-      const sessionUserId = `${currentUser.id}-ws-${workspaceId}`;
-
       const res = await fetch(`${BRIDGE_URL}/chat`, {
         method: 'POST',
         headers: {
@@ -135,10 +180,11 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
         },
         body: JSON.stringify({
           message: userText,
-          userId: currentUser.id,        // real ID — bridge checks admin status against this
-          sessionKey: `${currentUser.id}-ws-${workspaceId}`, // unique per workspace tab
+          userId: currentUser.id,
+          sessionKey: `${currentUser.id}-ws-${workspaceId}`,
           userName: currentUser.name,
           history: [],
+          model: ws.model,
         }),
       });
 
@@ -193,28 +239,26 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
   };
 
   const routeBadge = (routedTo?: string) => {
-    if (!routedTo) return null;
-    const colours: Record<string, string> = {
-      sassin: 'bg-purple-500/20 text-purple-300',
-      hermes: 'bg-blue-500/20 text-blue-300',
-      'hermes-fallback': 'bg-yellow-500/20 text-yellow-300',
-      batch: 'bg-green-500/20 text-green-300',
+    if (!routedTo || routedTo === 'system') return null;
+    const map: Record<string, { cls: string; label: string }> = {
+      sassin: { cls: 'bg-purple-500/20 text-purple-300', label: 'Local' },
+      'sassin-member': { cls: 'bg-purple-500/20 text-purple-300', label: 'Local' },
+      hermes: { cls: 'bg-blue-500/20 text-blue-300', label: 'Claude' },
+      'hermes-fallback': { cls: 'bg-yellow-500/20 text-yellow-300', label: 'Claude (fallback)' },
+      gemini: { cls: 'bg-emerald-500/20 text-emerald-300', label: 'Gemini' },
+      batch: { cls: 'bg-green-500/20 text-green-300', label: 'Batch' },
     };
-    const labels: Record<string, string> = {
-      sassin: 'Local',
-      hermes: 'Claude',
-      'hermes-fallback': 'Claude (fallback)',
-      batch: 'Batch',
-    };
-    const cls = colours[routedTo] || 'bg-white/10 text-white/50';
+    const m = map[routedTo] || { cls: 'bg-white/10 text-white/50', label: routedTo };
     return (
-      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${cls}`}>
-        {labels[routedTo] || routedTo}
+      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${m.cls}`}>
+        {m.label}
       </span>
     );
   };
 
   if (!activeWorkspace) return null;
+
+  const activeCfg = MODEL_CONFIG[activeWorkspace.model];
 
   return (
     <div className="flex flex-col h-full bg-portal-bg">
@@ -236,54 +280,55 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
 
       {/* Tabs */}
       <div className="flex-shrink-0 flex items-end gap-1 px-3 pt-2 overflow-x-auto scrollbar-hide border-b border-white/[0.07]">
-        {workspaces.map(ws => (
-          <div
-            key={ws.id}
-            onClick={() => setActiveId(ws.id)}
-            className={`group flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-t-lg cursor-pointer text-xs transition-colors max-w-[160px] ${
-              ws.id === activeId
-                ? 'bg-portal-surface text-white border-t border-l border-r border-white/[0.07]'
-                : 'text-white/50 hover:text-white/80 hover:bg-white/5'
-            }`}
-          >
-            {ws.isThinking && (
-              <Loader2 size={11} className="animate-spin text-brand-400 flex-shrink-0" />
-            )}
-            {!ws.isThinking && (
-              <Bot size={11} className="text-white/40 flex-shrink-0" />
-            )}
-
-            {editingTabId === ws.id ? (
-              <input
-                autoFocus
-                value={editingTabName}
-                onChange={e => setEditingTabName(e.target.value)}
-                onBlur={() => commitRename(ws.id)}
-                onKeyDown={e => { if (e.key === 'Enter') commitRename(ws.id); if (e.key === 'Escape') setEditingTabId(null); }}
-                onClick={e => e.stopPropagation()}
-                className="bg-transparent border-b border-brand-400 outline-none w-20 text-white text-xs"
-              />
-            ) : (
-              <span className="truncate">{ws.name}</span>
-            )}
-
-            {ws.id === activeId && editingTabId !== ws.id && (
-              <button
-                onClick={e => startRenameTab(ws, e)}
-                className="opacity-0 group-hover:opacity-100 flex-shrink-0 p-0.5 hover:text-white transition-opacity"
-              >
-                <Edit2 size={9} />
-              </button>
-            )}
-
-            <button
-              onClick={e => closeWorkspace(ws.id, e)}
-              className="opacity-0 group-hover:opacity-100 flex-shrink-0 p-0.5 hover:text-red-400 transition-opacity ml-auto"
+        {workspaces.map(ws => {
+          const cfg = MODEL_CONFIG[ws.model];
+          return (
+            <div
+              key={ws.id}
+              onClick={() => setActiveId(ws.id)}
+              className={`group flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-t-lg cursor-pointer text-xs transition-colors max-w-[180px] ${
+                ws.id === activeId
+                  ? 'bg-portal-surface text-white border-t border-l border-r border-white/[0.07]'
+                  : 'text-white/50 hover:text-white/80 hover:bg-white/5'
+              }`}
             >
-              <X size={10} />
-            </button>
-          </div>
-        ))}
+              {ws.isThinking
+                ? <Loader2 size={11} className="animate-spin text-brand-400 flex-shrink-0" />
+                : <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${cfg.dot}`} />
+              }
+
+              {editingTabId === ws.id ? (
+                <input
+                  autoFocus
+                  value={editingTabName}
+                  onChange={e => setEditingTabName(e.target.value)}
+                  onBlur={() => commitRename(ws.id)}
+                  onKeyDown={e => { if (e.key === 'Enter') commitRename(ws.id); if (e.key === 'Escape') setEditingTabId(null); }}
+                  onClick={e => e.stopPropagation()}
+                  className="bg-transparent border-b border-brand-400 outline-none w-20 text-white text-xs"
+                />
+              ) : (
+                <span className="truncate">{ws.name}</span>
+              )}
+
+              {ws.id === activeId && editingTabId !== ws.id && (
+                <button
+                  onClick={e => startRenameTab(ws, e)}
+                  className="opacity-0 group-hover:opacity-100 flex-shrink-0 p-0.5 hover:text-white transition-opacity"
+                >
+                  <Edit2 size={9} />
+                </button>
+              )}
+
+              <button
+                onClick={e => closeWorkspace(ws.id, e)}
+                className="opacity-0 group-hover:opacity-100 flex-shrink-0 p-0.5 hover:text-red-400 transition-opacity ml-auto"
+              >
+                <X size={10} />
+              </button>
+            </div>
+          );
+        })}
       </div>
 
       {/* Active workspace messages */}
@@ -291,7 +336,7 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
         {activeWorkspace.messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
             <Bot size={32} className="text-white/20" />
-            <p className="text-white/40 text-sm">Ask Echo anything — task data, content, rankings, strategy.</p>
+            <p className="text-white/40 text-sm">Ask anything — task data, content, rankings, strategy.</p>
             <p className="text-white/25 text-xs">This workspace is isolated. Open more tabs to run parallel sessions.</p>
           </div>
         )}
@@ -343,6 +388,55 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
 
       {/* Input */}
       <div className="flex-shrink-0 px-4 py-3 border-t border-white/[0.07]">
+        {/* Model picker */}
+        <div className="flex items-center justify-between mb-2">
+          <div className="relative" ref={pickerRef}>
+            <button
+              onClick={() => setModelPickerOpen(o => !o)}
+              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-xs"
+            >
+              <span className={`w-2 h-2 rounded-full ${activeCfg.dot}`} />
+              <span className="text-white/70 font-medium">{activeCfg.label}</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${activeCfg.badgeClass}`}>{activeCfg.badge}</span>
+              <ChevronDown size={11} className={`text-white/40 transition-transform ${modelPickerOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {modelPickerOpen && (
+              <div className="absolute bottom-full mb-1 left-0 w-64 bg-portal-surface border border-white/[0.1] rounded-xl shadow-xl shadow-black/40 overflow-hidden z-50">
+                {(Object.entries(MODEL_CONFIG) as [WorkspaceModel, typeof MODEL_CONFIG[WorkspaceModel]][]).map(([key, cfg]) => (
+                  <button
+                    key={key}
+                    onClick={() => setWorkspaceModel(activeWorkspace.id, key)}
+                    className={`w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors ${
+                      activeWorkspace.model === key ? 'bg-white/5' : ''
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full mt-1 flex-shrink-0 ${cfg.dot}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-white">{cfg.label}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${cfg.badgeClass}`}>{cfg.badge}</span>
+                        {activeWorkspace.model === key && (
+                          <Check size={11} className="text-brand-400 ml-auto flex-shrink-0" />
+                        )}
+                      </div>
+                      <p className="text-xs text-white/40 mt-0.5">{cfg.description}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={() => clearWorkspace(activeWorkspace.id)}
+            title="Clear workspace"
+            className="p-1.5 rounded-lg text-white/25 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+          >
+            <Trash2 size={13} />
+          </button>
+        </div>
+
         <div className="flex items-end gap-2">
           <div className="flex-1 relative">
             <textarea
@@ -350,7 +444,7 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
               value={activeWorkspace.input}
               onChange={e => updateWorkspace(activeWorkspace.id, w => ({ ...w, input: e.target.value }))}
               onKeyDown={e => handleKeyDown(e, activeWorkspace.id)}
-              placeholder="Ask Echo anything… (Enter to send, Shift+Enter for new line)"
+              placeholder={`Ask ${activeCfg.label} anything… (Enter to send, Shift+Enter for new line)`}
               rows={1}
               className="w-full bg-portal-surface border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder-white/30 outline-none focus:border-brand-500/50 resize-none overflow-hidden transition-colors"
               style={{ minHeight: '44px', maxHeight: '120px' }}
@@ -362,29 +456,20 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
               disabled={activeWorkspace.isThinking}
             />
           </div>
-          <div className="flex flex-col gap-1.5">
-            <button
-              onClick={() => sendMessage(activeWorkspace.id)}
-              disabled={!activeWorkspace.input.trim() || activeWorkspace.isThinking}
-              className="w-10 h-10 rounded-xl bg-brand-500 hover:bg-brand-600 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
-            >
-              {activeWorkspace.isThinking
-                ? <Loader2 size={16} className="animate-spin text-white" />
-                : <Send size={16} className="text-white" />
-              }
-            </button>
-            <button
-              onClick={() => clearWorkspace(activeWorkspace.id)}
-              title="Clear workspace"
-              className="w-10 h-10 rounded-xl bg-white/5 hover:bg-red-500/20 hover:text-red-400 text-white/30 flex items-center justify-center transition-colors"
-            >
-              <Trash2 size={14} />
-            </button>
-          </div>
+          <button
+            onClick={() => sendMessage(activeWorkspace.id)}
+            disabled={!activeWorkspace.input.trim() || activeWorkspace.isThinking}
+            className="w-10 h-10 rounded-xl bg-brand-500 hover:bg-brand-600 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors flex-shrink-0"
+          >
+            {activeWorkspace.isThinking
+              ? <Loader2 size={16} className="animate-spin text-white" />
+              : <Send size={16} className="text-white" />
+            }
+          </button>
         </div>
-        <p className="text-[10px] text-white/25 mt-2 pl-1">
-          Workspace session: <code className="font-mono">{currentUser.id.slice(0, 8)}-ws-{activeWorkspace.id}</code>
-          &nbsp;·&nbsp;{activeWorkspace.messages.length} messages
+
+        <p className="text-[10px] text-white/20 mt-1.5 pl-1">
+          {activeWorkspace.messages.length} messages · session {currentUser.id.slice(0, 8)}-ws-{activeWorkspace.id}
         </p>
       </div>
     </div>
