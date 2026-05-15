@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Search, PenTool, BarChart, Settings, TableProperties, MessageSquare, Hexagon, LogOut, UserPlus, MoreVertical, Bell, X, Check, CheckSquare, Menu, FileCheck } from 'lucide-react';
+import { LayoutDashboard, Search, PenTool, BarChart, Settings, TableProperties, MessageSquare, Hexagon, LogOut, UserPlus, MoreVertical, Bell, X, Check, CheckSquare, Menu, FileCheck, Zap } from 'lucide-react';
 import { ToolView, BrandingConfig, User, AppNotification } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { fetchNotifications, markNotificationRead, markAllNotificationsRead, deleteAllNotifications, deleteNotification } from '../services/databaseService';
@@ -152,6 +152,7 @@ interface SidebarProps {
   currentUser: User;
   onLogout: () => void;
   onInvite: () => void;
+  onOpenPalette?: () => void;
   isMobileMenuOpen: boolean;
   setIsMobileMenuOpen: (open: boolean) => void;
 }
@@ -163,6 +164,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   currentUser,
   onLogout,
   onInvite,
+  onOpenPalette,
   isMobileMenuOpen,
   setIsMobileMenuOpen
 }) => {
@@ -419,16 +421,32 @@ const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  const navItems = [
-    { id: ToolView.DASHBOARD, label: 'Dashboard', icon: LayoutDashboard },
-    { id: ToolView.KEYWORD_RESEARCH, label: 'Keyword Research', icon: Search },
-    { id: ToolView.CONTENT_GENERATOR, label: 'Content Generator', icon: PenTool },
-    { id: ToolView.SITE_AUDIT, label: 'SEO Audit', icon: BarChart },
-    { id: ToolView.QA_CHECKER, label: 'QA Checker', icon: FileCheck },
-    { id: ToolView.TASKS, label: 'Project Tasks', icon: TableProperties },
-    { id: ToolView.MY_WORK, label: 'My Work', icon: CheckSquare },
-    { id: ToolView.TEAM_CHAT, label: 'Team Chat', icon: MessageSquare },
-    { id: ToolView.SETTINGS, label: 'Settings', icon: Settings },
+  const navGroups = [
+    {
+      label: 'WORK',
+      items: [
+        { id: ToolView.DASHBOARD,   label: 'Dashboard',     icon: LayoutDashboard, shortcut: 'G D' },
+        { id: ToolView.TASKS,       label: 'Project Tasks', icon: TableProperties, shortcut: 'G T' },
+        { id: ToolView.MY_WORK,     label: 'My Work',       icon: CheckSquare,     shortcut: 'G M' },
+        { id: ToolView.TEAM_CHAT,   label: 'Team Chat',     icon: MessageSquare,   shortcut: 'G C' },
+      ],
+    },
+    {
+      label: 'AI TOOLS',
+      items: [
+        { id: ToolView.ECHO_WORKSPACES,   label: 'Echo Workspaces',   icon: Zap,        shortcut: 'G E' },
+        { id: ToolView.CONTENT_GENERATOR, label: 'Content Generator', icon: PenTool,    shortcut: null },
+        { id: ToolView.KEYWORD_RESEARCH,  label: 'Keyword Research',  icon: Search,     shortcut: null },
+        { id: ToolView.SITE_AUDIT,        label: 'SEO Audit',         icon: BarChart,   shortcut: null },
+        { id: ToolView.QA_CHECKER,        label: 'QA Checker',        icon: FileCheck,  shortcut: null },
+      ],
+    },
+    {
+      label: 'ACCOUNT',
+      items: [
+        { id: ToolView.SETTINGS, label: 'Settings', icon: Settings, shortcut: null },
+      ],
+    },
   ];
 
   return (
@@ -533,38 +551,68 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      <nav className="flex-1 px-2 py-3 space-y-1 overflow-y-auto min-h-0">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = currentView === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => handleViewChange(item.id)}
-              className={`w-full flex items-center gap-3 px-3 py-3 lg:py-2 rounded-xl lg:rounded-lg transition-all duration-200 group active:scale-[0.98] ${
-                isActive
-                  ? 'bg-portal-accent text-white shadow-md shadow-portal-accent/20'
-                  : 'text-portal-soft hover:bg-portal-surface2 hover:text-portal-text active:bg-portal-surface2'
-              }`}
-            >
-              <Icon className={`w-5 h-5 lg:w-4 lg:h-4 flex-shrink-0 ${isActive ? 'text-white' : 'text-portal-soft group-hover:text-portal-text'}`} />
-              <span className="font-medium text-base lg:text-sm truncate">{item.label}</span>
-            </button>
-          );
-        })}
+      <nav className="flex-1 px-2 py-3 overflow-y-auto min-h-0 space-y-4">
 
-        {/* Invite Button - Moved to main nav as requested */}
-        {currentUser.role === 'Owner' && (
-            <div className="pt-6 mt-2 border-t border-white/[0.07]">
-                <div className="px-3 text-[10px] font-semibold text-portal-soft uppercase tracking-wider mb-2">Team</div>
-                <button
-                    onClick={onInvite}
-                    className="w-full flex items-center gap-3 px-3 py-3 lg:py-2 rounded-xl lg:rounded-lg transition-all duration-200 bg-blue-600/10 text-blue-400 border border-blue-600/20 hover:bg-blue-600 hover:text-white active:scale-[0.98] group"
-                >
-                    <UserPlus className="w-5 h-5 lg:w-4 lg:h-4 flex-shrink-0 text-blue-500 group-hover:text-white" />
-                    <span className="font-medium text-base lg:text-sm truncate">Invite Member</span>
-                </button>
+        {/* Command Palette shortcut button */}
+        {onOpenPalette && (
+          <button
+            onClick={onOpenPalette}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.07] hover:bg-white/[0.08] transition-colors text-portal-soft hover:text-portal-text group"
+          >
+            <Search className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="flex-1 text-left text-xs truncate">Search or jump to…</span>
+            <kbd className="hidden lg:inline px-1.5 py-0.5 rounded bg-white/10 text-[10px] font-mono text-white/30">⌘K</kbd>
+          </button>
+        )}
+
+        {/* Grouped nav */}
+        {navGroups.map(group => (
+          <div key={group.label}>
+            <div className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-white/25">
+              {group.label}
             </div>
+            <div className="space-y-0.5">
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const isActive = currentView === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => handleViewChange(item.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 lg:py-2 rounded-xl lg:rounded-lg transition-all duration-200 group active:scale-[0.98] ${
+                      isActive
+                        ? 'bg-portal-accent text-white shadow-md shadow-portal-accent/20'
+                        : 'text-portal-soft hover:bg-portal-surface2 hover:text-portal-text active:bg-portal-surface2'
+                    }`}
+                  >
+                    <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-white' : 'text-portal-soft group-hover:text-portal-text'}`} />
+                    <span className="flex-1 font-medium text-sm truncate text-left">{item.label}</span>
+                    {item.shortcut && (
+                      <span className="hidden lg:flex gap-0.5 flex-shrink-0">
+                        {item.shortcut.split(' ').map((k: string, ki: number) => (
+                          <kbd key={ki} className={`px-1 py-0.5 rounded text-[9px] font-mono ${isActive ? 'bg-white/20 text-white/70' : 'bg-white/10 text-white/25'}`}>{k}</kbd>
+                        ))}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+
+        {/* Invite Button */}
+        {currentUser.role === 'Owner' && (
+          <div>
+            <div className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-white/25">TEAM</div>
+            <button
+              onClick={onInvite}
+              className="w-full flex items-center gap-3 px-3 py-2.5 lg:py-2 rounded-xl lg:rounded-lg transition-all duration-200 bg-blue-600/10 text-blue-400 border border-blue-600/20 hover:bg-blue-600 hover:text-white active:scale-[0.98] group"
+            >
+              <UserPlus className="w-4 h-4 flex-shrink-0 text-blue-500 group-hover:text-white" />
+              <span className="font-medium text-sm truncate">Invite Member</span>
+            </button>
+          </div>
         )}
       </nav>
 

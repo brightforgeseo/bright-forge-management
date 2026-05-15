@@ -1,9 +1,11 @@
 
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useRef, useCallback, Suspense, lazy } from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import ToastContainer from './components/ToastContainer';
 import Login from './components/Login';
+import CommandPalette from './components/CommandPalette';
+import MobileTabBar from './components/MobileTabBar';
 
 // Heavy tools are code-split — they only download when the user navigates to that view.
 // Initial bundle drops dramatically because TaskBoard + TeamChat alone are most of the weight.
@@ -15,15 +17,16 @@ const TaskBoard = lazy(() => import('./components/TaskBoard'));
 const MyWork = lazy(() => import('./components/MyWork'));
 const TeamChat = lazy(() => import('./components/TeamChat'));
 const Settings = lazy(() => import('./components/Settings'));
+const EchoWorkspaces = lazy(() => import('./components/EchoWorkspaces'));
 
 const ViewFallback: React.FC = () => (
   <div className="flex h-full items-center justify-center">
     <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
   </div>
 );
-import { ToolView, BrandingConfig, User, ToastNotification, ToastType } from './types';
+import { ToolView, BrandingConfig, User, ToastNotification, ToastType, Profile } from './types';
 import { supabase } from './lib/supabaseClient';
-import { addToAllowlist, updateUserProfile, checkDueDateNotifications } from './services/databaseService';
+import { addToAllowlist, updateUserProfile, checkDueDateNotifications, fetchClientBoards, fetchProfiles } from './services/databaseService';
 import { listenForPushClicks } from './lib/pushNotifications';
 import { Copy, X, UserPlus, Check, Mail, RefreshCw, AlertTriangle, MessageSquare } from 'lucide-react';
 
@@ -32,7 +35,12 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ToolView>(ToolView.DASHBOARD);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Invite Modal State
+  // Command Palette
+  const [isPaletteOpen, setIsPaletteOpen] = useState(false);
+  const [paletteClients, setPaletteClients] = useState<{ id: string; name: string }[]>([]);
+  const [paletteProfiles, setPaletteProfiles] = useState<Profile[]>([]);
+  const gKeyRef = useRef(false);
+  const gKeyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteStep, setInviteStep] = useState<'form' | 'success'>('form');
   const [inviteForm, setInviteForm] = useState({ email: '', name: '', password: '' });
@@ -206,6 +214,67 @@ const App: React.FC = () => {
   const addToast = (type: ToastType, message: string) => setToasts(prev => [...prev, { id: Date.now().toString(), type, message }]);
   const removeToast = (id: string) => setToasts(prev => prev.filter(t => t.id !== id));
 
+  // Load palette data once authenticated
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    fetchClientBoards().then(boards => {
+      setPaletteClients(boards.map(b => ({ id: b.id, name: b.name })));
+    }).catch(() => {});
+    fetchProfiles().then(setPaletteProfiles).catch(() => {});
+  }, [isAuthenticated]);
+
+  // Global keyboard shortcuts
+  // Cmd/Ctrl+K → Command Palette
+  // G then D/T/M/C/E → jump to view
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable;
+
+      // Cmd/Ctrl+K — always open palette
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsPaletteOpen(p => !p);
+        return;
+      }
+
+      // Escape closes palette
+      if (e.key === 'Escape') {
+        setIsPaletteOpen(false);
+        return;
+      }
+
+      // G+key shortcuts — only when not in an input
+      if (inInput) return;
+
+      if (e.key === 'g' || e.key === 'G') {
+        gKeyRef.current = true;
+        if (gKeyTimerRef.current) clearTimeout(gKeyTimerRef.current);
+        gKeyTimerRef.current = setTimeout(() => { gKeyRef.current = false; }, 1500);
+        return;
+      }
+
+      if (gKeyRef.current) {
+        const map: Record<string, ToolView> = {
+          'd': ToolView.DASHBOARD,
+          't': ToolView.TASKS,
+          'm': ToolView.MY_WORK,
+          'c': ToolView.TEAM_CHAT,
+          'e': ToolView.ECHO_WORKSPACES,
+        };
+        const target = map[e.key.toLowerCase()];
+        if (target) {
+          e.preventDefault();
+          gKeyRef.current = false;
+          setCurrentView(target);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   // Generate random password for invites
   const generatePassword = () => {
       const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$';
@@ -265,6 +334,7 @@ ${currentUser.name}`;
         case ToolView.TASKS: return <TaskBoard currentUser={currentUser} addToast={addToast} />;
         case ToolView.MY_WORK: return <MyWork currentUser={currentUser} addToast={addToast} onNavigateToTasks={() => setCurrentView(ToolView.TASKS)} />;
         case ToolView.TEAM_CHAT: return <TeamChat currentUser={currentUser} addToast={addToast} onNavigateToTask={() => setCurrentView(ToolView.TASKS)} />;
+        case ToolView.ECHO_WORKSPACES: return <EchoWorkspaces currentUser={currentUser} addToast={addToast} />;
         case ToolView.SETTINGS: return <Settings branding={branding} setBranding={setBranding} addToast={addToast} currentUser={currentUser} />;
         default: return <Dashboard currentUser={currentUser} setCurrentView={setCurrentView} />;
       }
@@ -292,8 +362,23 @@ ${currentUser.name}`;
         currentUser={currentUser}
         onLogout={handleLogout}
         onInvite={() => { generatePassword(); setShowInviteModal(true); }}
+        onOpenPalette={() => setIsPaletteOpen(true)}
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
+      />
+
+      <CommandPalette
+        isOpen={isPaletteOpen}
+        onClose={() => setIsPaletteOpen(false)}
+        onNavigate={(view) => { setCurrentView(view); setIsPaletteOpen(false); }}
+        currentUser={currentUser}
+        clients={paletteClients}
+        profiles={paletteProfiles}
+      />
+
+      <MobileTabBar
+        currentView={currentView}
+        onNavigate={(view) => { setCurrentView(view); setIsMobileMenuOpen(false); }}
       />
 
       {/* Mobile Header - Hidden on TeamChat which has its own header */}
@@ -321,7 +406,7 @@ ${currentUser.name}`;
       </div>
       )}
 
-      <main className={`flex-1 lg:ml-64 h-full overflow-hidden relative ${isFullHeight ? '' : 'bg-portal-dark'} ${currentView === ToolView.TEAM_CHAT ? '' : 'pt-14'} lg:pt-0`}>
+      <main className={`flex-1 lg:ml-64 h-full overflow-hidden relative ${isFullHeight ? '' : 'bg-portal-dark'} ${currentView === ToolView.TEAM_CHAT ? '' : 'pt-14'} lg:pt-0 pb-16 lg:pb-0`}>
         {isFullHeight ? renderContent() : <ScrollablePageWrapper>{renderContent()}</ScrollablePageWrapper>}
       </main>
       <ToastContainer toasts={toasts} removeToast={removeToast} />

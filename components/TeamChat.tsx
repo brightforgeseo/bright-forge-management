@@ -1744,22 +1744,40 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       }
 
       try {
-        // Build context from conversation history
-        const recentHistory = messages.slice(-10).map(m => `${m.sender}: ${m.text}`).join('\n');
-
-        // Get past conversation context (if available)
-        let pastContext = '';
-        try {
-          pastContext = await buildConversationContext(currentUser.id, activeChannelId);
-        } catch (e) {
-          console.log('[Echo] Past context not available yet');
-        }
-
-        const fullHistory = pastContext + '\n\n' + recentHistory;
-        const response = await getChatResponse(fullHistory, userMsg.text, {
-          id: currentUser.id,
-          name: currentUser.name
+        // Route through portal bridge — handles admin/member permissions and local model routing
+        const BRIDGE_URL = (import.meta as any).env?.VITE_BRIDGE_URL || 'http://localhost:18790';
+        const BRIDGE_SECRET = (import.meta as any).env?.VITE_ECHO_BRIDGE_SECRET || 'brightforge-echo-bridge-2026';
+        const bridgeRes = await fetch(`${BRIDGE_URL}/chat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${BRIDGE_SECRET}`,
+          },
+          body: JSON.stringify({
+            message: userMsg.text,
+            userId: currentUser.id,
+            userName: currentUser.name,
+            history: messages.slice(-8).map(m => ({
+              role: m.isAi ? 'assistant' : 'user',
+              content: `${m.sender}: ${m.text}`,
+            })),
+          }),
         });
+
+        let response: string;
+        if (bridgeRes.ok) {
+          const data = await bridgeRes.json();
+          response = data.response || '(no response)';
+        } else {
+          // Fallback to getChatResponse if bridge is down
+          const recentHistory = messages.slice(-10).map(m => `${m.sender}: ${m.text}`).join('\n');
+          let pastContext = '';
+          try { pastContext = await buildConversationContext(currentUser.id, activeChannelId); } catch (e) {}
+          response = await getChatResponse(pastContext + '\n\n' + recentHistory, userMsg.text, {
+            id: currentUser.id,
+            name: currentUser.name
+          });
+        }
 
         // If we have a placeholder, edit it in place; otherwise insert fresh.
         if (placeholderMsgId) {
