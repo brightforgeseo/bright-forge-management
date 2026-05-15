@@ -96,8 +96,9 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
   // Mobile sidebar state
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [channelSearch, setChannelSearch] = useState('');
+  const [isTeamExpanded, setIsTeamExpanded] = useState(false);
 
-  // Pagination state for messages
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [loadingMoreMessages, setLoadingMoreMessages] = useState(false);
 
@@ -1993,9 +1994,29 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
         )}
 
         <div className="flex-1 overflow-y-auto custom-scrollbar py-2 space-y-3 min-h-0">
+
+          {/* Search */}
+          <div className="px-2">
+            <div className="flex items-center gap-2 px-2.5 py-1.5 bg-portal-surface2 rounded-lg border border-white/[0.05]">
+              <Search className="w-3.5 h-3.5 text-portal-soft flex-shrink-0" />
+              <input
+                type="text"
+                placeholder="Search…"
+                value={channelSearch}
+                onChange={e => setChannelSearch(e.target.value)}
+                className="flex-1 bg-transparent text-xs text-portal-text placeholder-portal-soft outline-none min-w-0"
+              />
+              {channelSearch && (
+                <button onClick={() => setChannelSearch('')} className="text-portal-soft hover:text-white">
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* AI Assistant Section */}
           <div>
-            <div className="px-3 flex items-center justify-between group text-portal-soft mb-1">
+            <div className="px-3 flex items-center justify-between text-portal-soft mb-1">
               <span className="text-[10px] font-semibold uppercase tracking-wider">AI Assistant</span>
             </div>
             <ul>
@@ -2003,22 +2024,31 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                 <li
                   key={echoAIChannel.id}
                   onClick={() => setActiveChannelId(echoAIChannel.id)}
-                  className={`px-3 py-2.5 md:py-1.5 flex items-center justify-between cursor-pointer mx-1.5 rounded-lg md:rounded group active:opacity-80 ${activeChannelId === echoAIChannel.id ? 'bg-portal-accent text-white' : 'text-portal-soft hover:bg-portal-surface2'}`}
+                  className={`px-3 py-2.5 md:py-2 flex items-center justify-between cursor-pointer mx-1.5 rounded-lg group active:opacity-80 ${activeChannelId === echoAIChannel.id ? 'bg-portal-accent text-white' : 'text-portal-soft hover:bg-portal-surface2'}`}
                 >
-                  <div className="flex items-center gap-2 md:gap-1.5 truncate">
-                    <Bot className="w-4 h-4 md:w-3.5 md:h-3.5 text-brand-400" />
-                    <span className={`truncate text-base md:text-sm ${echoAIChannel.unread ? 'font-bold text-white' : ''}`}>
-                      Echo AI {echoAIChannel.unread ? `(${echoAIChannel.unread})` : ''}
+                  <div className="flex items-center gap-2.5 md:gap-2 truncate">
+                    <div className="w-6 h-6 md:w-5 md:h-5 rounded-md bg-brand-500 flex items-center justify-center flex-shrink-0">
+                      <Bot className="w-3.5 h-3.5 text-white" />
+                    </div>
+                    <span className={`truncate text-sm font-medium ${echoAIChannel.unread ? 'text-white' : ''}`}>
+                      Echo AI
                     </span>
                   </div>
+                  {echoAIChannel.unread ? (
+                    <span className="ml-2 min-w-[18px] h-[18px] bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1 flex-shrink-0">
+                      {echoAIChannel.unread}
+                    </span>
+                  ) : null}
                 </li>
               ) : (
                 <li
                   onClick={handleStartEchoAI}
-                  className="px-3 py-2.5 md:py-1.5 flex items-center gap-2 md:gap-1.5 mx-1.5 rounded-lg md:rounded text-portal-soft hover:bg-portal-surface2 cursor-pointer active:opacity-80"
+                  className="px-3 py-2.5 md:py-2 flex items-center gap-2.5 md:gap-2 mx-1.5 rounded-lg text-portal-soft hover:bg-portal-surface2 cursor-pointer active:opacity-80"
                 >
-                  <Bot className="w-4 h-4 md:w-3.5 md:h-3.5 text-brand-400" />
-                  <span className="truncate text-base md:text-sm">Start Echo AI Chat</span>
+                  <div className="w-6 h-6 md:w-5 md:h-5 rounded-md bg-brand-500/30 flex items-center justify-center flex-shrink-0">
+                    <Bot className="w-3.5 h-3.5 text-brand-400" />
+                  </div>
+                  <span className="truncate text-sm">Start Echo AI Chat</span>
                 </li>
               )}
             </ul>
@@ -2029,51 +2059,49 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
             <div className="px-3 flex items-center justify-between group text-portal-soft mb-1">
               <span className="text-[10px] font-semibold uppercase tracking-wider">Channels</span>
             </div>
-            <ul>
-              {publicChannels.map(channel => (
+            <ul className="space-y-0.5">
+              {publicChannels
+                .filter(c => !channelSearch || c.name.toLowerCase().includes(channelSearch.toLowerCase()))
+                .map(channel => (
                 <li
                   key={channel.id}
                   onClick={() => setActiveChannelId(channel.id)}
-                  className={`px-3 py-2.5 md:py-1.5 flex items-center justify-between cursor-pointer mx-1.5 rounded-lg md:rounded group active:opacity-80 ${activeChannelId === channel.id ? 'bg-portal-accent text-white' : 'text-portal-soft hover:bg-portal-surface2'}`}
+                  className={`px-3 py-2.5 md:py-2 flex items-center justify-between cursor-pointer mx-1.5 rounded-lg group active:opacity-80 ${activeChannelId === channel.id ? 'bg-portal-accent text-white' : 'text-portal-soft hover:bg-portal-surface2'}`}
                 >
-                  <div className="flex items-center truncate">
+                  <div className="flex items-center gap-2 md:gap-1.5 truncate min-w-0">
                     {channel.is_private ? (
-                      <Lock className="w-4 h-4 md:w-3.5 md:h-3.5 mr-2 md:mr-1.5 opacity-70" />
+                      <Lock className="w-3.5 h-3.5 flex-shrink-0 opacity-60" />
                     ) : (
-                      <Hash className="w-4 h-4 md:w-3.5 md:h-3.5 mr-2 md:mr-1.5 opacity-70" />
+                      <Hash className="w-3.5 h-3.5 flex-shrink-0 opacity-60" />
                     )}
-                    <span className={`truncate text-base md:text-sm ${channel.unread ? 'font-bold text-white' : ''}`}>
-                      {channel.name} {channel.unread ? `(${channel.unread})` : ''}
+                    <span className={`truncate text-sm ${channel.unread ? 'font-semibold text-white' : ''}`}>
+                      {channel.name}
                     </span>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 flex-shrink-0 ml-1">
+                    {channel.unread ? (
+                      <span className="min-w-[18px] h-[18px] bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1">
+                        {channel.unread}
+                      </span>
+                    ) : null}
                     {channel.is_private && channel.owner_id === currentUser.id && (
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowMembersModal(true);
-                          loadChannelMembers(channel.id);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 text-portal-soft hover:text-blue-400"
+                        onClick={(e) => { e.stopPropagation(); setShowMembersModal(true); loadChannelMembers(channel.id); }}
+                        className="opacity-0 group-hover:opacity-100 text-portal-soft hover:text-blue-400 p-0.5"
                         title="Manage members"
                       >
-                        <UserPlus className="w-4 h-4" />
+                        <UserPlus className="w-3.5 h-3.5" />
                       </button>
                     )}
                     {currentUser.role === 'Owner' && (
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (window.confirm(`Delete #${channel.name} and all its messages?`)) {
-                            handleDeleteChannel(channel.id);
-                          }
-                        }}
-                        className="opacity-0 group-hover:opacity-100 text-portal-soft hover:text-red-400"
-                      title="Delete channel"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  )}
+                        onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete #${channel.name} and all its messages?`)) handleDeleteChannel(channel.id); }}
+                        className="opacity-0 group-hover:opacity-100 text-portal-soft hover:text-red-400 p-0.5"
+                        title="Delete channel"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    )}
                   </div>
                 </li>
               ))}
@@ -2084,90 +2112,95 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
           <div>
             <div className="px-3 flex items-center justify-between group text-portal-soft mb-1">
               <span className="text-[10px] font-semibold uppercase tracking-wider">Direct Messages</span>
-              <button onClick={refreshData} title="Refresh List" className={`${isRefreshing ? 'animate-spin' : ''} hover:text-white`}>
+              <button onClick={refreshData} title="Refresh" className={`${isRefreshing ? 'animate-spin' : ''} hover:text-white p-0.5`}>
                 <RefreshCw className="w-2.5 h-2.5" />
               </button>
             </div>
-            <ul>
-              {dmChannels.map(channel => {
-                const { name, avatar, isOnline } = getDMInfo(channel);
-                return (
-                  <li
-                    key={channel.id}
-                    onClick={() => setActiveChannelId(channel.id)}
-                    className={`px-3 py-2.5 md:py-1.5 flex items-center gap-2 md:gap-1.5 mx-1.5 rounded-lg md:rounded group cursor-pointer active:opacity-80 ${activeChannelId === channel.id ? 'bg-portal-accent text-white' : 'text-portal-soft hover:bg-portal-surface2'}`}
-                  >
-                    <div className="relative w-5 h-5 md:w-4 md:h-4 flex-shrink-0">
-                      {avatar ? (
-                        <img src={avatar} alt="" className="w-5 h-5 md:w-4 md:h-4 rounded-full object-cover" />
-                      ) : (
-                        <div className="w-5 h-5 md:w-4 md:h-4 rounded-full bg-green-600 flex items-center justify-center text-[9px] md:text-[8px] text-white font-bold">
-                          {name.charAt(0)}
-                        </div>
-                      )}
-                      {channel.unread ? (
-                        <div className="absolute -top-1 -right-1 w-2.5 h-2.5 md:w-2 md:h-2 bg-red-500 rounded-full border border-[#3F0E40]" title="Unread messages"></div>
-                      ) : isOnline ? (
-                        <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 md:w-2 md:h-2 bg-green-500 rounded-full border border-[#3F0E40]" title="Online"></div>
-                      ) : null}
-                    </div>
-                    <span className={`truncate text-base md:text-sm flex-1 ${channel.unread ? 'font-bold text-white' : ''}`}>
-                      {name} {channel.unread ? `(${channel.unread})` : ''}
-                      {isOnline && !channel.unread && <span className="ml-1 text-[10px] text-green-400">●</span>}
-                    </span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (window.confirm(`Delete conversation with ${name}?`)) {
-                          handleDeleteChannel(channel.id);
-                        }
-                      }}
-                      className="opacity-0 group-hover:opacity-100 text-portal-soft hover:text-red-400 flex-shrink-0 p-1"
-                      title="Delete conversation"
+            <ul className="space-y-0.5">
+              {dmChannels
+                .filter(c => {
+                  if (!channelSearch) return true;
+                  const { name } = getDMInfo(c);
+                  return name.toLowerCase().includes(channelSearch.toLowerCase());
+                })
+                .map(channel => {
+                  const { name, avatar, isOnline } = getDMInfo(channel);
+                  return (
+                    <li
+                      key={channel.id}
+                      onClick={() => setActiveChannelId(channel.id)}
+                      className={`px-3 py-2 md:py-1.5 flex items-center gap-2.5 md:gap-2 mx-1.5 rounded-lg group cursor-pointer active:opacity-80 ${activeChannelId === channel.id ? 'bg-portal-accent text-white' : 'text-portal-soft hover:bg-portal-surface2'}`}
                     >
-                      <Trash2 className="w-4 h-4 md:w-3 md:h-3" />
-                    </button>
-                  </li>
-                );
-              })}
-              {dmChannels.length === 0 && <li className="px-3 text-[10px] text-portal-soft italic">No active chats</li>}
+                      <div className="relative w-6 h-6 flex-shrink-0">
+                        {avatar ? (
+                          <img src={avatar} alt="" className="w-6 h-6 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-6 h-6 rounded-full bg-portal-dark flex items-center justify-center text-[10px] text-white font-bold">
+                            {name.charAt(0)}
+                          </div>
+                        )}
+                        {channel.unread ? (
+                          <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full border border-portal-surface" />
+                        ) : isOnline ? (
+                          <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full border border-portal-surface" />
+                        ) : null}
+                      </div>
+                      <span className={`truncate text-sm flex-1 ${channel.unread ? 'font-semibold text-white' : ''}`}>
+                        {name}
+                      </span>
+                      {channel.unread ? (
+                        <span className="min-w-[18px] h-[18px] bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1 flex-shrink-0">
+                          {channel.unread}
+                        </span>
+                      ) : null}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete conversation with ${name}?`)) handleDeleteChannel(channel.id); }}
+                        className="opacity-0 group-hover:opacity-100 text-portal-soft hover:text-red-400 flex-shrink-0 p-0.5"
+                        title="Delete conversation"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </li>
+                  );
+                })}
+              {dmChannels.length === 0 && <li className="px-3 text-[10px] text-portal-soft italic py-1">No active chats</li>}
             </ul>
           </div>
 
-          {/* Partner Chats - Only visible to Owners and Admins */}
+          {/* Partner Chats */}
           {partners.length > 0 && (currentUser.role === 'Owner' || currentUser.role === 'Admin') && (
             <div>
               <div className="px-3 flex items-center justify-between group text-portal-soft mb-1">
                 <span className="text-[10px] font-semibold uppercase tracking-wider">Partner Chats</span>
                 <Users className="w-2.5 h-2.5 text-purple-400" />
               </div>
-              <ul>
+              <ul className="space-y-0.5">
                 {partners.map(partner => (
                   <li
                     key={partner.id}
                     onClick={() => handleSelectPartner(partner.id)}
-                    className={`px-3 py-2.5 md:py-1.5 flex items-center gap-2 md:gap-1.5 mx-1.5 rounded-lg md:rounded group cursor-pointer active:opacity-80 ${activePartnerId === partner.id ? 'bg-purple-600 text-white' : 'text-portal-soft hover:bg-portal-surface2'}`}
+                    className={`px-3 py-2 md:py-1.5 flex items-center gap-2.5 md:gap-2 mx-1.5 rounded-lg group cursor-pointer active:opacity-80 ${activePartnerId === partner.id ? 'bg-purple-600 text-white' : 'text-portal-soft hover:bg-portal-surface2'}`}
                   >
-                    <div className="relative w-5 h-5 md:w-4 md:h-4 flex-shrink-0">
+                    <div className="relative w-6 h-6 flex-shrink-0">
                       {partner.avatar_url ? (
-                        <img src={partner.avatar_url} alt="" className="w-5 h-5 md:w-4 md:h-4 rounded-full object-cover" />
+                        <img src={partner.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
                       ) : (
-                        <div className="w-5 h-5 md:w-4 md:h-4 rounded-full bg-purple-500 flex items-center justify-center text-[9px] md:text-[8px] text-white font-bold">
+                        <div className="w-6 h-6 rounded-full bg-purple-500 flex items-center justify-center text-[10px] text-white font-bold">
                           {partner.company_name.charAt(0)}
                         </div>
                       )}
                       {partner.unreadMessages > 0 && (
-                        <div className="absolute -top-1 -right-1 w-2.5 h-2.5 md:w-2 md:h-2 bg-red-500 rounded-full border border-[#3F0E40]" title="Unread messages"></div>
+                        <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full border border-portal-surface" />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <span className={`truncate text-base md:text-sm block ${partner.unreadMessages > 0 ? 'font-bold text-white' : ''}`}>
+                      <span className={`truncate text-sm block ${partner.unreadMessages > 0 ? 'font-semibold text-white' : ''}`}>
                         {partner.company_name}
                       </span>
                       <span className="text-[10px] text-portal-soft truncate block">{partner.full_name}</span>
                     </div>
                     {partner.unreadMessages > 0 && (
-                      <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                      <span className="min-w-[18px] h-[18px] bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1 flex-shrink-0">
                         {partner.unreadMessages}
                       </span>
                     )}
@@ -2177,45 +2210,51 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
             </div>
           )}
 
-          {/* All Team Members */}
+          {/* Team — collapsible */}
           <div>
-            <div className="px-3 flex items-center justify-between group text-portal-soft mb-1">
+            <button
+              onClick={() => setIsTeamExpanded(prev => !prev)}
+              className="w-full px-3 flex items-center justify-between text-portal-soft mb-1 hover:text-portal-text transition-colors"
+            >
               <span className="text-[10px] font-semibold uppercase tracking-wider">Team</span>
-              <Users className="w-2.5 h-2.5" />
-            </div>
-            <ul>
-              {profiles.map(p => (
-                <li
-                  key={p.id}
-                  onClick={() => handleStartDM(p.id)}
-                  className="px-3 py-2.5 md:py-1.5 flex items-center gap-2 md:gap-1.5 mx-1.5 text-portal-soft hover:bg-portal-surface2 rounded-lg md:rounded cursor-pointer transition-colors active:opacity-80"
-                >
-                  <div className="relative">
-                    {p.avatar_url ? (
-                      <img src={p.avatar_url} alt="" className="w-5 h-5 md:w-3.5 md:h-3.5 rounded-full object-cover" />
-                    ) : (
-                      <div className="w-5 h-5 md:w-3.5 md:h-3.5 rounded-full bg-portal-dark0 flex items-center justify-center text-[9px] md:text-[7px] text-white font-bold">
-                        {p.full_name?.charAt(0) || '?'}
-                      </div>
+              <div className="flex items-center gap-1">
+                <Users className="w-2.5 h-2.5" />
+                <ChevronDown className={`w-3 h-3 transition-transform duration-150 ${isTeamExpanded ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
+            {isTeamExpanded && (
+              <ul className="space-y-0.5">
+                {profiles
+                  .filter(p => !channelSearch || (p.full_name || '').toLowerCase().includes(channelSearch.toLowerCase()))
+                  .map(p => (
+                  <li
+                    key={p.id}
+                    onClick={() => handleStartDM(p.id)}
+                    className="px-3 py-2 md:py-1.5 flex items-center gap-2.5 md:gap-2 mx-1.5 text-portal-soft hover:bg-portal-surface2 rounded-lg cursor-pointer transition-colors active:opacity-80"
+                  >
+                    <div className="relative w-6 h-6 flex-shrink-0">
+                      {p.avatar_url ? (
+                        <img src={p.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-6 h-6 rounded-full bg-portal-dark flex items-center justify-center text-[10px] text-white font-bold">
+                          {p.full_name?.charAt(0) || '?'}
+                        </div>
+                      )}
+                      <div className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-portal-surface ${p.isOnline ? 'bg-green-500' : 'bg-slate-600'}`} />
+                    </div>
+                    <span className="truncate text-sm flex-1">
+                      {p.full_name || p.email?.split('@')[0] || 'Team Member'}
+                      {p.id === currentUser.id && <span className="ml-1 text-[10px] text-portal-soft">(You)</span>}
+                    </span>
+                    {p.isOnline && p.id !== currentUser.id && (
+                      <span className="text-[9px] text-green-400 flex-shrink-0">●</span>
                     )}
-                    <div
-                      className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 md:w-1.5 md:h-1.5 rounded-full border border-[#3F0E40] ${
-                        p.isOnline ? 'bg-green-500' : 'bg-slate-400'
-                      }`}
-                      title={p.isOnline ? 'Online' : 'Offline'}
-                    />
-                  </div>
-                  <span className="truncate text-base md:text-sm flex-1">
-                    {p.full_name || p.email?.split('@')[0] || 'Team Member'}
-                    {p.id === currentUser.id && ' (You)'}
-                  </span>
-                  {p.isOnline && p.id !== currentUser.id && (
-                    <span className="text-[10px] md:text-[9px] text-green-400 font-medium">●</span>
-                  )}
-                </li>
-              ))}
-            </ul>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
+
         </div>
       </div>
 
