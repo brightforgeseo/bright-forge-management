@@ -91,8 +91,8 @@ const ContentTool: React.FC = () => {
             <div className="grid grid-cols-2 gap-2">
               {(['edit', 'full'] as ContentMode[]).map((m) => {
                 const cfg = m === 'edit'
-                  ? { label: 'Fast Draft', desc: 'Echo → Gemma edit. ~30s.', badge: '~30s', color: 'text-emerald-400', activeBorder: 'border-emerald-500 bg-emerald-500/10', icon: <Zap className="w-4 h-4" /> }
-                  : { label: 'Full Article', desc: 'Echo outline → Sassin. ~90s.', badge: '~90s', color: 'text-brand-400', activeBorder: 'border-brand-500 bg-brand-500/10', icon: <Star className="w-4 h-4" /> };
+                  ? { label: 'Fast Draft', desc: 'Quick draft cleaned up by Gemma. Good for turnarounds.', badge: '~30s', color: 'text-emerald-400', activeBorder: 'border-emerald-500 bg-emerald-500/10', icon: <Zap className="w-4 h-4" /> }
+                  : { label: 'Full Article', desc: 'Echo outlines, Sassin writes. Longer and more polished.', badge: '~90s', color: 'text-brand-400', activeBorder: 'border-brand-500 bg-brand-500/10', icon: <Star className="w-4 h-4" /> };
                 const active = mode === m;
                 return (
                   <button
