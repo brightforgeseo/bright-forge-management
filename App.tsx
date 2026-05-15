@@ -34,6 +34,9 @@ const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentView, setCurrentView] = useState<ToolView>(ToolView.DASHBOARD);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem('sidebar-collapsed') === 'true'; } catch { return false; }
+  });
 
   // Command Palette
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
@@ -223,6 +226,17 @@ const App: React.FC = () => {
     fetchProfiles().then(setPaletteProfiles).catch(() => {});
   }, [isAuthenticated]);
 
+  // Sync sidebar collapsed state from localStorage (Sidebar writes it directly)
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'sidebar-collapsed') {
+        setIsSidebarCollapsed(e.newValue === 'true');
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
   // Global keyboard shortcuts
   // Cmd/Ctrl+K → Command Palette
   // G then D/T/M/C/E → jump to view
@@ -406,7 +420,7 @@ ${currentUser.name}`;
       </div>
       )}
 
-      <main className={`flex-1 lg:ml-64 h-full overflow-hidden relative ${isFullHeight ? '' : 'bg-portal-dark'} ${currentView === ToolView.TEAM_CHAT ? '' : 'pt-14'} lg:pt-0 pb-16 lg:pb-0`}>
+      <main className={`flex-1 ${isSidebarCollapsed ? 'lg:ml-[60px]' : 'lg:ml-64'} h-full overflow-hidden relative transition-all duration-200 ${isFullHeight ? '' : 'bg-portal-dark'} ${currentView === ToolView.TEAM_CHAT ? '' : 'pt-14'} lg:pt-0 pb-16 lg:pb-0`}>
         {isFullHeight ? renderContent() : <ScrollablePageWrapper>{renderContent()}</ScrollablePageWrapper>}
       </main>
       <ToastContainer toasts={toasts} removeToast={removeToast} />

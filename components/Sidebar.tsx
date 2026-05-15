@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Search, PenTool, BarChart, Settings, TableProperties, MessageSquare, Hexagon, LogOut, UserPlus, MoreVertical, Bell, X, Check, CheckSquare, Menu, FileCheck, Zap } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { LayoutDashboard, Search, PenTool, BarChart, Settings, TableProperties, MessageSquare, Hexagon, LogOut, UserPlus, MoreVertical, Bell, X, Check, CheckSquare, Menu, FileCheck, Zap, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { ToolView, BrandingConfig, User, AppNotification } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { fetchNotifications, markNotificationRead, markAllNotificationsRead, deleteAllNotifications, deleteNotification } from '../services/databaseService';
@@ -171,11 +171,44 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    try { return localStorage.getItem('sidebar-collapsed') === 'true'; } catch { return false; }
+  });
+  const [recentViews, setRecentViews] = useState<ToolView[]>(() => {
+    try { return JSON.parse(localStorage.getItem('sidebar-recent') || '[]'); } catch { return []; }
+  });
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
 
   const handleViewChange = (view: ToolView) => {
     onChangeView(view);
     setIsMobileMenuOpen(false);
+    // Track recent views (last 3, no duplicates, exclude current)
+    setRecentViews(prev => {
+      const next = [view, ...prev.filter(v => v !== view)].slice(0, 3);
+      try { localStorage.setItem('sidebar-recent', JSON.stringify(next)); } catch {}
+      return next;
+    });
+    // Reset unread count when navigating to chat
+    if (view === ToolView.TEAM_CHAT) setUnreadChatCount(0);
   };
+
+  const toggleCollapsed = () => {
+    setIsCollapsed(prev => {
+      const next = !prev;
+      try { localStorage.setItem('sidebar-collapsed', String(next)); } catch {}
+      return next;
+    });
+  };
+
+  // Listen for unread chat messages broadcast from TeamChat
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const count = (e as CustomEvent).detail?.count ?? 0;
+      if (currentView !== ToolView.TEAM_CHAT) setUnreadChatCount(count);
+    };
+    window.addEventListener('chatUnreadCount', handler);
+    return () => window.removeEventListener('chatUnreadCount', handler);
+  }, [currentView]);
 
   // Request notification permission + register web push subscription on mount.
   // enableWebPush handles permission, SW registration, PushManager.subscribe, and persistence.
@@ -449,6 +482,11 @@ const Sidebar: React.FC<SidebarProps> = ({
     },
   ];
 
+  const allNavItems = navGroups.flatMap(g => g.items);
+  const getLabel = (view: ToolView) => allNavItems.find(i => i.id === view)?.label ?? view;
+  const getIcon = (view: ToolView) => allNavItems.find(i => i.id === view)?.icon ?? Clock;
+  const recentFiltered = recentViews.filter(v => v !== currentView).slice(0, 3);
+
   return (
     <>
       {/* Mobile Overlay */}
@@ -461,14 +499,19 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Sidebar */}
       <div className={`
-        w-72 lg:w-64 bg-portal-surface text-white flex flex-col h-full fixed left-0 top-0 shadow-xl transition-transform duration-300 ease-out
+        ${isCollapsed ? 'w-[60px]' : 'w-72 lg:w-64'} bg-portal-surface text-white flex flex-col h-full fixed left-0 top-0 shadow-xl transition-all duration-200 ease-out
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `} style={{ zIndex: 100 }}>
+
       {/* Brand Header */}
       <div className="p-3 pt-8 border-b border-white/[0.07] flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-2 overflow-hidden min-w-0 flex-1">
+        {!isCollapsed && (
+          <div className="flex items-center gap-2 overflow-hidden min-w-0 flex-1">
             <img src={logoUrl} alt="BrightForge" className="w-[200px] flex-shrink-0" />
-        </div>
+          </div>
+        )}
+        {isCollapsed && <div className="flex-1" />}
+
         {/* Mobile close button */}
         <button
           onClick={() => setIsMobileMenuOpen(false)}
@@ -478,83 +521,95 @@ const Sidebar: React.FC<SidebarProps> = ({
           <X className="w-5 h-5 text-portal-soft" />
         </button>
 
-        {/* Notification Bell */}
-        <div className="relative flex-shrink-0">
-          <button
-            onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-            className="p-1.5 rounded-lg hover:bg-portal-surface2 transition-colors relative"
-          >
-            <Bell className={`w-4 h-4 ${unreadCount > 0 ? 'text-portal-accent' : 'text-portal-soft'}`} />
-            {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] bg-portal-accent text-white text-[9px] font-bold rounded-full border-2 border-portal-surface flex items-center justify-center px-0.5">
-                {unreadCount}
-              </span>
-            )}
-          </button>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {/* Notification Bell — hide when collapsed */}
+          {!isCollapsed && (
+            <div className="relative">
+              <button
+                onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                className="p-1.5 rounded-lg hover:bg-portal-surface2 transition-colors relative"
+              >
+                <Bell className={`w-4 h-4 ${unreadCount > 0 ? 'text-portal-accent' : 'text-portal-soft'}`} />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] bg-portal-accent text-white text-[9px] font-bold rounded-full border-2 border-portal-surface flex items-center justify-center px-0.5">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
 
-          {/* Notification Panel - Dropdown (responsive for mobile) */}
-          {isNotificationsOpen && (
-            <>
-              <div className="fixed inset-0" style={{ zIndex: 10000 }} onClick={() => setIsNotificationsOpen(false)}></div>
-              <div className="fixed top-14 left-2 right-2 sm:left-auto sm:right-auto sm:left-[270px] w-auto sm:w-80 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden text-slate-900 max-h-[calc(100vh-4rem)]" style={{ zIndex: 10001 }}>
-                <div className="p-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                  <h3 className="font-bold text-sm text-slate-700">Notifications</h3>
-                  <div className="flex gap-2">
-                    {unreadCount > 0 && (
-                      <button onClick={handleMarkAllRead} className="text-xs text-brand-600 hover:text-brand-700 font-medium">
-                        Mark all read
-                      </button>
-                    )}
-                    {notifications.length > 0 && (
-                      <button onClick={handleClearAll} className="text-xs text-red-600 hover:text-red-700 font-medium">
-                        Clear all
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <div className="overflow-y-auto max-h-[500px]">
-                  {notifications.length === 0 ? (
-                    <div className="p-8 text-center text-portal-soft text-sm">No notifications</div>
-                  ) : (
-                    notifications.map(n => (
-                      <div
-                        key={n.id}
-                        className={`p-3 border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer group ${!n.isRead ? 'bg-blue-50/30' : ''}`}
-                        onClick={() => handleNotificationClick(n)}
-                      >
-                        <div className="flex justify-between items-start gap-2">
-                          <div className="flex-1 min-w-0">
-                            <p className={`text-sm ${!n.isRead ? 'font-bold text-slate-900' : 'font-medium text-slate-700'}`}>{n.title}</p>
-                            <p className="text-xs text-portal-soft line-clamp-2 mt-0.5">{n.message}</p>
-                            <p className="text-[10px] text-portal-soft mt-1">
-                              {new Date(n.createdAt).toLocaleTimeString()} · {new Date(n.createdAt).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-1 flex-shrink-0">
-                            {!n.isRead && <div className="w-2 h-2 bg-brand-500 rounded-full"></div>}
-                            <button
-                              onClick={(e) => handleDeleteNotification(e, n.id)}
-                              className="p-1 text-portal-soft hover:text-red-500 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-all"
-                              title="Delete notification"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
+              {isNotificationsOpen && (
+                <>
+                  <div className="fixed inset-0" style={{ zIndex: 10000 }} onClick={() => setIsNotificationsOpen(false)}></div>
+                  <div className="fixed top-14 left-2 right-2 sm:left-auto sm:right-auto sm:left-[270px] w-auto sm:w-80 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden text-slate-900 max-h-[calc(100vh-4rem)]" style={{ zIndex: 10001 }}>
+                    <div className="p-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                      <h3 className="font-bold text-sm text-slate-700">Notifications</h3>
+                      <div className="flex gap-2">
+                        {unreadCount > 0 && (
+                          <button onClick={handleMarkAllRead} className="text-xs text-brand-600 hover:text-brand-700 font-medium">
+                            Mark all read
+                          </button>
+                        )}
+                        {notifications.length > 0 && (
+                          <button onClick={handleClearAll} className="text-xs text-red-600 hover:text-red-700 font-medium">
+                            Clear all
+                          </button>
+                        )}
                       </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </>
+                    </div>
+                    <div className="overflow-y-auto max-h-[500px]">
+                      {notifications.length === 0 ? (
+                        <div className="p-8 text-center text-portal-soft text-sm">No notifications</div>
+                      ) : (
+                        notifications.map(n => (
+                          <div
+                            key={n.id}
+                            className={`p-3 border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer group ${!n.isRead ? 'bg-blue-50/30' : ''}`}
+                            onClick={() => handleNotificationClick(n)}
+                          >
+                            <div className="flex justify-between items-start gap-2">
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-sm ${!n.isRead ? 'font-bold text-slate-900' : 'font-medium text-slate-700'}`}>{n.title}</p>
+                                <p className="text-xs text-portal-soft line-clamp-2 mt-0.5">{n.message}</p>
+                                <p className="text-[10px] text-portal-soft mt-1">
+                                  {new Date(n.createdAt).toLocaleTimeString()} · {new Date(n.createdAt).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                {!n.isRead && <div className="w-2 h-2 bg-brand-500 rounded-full"></div>}
+                                <button
+                                  onClick={(e) => handleDeleteNotification(e, n.id)}
+                                  className="p-1 text-portal-soft hover:text-red-500 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-all"
+                                  title="Delete notification"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           )}
+
+          {/* Collapse toggle — desktop only */}
+          <button
+            onClick={toggleCollapsed}
+            className="hidden lg:flex p-1.5 rounded-lg hover:bg-portal-surface2 transition-colors text-portal-soft hover:text-portal-text"
+            title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          </button>
         </div>
       </div>
 
-      <nav className="flex-1 px-2 py-3 overflow-y-auto min-h-0 space-y-4">
+      <nav className={`flex-1 ${isCollapsed ? 'px-1' : 'px-2'} py-3 overflow-y-auto min-h-0 space-y-4`}>
 
-        {/* Command Palette shortcut button */}
-        {onOpenPalette && (
+        {/* Command Palette shortcut — hide when collapsed */}
+        {onOpenPalette && !isCollapsed && (
           <button
             onClick={onOpenPalette}
             className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.07] hover:bg-white/[0.08] transition-colors text-portal-soft hover:text-portal-text group"
@@ -564,35 +619,86 @@ const Sidebar: React.FC<SidebarProps> = ({
             <kbd className="hidden lg:inline px-1.5 py-0.5 rounded bg-white/10 text-[10px] font-mono text-white/30">⌘K</kbd>
           </button>
         )}
+        {onOpenPalette && isCollapsed && (
+          <button
+            onClick={onOpenPalette}
+            className="w-full flex items-center justify-center p-2.5 rounded-lg bg-white/[0.04] border border-white/[0.07] hover:bg-white/[0.08] transition-colors text-portal-soft hover:text-portal-text"
+            title="Search (⌘K)"
+          >
+            <Search className="w-4 h-4" />
+          </button>
+        )}
+
+        {/* Recent views strip — collapsed hides labels */}
+        {recentFiltered.length > 0 && !isCollapsed && (
+          <div>
+            <div className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-white/25">RECENT</div>
+            <div className="space-y-0.5">
+              {recentFiltered.map(view => {
+                const Icon = getIcon(view);
+                return (
+                  <button
+                    key={view}
+                    onClick={() => handleViewChange(view)}
+                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-portal-soft/70 hover:bg-portal-surface2 hover:text-portal-text transition-all duration-150 text-xs"
+                  >
+                    <Clock className="w-3.5 h-3.5 flex-shrink-0 opacity-50" />
+                    <span className="truncate">{getLabel(view)}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Grouped nav */}
         {navGroups.map(group => (
           <div key={group.label}>
-            <div className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-white/25">
-              {group.label}
-            </div>
+            {!isCollapsed && (
+              <div className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-white/25">
+                {group.label}
+              </div>
+            )}
             <div className="space-y-0.5">
               {group.items.map((item) => {
                 const Icon = item.icon;
                 const isActive = currentView === item.id;
+                const chatBadge = item.id === ToolView.TEAM_CHAT && unreadChatCount > 0;
                 return (
                   <button
                     key={item.id}
                     onClick={() => handleViewChange(item.id)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 lg:py-2 rounded-xl lg:rounded-lg transition-all duration-200 group active:scale-[0.98] ${
+                    title={isCollapsed ? item.label : undefined}
+                    className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-${isCollapsed ? '0' : '3'} py-2.5 lg:py-2 rounded-xl lg:rounded-lg transition-all duration-200 group active:scale-[0.98] ${
                       isActive
                         ? 'bg-portal-accent text-white shadow-md shadow-portal-accent/20'
                         : 'text-portal-soft hover:bg-portal-surface2 hover:text-portal-text active:bg-portal-surface2'
                     }`}
                   >
-                    <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-white' : 'text-portal-soft group-hover:text-portal-text'}`} />
-                    <span className="flex-1 font-medium text-sm truncate text-left">{item.label}</span>
-                    {item.shortcut && (
-                      <span className="hidden lg:flex gap-0.5 flex-shrink-0">
-                        {item.shortcut.split(' ').map((k: string, ki: number) => (
-                          <kbd key={ki} className={`px-1 py-0.5 rounded text-[9px] font-mono ${isActive ? 'bg-white/20 text-white/70' : 'bg-white/10 text-white/25'}`}>{k}</kbd>
-                        ))}
-                      </span>
+                    <div className="relative flex-shrink-0">
+                      <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-portal-soft group-hover:text-portal-text'}`} />
+                      {chatBadge && isCollapsed && (
+                        <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full" />
+                      )}
+                    </div>
+                    {!isCollapsed && (
+                      <>
+                        <span className="flex-1 font-medium text-sm truncate text-left">{item.label}</span>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          {chatBadge && (
+                            <span className="min-w-[18px] h-[18px] bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1">
+                              {unreadChatCount > 99 ? '99+' : unreadChatCount}
+                            </span>
+                          )}
+                          {item.shortcut && (
+                            <span className="hidden lg:flex gap-0.5">
+                              {item.shortcut.split(' ').map((k: string, ki: number) => (
+                                <kbd key={ki} className={`px-1 py-0.5 rounded text-[9px] font-mono ${isActive ? 'bg-white/20 text-white/70' : 'bg-white/10 text-white/25'}`}>{k}</kbd>
+                              ))}
+                            </span>
+                          )}
+                        </div>
+                      </>
                     )}
                   </button>
                 );
@@ -602,7 +708,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         ))}
 
         {/* Invite Button */}
-        {currentUser.role === 'Owner' && (
+        {currentUser.role === 'Owner' && !isCollapsed && (
           <div>
             <div className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-white/25">TEAM</div>
             <button
@@ -614,21 +720,45 @@ const Sidebar: React.FC<SidebarProps> = ({
             </button>
           </div>
         )}
+        {currentUser.role === 'Owner' && isCollapsed && (
+          <button
+            onClick={onInvite}
+            title="Invite Member"
+            className="w-full flex items-center justify-center py-2.5 lg:py-2 rounded-xl lg:rounded-lg transition-all duration-200 bg-blue-600/10 text-blue-400 hover:bg-blue-600 hover:text-white"
+          >
+            <UserPlus className="w-4 h-4" />
+          </button>
+        )}
       </nav>
 
-      <div className="p-2 border-t border-white/[0.07] flex-shrink-0">
+      <div className={`${isCollapsed ? 'p-1' : 'p-2'} border-t border-white/[0.07] flex-shrink-0`}>
         {/* User Profile */}
         <div className="relative">
+          {isCollapsed ? (
+            <button
+              onClick={() => setIsProfileOpen(!isProfileOpen)}
+              className="w-full flex items-center justify-center p-2 hover:bg-portal-surface2 rounded-lg transition-colors"
+              title={currentUser.name}
+            >
+              {currentUser.avatarUrl ? (
+                <img src={currentUser.avatarUrl} alt="Avatar" className="w-7 h-7 rounded-full object-cover border border-portal-accent" />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-portal-accent flex items-center justify-center text-[10px] font-bold text-white border border-portal-accent shadow-sm">
+                  {currentUser.initials}
+                </div>
+              )}
+            </button>
+          ) : (
             <button
               onClick={() => setIsProfileOpen(!isProfileOpen)}
               className="w-full flex items-center gap-2 p-1.5 hover:bg-portal-surface2 rounded-lg transition-colors group"
             >
               {currentUser.avatarUrl ? (
-                  <img src={currentUser.avatarUrl} alt="Avatar" className="w-7 h-7 rounded-full object-cover border border-portal-accent flex-shrink-0" />
+                <img src={currentUser.avatarUrl} alt="Avatar" className="w-7 h-7 rounded-full object-cover border border-portal-accent flex-shrink-0" />
               ) : (
-                  <div className="w-7 h-7 rounded-full bg-portal-accent flex items-center justify-center text-[10px] font-bold text-white border border-portal-accent shadow-sm flex-shrink-0">
-                    {currentUser.initials}
-                  </div>
+                <div className="w-7 h-7 rounded-full bg-portal-accent flex items-center justify-center text-[10px] font-bold text-white border border-portal-accent shadow-sm flex-shrink-0">
+                  {currentUser.initials}
+                </div>
               )}
               <div className="flex-1 text-left overflow-hidden min-w-0">
                 <p className="text-xs font-medium text-portal-text truncate">{currentUser.name}</p>
@@ -636,31 +766,34 @@ const Sidebar: React.FC<SidebarProps> = ({
               </div>
               <MoreVertical className="w-3.5 h-3.5 text-portal-soft group-hover:text-portal-text flex-shrink-0" />
             </button>
+          )}
 
-            {/* Profile Menu */}
-            {isProfileOpen && (
-              <>
-              <div className="fixed inset-0 z-10" onClick={() => setIsProfileOpen(false)}></div>
-              <div className="absolute bottom-full left-0 w-full bg-portal-surface2 border border-white/[0.07] rounded-xl shadow-xl mb-2 overflow-hidden z-20 animate-fadeIn">
-                 <div className="p-2.5 border-b border-white/[0.07]">
-                    <p className="text-[10px] text-portal-soft">Signed in as</p>
-                    <p className="text-xs font-medium text-white truncate">{currentUser.email}</p>
-                 </div>
-                 <button
-                    onClick={onLogout}
-                    className="w-full text-left p-2.5 text-xs flex items-center gap-2 hover:bg-red-900/20 text-red-400 hover:text-red-300 transition-colors"
-                 >
-                    <LogOut className="w-3.5 h-3.5" /> Log Out
-                 </button>
-              </div>
-              </>
-            )}
+          {/* Profile Menu */}
+          {isProfileOpen && (
+            <>
+            <div className="fixed inset-0 z-10" onClick={() => setIsProfileOpen(false)}></div>
+            <div className="absolute bottom-full left-0 w-full bg-portal-surface2 border border-white/[0.07] rounded-xl shadow-xl mb-2 overflow-hidden z-20 animate-fadeIn">
+               <div className="p-2.5 border-b border-white/[0.07]">
+                  <p className="text-[10px] text-portal-soft">Signed in as</p>
+                  <p className="text-xs font-medium text-white truncate">{currentUser.email}</p>
+               </div>
+               <button
+                  onClick={onLogout}
+                  className="w-full text-left p-2.5 text-xs flex items-center gap-2 hover:bg-red-900/20 text-red-400 hover:text-red-300 transition-colors"
+               >
+                  <LogOut className="w-3.5 h-3.5" /> Log Out
+               </button>
+            </div>
+            </>
+          )}
         </div>
 
         {/* Version Number */}
-        <div className="text-center pt-1">
-          <span className="text-[10px] text-portal-soft">v{version}</span>
-        </div>
+        {!isCollapsed && (
+          <div className="text-center pt-1">
+            <span className="text-[10px] text-portal-soft">v{version}</span>
+          </div>
+        )}
       </div>
     </div>
     </>
