@@ -139,7 +139,7 @@ const ContentTool: React.FC = () => {
 
           <div>
             <label className="block text-sm font-medium text-portal-text mb-2">
-              Writing Instructions <span className="text-portal-soft font-normal">(optional)</span>
+              AI Prompt <span className="text-portal-soft font-normal">(optional)</span>
             </label>
             <textarea
               className="w-full p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none bg-white text-slate-900 resize-none"
