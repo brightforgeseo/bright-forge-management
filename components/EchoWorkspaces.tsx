@@ -293,7 +293,7 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
 
   if (!activeWorkspace) return null;
 
-  const activeCfg = MODEL_CONFIG[activeWorkspace.model];
+  const activeCfg = MODEL_CONFIG[activeWorkspace.model as keyof typeof MODEL_CONFIG] || MODEL_CONFIG['sassin'];
 
   return (
     <div className="flex flex-col h-full bg-portal-bg">
@@ -316,7 +316,7 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
       {/* Tabs */}
       <div className="flex-shrink-0 flex items-end gap-1 px-3 pt-2 overflow-x-auto scrollbar-hide border-b border-white/[0.07]">
         {workspaces.map(ws => {
-          const cfg = MODEL_CONFIG[ws.model];
+          const cfg = MODEL_CONFIG[ws.model as keyof typeof MODEL_CONFIG] || MODEL_CONFIG['sassin'];
           return (
             <div
               key={ws.id}
