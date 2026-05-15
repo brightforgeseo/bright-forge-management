@@ -342,21 +342,21 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
         )}
 
         {activeWorkspace.messages.map(msg => (
-          <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+          <div key={msg.id} className={`flex gap-2.5 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             {msg.role === 'assistant' && (
-              <div className="flex-shrink-0 w-7 h-7 rounded-full bg-brand-500/20 flex items-center justify-center mt-0.5">
-                <Bot size={14} className="text-brand-400" />
+              <div className="flex-shrink-0 w-7 h-7 rounded-full bg-brand-500 flex items-center justify-center mt-0.5">
+                <Bot size={14} className="text-white" />
               </div>
             )}
-            <div className={`max-w-[80%] ${msg.role === 'user' ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
+            <div className={`max-w-[75%] flex flex-col gap-1 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
               <div
-                className={`rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap leading-relaxed ${
+                className={`relative px-3.5 py-2.5 rounded-2xl text-sm ${
                   msg.role === 'user'
-                    ? 'bg-brand-500 text-white rounded-tr-sm'
-                    : 'bg-portal-surface text-white/90 rounded-tl-sm border border-white/[0.06]'
+                    ? 'bg-brand-600 text-white rounded-tr-sm'
+                    : 'bg-brand-500/10 border border-brand-500/20 text-portal-text rounded-tl-sm'
                 }`}
               >
-                {msg.text}
+                <span className="whitespace-pre-wrap leading-relaxed">{msg.text}</span>
               </div>
               <div className="flex items-center gap-2 px-1">
                 <span className="text-[10px] text-white/25">
@@ -365,19 +365,24 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
                 {msg.role === 'assistant' && routeBadge(msg.routedTo)}
               </div>
             </div>
+            {msg.role === 'user' && (
+              <div className="flex-shrink-0 w-7 h-7 rounded-full bg-brand-500 flex items-center justify-center mt-0.5 text-white font-bold text-xs">
+                {currentUser.name.charAt(0).toUpperCase()}
+              </div>
+            )}
           </div>
         ))}
 
         {activeWorkspace.isThinking && (
-          <div className="flex gap-3 justify-start">
-            <div className="flex-shrink-0 w-7 h-7 rounded-full bg-brand-500/20 flex items-center justify-center">
-              <Loader2 size={14} className="text-brand-400 animate-spin" />
+          <div className="flex gap-2.5 justify-start">
+            <div className="flex-shrink-0 w-7 h-7 rounded-full bg-brand-500 flex items-center justify-center">
+              <Bot size={14} className="text-white" />
             </div>
-            <div className="bg-portal-surface border border-white/[0.06] rounded-2xl rounded-tl-sm px-4 py-2.5">
-              <div className="flex gap-1 items-center h-5">
-                <span className="w-1.5 h-1.5 bg-white/30 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-1.5 h-1.5 bg-white/30 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-1.5 h-1.5 bg-white/30 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            <div className="bg-brand-500/10 border border-brand-500/20 rounded-2xl rounded-tl-sm px-3.5 py-2.5">
+              <div className="flex items-center gap-1.5 py-0.5">
+                <span className="w-2 h-2 bg-brand-400 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                <span className="w-2 h-2 bg-brand-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                <span className="w-2 h-2 bg-brand-400 rounded-full animate-bounce" />
               </div>
             </div>
           </div>
