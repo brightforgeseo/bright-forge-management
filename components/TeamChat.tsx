@@ -2689,263 +2689,306 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
               </button>
             </div>
           )}
-          {messages.map((msg) => (
-            <div key={msg.id} id={`msg-${msg.id}`} className={`flex gap-2 md:gap-4 group transition-colors duration-500 ${msg.isAi ? 'bg-brand-50/30 -mx-3 md:-mx-6 px-3 md:px-6 py-2' : ''}`}>
-              <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${msg.isAi ? 'bg-brand-500' : 'bg-portal-surface2'}`}>
-                {msg.isAi ? (
-                  <Bot className="w-4 h-4 md:w-6 md:h-6 text-white" />
-                ) : msg.avatar && msg.avatar !== 'user' && msg.avatar.startsWith('http') ? (
-                  <img src={msg.avatar} alt="" className="w-full h-full rounded-lg object-cover" />
-                ) : (
-                  <UserIcon className="w-4 h-4 md:w-6 md:h-6 text-portal-soft" />
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-baseline gap-1 md:gap-2">
-                  <span className={`font-bold text-sm md:text-base ${isDarkBackground() ? 'text-white' : 'text-white'}`}>{msg.sender}</span>
-                  <span className={`text-[10px] md:text-xs ${isDarkBackground() ? 'text-portal-soft' : 'text-portal-soft'}`}>
-                    {formatMessageTime(msg.timestamp)}
-                    {msg.isEdited && <span className="ml-1 italic">(edited)</span>}
-                  </span>
-                </div>
-                {msg.attachmentUrl && (
-                  <div className="mt-1 md:mt-2 mb-1">
-                    {msg.attachmentType === 'image' ? (
-                      <a href={msg.attachmentUrl} target="_blank" rel="noopener noreferrer">
-                        <img src={msg.attachmentUrl} alt="Attachment" className="max-h-48 md:max-h-60 rounded-lg border border-white/[0.07]" />
-                      </a>
-                    ) : msg.attachmentType === 'video' ? (
-                      <video
-                        src={msg.attachmentUrl}
-                        controls
-                        className="max-h-64 md:max-h-80 rounded-lg border border-white/[0.07]"
-                        preload="metadata"
-                      />
+          {messages.map((msg, msgIndex) => {
+            const isCurrentUser = msg.senderId === currentUser.id && !msg.isAi;
+            const prevMsg = msgIndex > 0 ? messages[msgIndex - 1] : null;
+            const isGrouped = !!(prevMsg &&
+              prevMsg.senderId === msg.senderId &&
+              !msg.isAi && !prevMsg.isAi &&
+              (new Date(msg.timestamp).getTime() - new Date(prevMsg.timestamp).getTime()) < 5 * 60 * 1000);
+            const isThinking = msg.isAi && msg.text === '⏳ Echo is thinking…';
+
+            return (
+              <div
+                key={msg.id}
+                id={`msg-${msg.id}`}
+                className={`flex group ${isCurrentUser ? 'justify-end' : 'justify-start'} ${isGrouped ? 'mt-0.5' : 'mt-3'}`}
+              >
+                {/* Left avatar for non-current-user */}
+                {!isCurrentUser && (
+                  <div className="flex-shrink-0 mr-2">
+                    {!isGrouped ? (
+                      <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg flex items-center justify-center ${msg.isAi ? 'bg-brand-500' : 'bg-portal-surface2'}`}>
+                        {msg.isAi ? (
+                          <Bot className="w-4 h-4 md:w-6 md:h-6 text-white" />
+                        ) : msg.avatar && msg.avatar !== 'user' && msg.avatar.startsWith('http') ? (
+                          <img src={msg.avatar} alt="" className="w-full h-full rounded-lg object-cover" />
+                        ) : (
+                          <UserIcon className="w-4 h-4 md:w-6 md:h-6 text-portal-soft" />
+                        )}
+                      </div>
                     ) : (
-                      <a
-                        href={msg.attachmentUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-3 px-4 py-3 bg-portal-surface2 hover:bg-portal-surface2 rounded-lg border border-white/[0.07] transition-colors group"
-                      >
-                        <div className="p-2 bg-portal-surface rounded-lg shadow-sm">
-                          <File className="w-5 h-5 text-brand-600" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-portal-text truncate max-w-[200px]">
-                            {msg.attachmentName || 'File attachment'}
-                          </p>
-                          <p className="text-xs text-portal-soft">Click to download</p>
-                        </div>
-                        <Download className="w-4 h-4 text-portal-soft group-hover:text-brand-600 transition-colors" />
-                      </a>
+                      <div className="w-8 md:w-10" />
                     )}
                   </div>
                 )}
-                {editingMessageId === msg.id ? (
-                  <div className="mt-2 space-y-2">
-                    <textarea
-                      value={editingText}
-                      onChange={(e) => setEditingText(e.target.value)}
-                      className="w-full p-2 text-xs md:text-sm border border-white/[0.07] rounded-lg focus:ring-2 focus:ring-brand-500 outline-none resize-none bg-white text-slate-900"
-                      rows={3}
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          handleEditMessage(msg.id);
-                        } else if (e.key === 'Escape') {
-                          handleCancelEdit();
-                        }
-                      }}
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleEditMessage(msg.id)}
-                        className="flex items-center gap-1 px-3 py-1 bg-brand-600 hover:bg-brand-700 text-white text-sm rounded-lg transition-colors"
-                      >
-                        <Check className="w-3 h-3" />
-                        Save
-                      </button>
-                      <button
-                        onClick={handleCancelEdit}
-                        className="flex items-center gap-1 px-3 py-1 bg-portal-surface2 hover:bg-portal-surface2 text-portal-text text-sm rounded-lg transition-colors"
-                      >
-                        <X className="w-3 h-3" />
-                        Cancel
-                      </button>
-                      <span className="text-xs text-portal-soft self-center ml-2">
-                        Press Enter to save • Esc to cancel
+
+                {/* Bubble column */}
+                <div className={`flex flex-col ${isCurrentUser ? 'items-end' : 'items-start'} max-w-[78%]`}>
+                  {/* Sender name + timestamp (first in group only) */}
+                  {!isGrouped && (
+                    <div className={`flex items-baseline gap-1 md:gap-2 mb-1 ${isCurrentUser ? 'flex-row-reverse' : ''}`}>
+                      <span className={`font-semibold text-sm ${msg.isAi ? 'text-brand-400' : 'text-portal-soft'}`}>
+                        {isCurrentUser ? 'You' : msg.sender}
+                      </span>
+                      <span className="text-[10px] text-portal-soft/50 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                        {formatMessageTime(msg.timestamp)}
+                        {msg.isEdited && <span className="ml-1 italic">(edited)</span>}
                       </span>
                     </div>
-                  </div>
-                ) : (
-                  <div className="mt-1">
-                    <span className={`whitespace-pre-wrap text-sm md:text-base ${isDarkBackground() ? 'text-slate-200' : 'text-portal-text'}`}>{renderTextWithMentions(msg.text)}</span>
-                    <span className="inline-flex items-center gap-1 ml-2">
-                      {!msg.isAi && msg.senderId === currentUser.id && editingMessageId !== msg.id && (
-                        <button
-                          onClick={() => {
-                            setEditingMessageId(msg.id);
-                            setEditingText(msg.text);
-                          }}
-                          className="opacity-0 group-hover:opacity-100 text-portal-soft hover:text-brand-600 transition-opacity inline-flex items-center align-middle"
-                          title="Edit message"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                      )}
-                      {!msg.isAi && (currentUser.role === 'Owner' || msg.senderId === currentUser.id) && editingMessageId !== msg.id && (
-                        <button
-                          onClick={() => handleDeleteMessage(msg.id, msg.text)}
-                          className="opacity-0 group-hover:opacity-100 text-portal-soft hover:text-red-600 transition-opacity inline-flex items-center align-middle"
-                          title="Delete message"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                      {!msg.isAi && editingMessageId !== msg.id && (
-                        <button
-                          onClick={() => msg.isPinned ? handleUnpinMessage(msg.id) : handlePinMessage(msg.id)}
-                          className={`opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center align-middle ${msg.isPinned ? 'text-amber-500 hover:text-portal-soft' : 'text-portal-soft hover:text-amber-500'}`}
-                          title={msg.isPinned ? 'Unpin message' : 'Pin message'}
-                        >
-                          {msg.isPinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
-                        </button>
-                      )}
-                      {!msg.isAi && editingMessageId !== msg.id && (
-                        <button
-                          onClick={() => setReplyingToMessage(msg)}
-                          className="opacity-0 group-hover:opacity-100 text-portal-soft hover:text-brand-600 transition-opacity inline-flex items-center align-middle"
-                          title="Reply to message"
-                        >
-                          <Reply className="w-4 h-4" />
-                        </button>
-                      )}
-                      {msg.isPinned && (
-                        <span className="text-amber-500 ml-1" title="Pinned message">
-                          <Pin className="w-3 h-3 inline" />
-                        </span>
-                      )}
-                    </span>
-                    {/* Task Link Card */}
-                    {msg.taskLink && renderTaskLinkCard(msg.taskLink)}
-                  </div>
-                )}
+                  )}
 
-                {/* Reactions Display and Picker */}
-                <div className="mt-2 flex flex-wrap items-center gap-1">
-                  {(messageReactions[msg.id] || []).map((reaction) => (
-                    <button
-                      key={reaction.emoji}
-                      onClick={() => handleReaction(msg.id, reaction.emoji)}
-                      className={`flex items-center gap-1 px-2 py-1 rounded-full text-sm transition-all ${
-                        reaction.userIds.includes(currentUser.id)
-                          ? 'bg-brand-100 border-brand-300 border-2'
-                          : 'bg-portal-surface2 border border-white/[0.07] hover:bg-portal-surface2'
-                      }`}
-                      title={reaction.userIds
-                        .map(uid => {
-                          if (uid === currentUser.id) return 'You';
-                          const profile = profiles.find(p => p.id === uid);
-                          return profile?.full_name || 'Unknown';
-                        })
-                        .join(', ')}
-                    >
-                      <span>{reaction.emoji}</span>
-                      <span className="text-xs font-medium text-portal-soft">
-                        {reaction.userIds
-                          .map(uid => {
-                            if (uid === currentUser.id) return 'You';
-                            const profile = profiles.find(p => p.id === uid);
-                            return profile?.full_name?.split(' ')[0] || 'Unknown';
-                          })
-                          .join(', ')}
-                      </span>
-                    </button>
-                  ))}
-
-                  {!msg.isAi && (
-                    <div className="relative">
-                      <button
-                        onClick={() => setShowReactionPicker(showReactionPicker === msg.id ? null : msg.id)}
-                        className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-portal-surface2 hover:bg-portal-surface2 border border-white/[0.07] transition-opacity"
-                        title="Add reaction"
-                      >
-                        <SmilePlus className="w-4 h-4" />
-                      </button>
-
-                      {showReactionPicker === msg.id && (
-                        <div className="absolute left-0 bottom-full mb-2 bg-portal-surface rounded-lg shadow-xl border border-white/[0.07] p-2 z-50 flex gap-1">
-                          {['👍', '❤️', '😂', '😮', '😢', '👏', '🎉', '🔥'].map((emoji) => (
-                            <button
-                              key={emoji}
-                              onClick={() => handleReaction(msg.id, emoji)}
-                              className="text-2xl hover:scale-125 transition-transform p-1"
-                            >
-                              {emoji}
-                            </button>
-                          ))}
-                        </div>
+                  {/* Attachment */}
+                  {msg.attachmentUrl && (
+                    <div className="mb-1.5">
+                      {msg.attachmentType === 'image' ? (
+                        <a href={msg.attachmentUrl} target="_blank" rel="noopener noreferrer">
+                          <img src={msg.attachmentUrl} alt="Attachment" className="max-h-48 md:max-h-60 rounded-xl border border-white/[0.07]" />
+                        </a>
+                      ) : msg.attachmentType === 'video' ? (
+                        <video
+                          src={msg.attachmentUrl}
+                          controls
+                          className="max-h-64 md:max-h-80 rounded-xl border border-white/[0.07]"
+                          preload="metadata"
+                        />
+                      ) : (
+                        <a
+                          href={msg.attachmentUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-3 px-4 py-3 bg-portal-surface2 rounded-xl border border-white/[0.07] transition-colors"
+                        >
+                          <div className="p-2 bg-portal-surface rounded-lg shadow-sm">
+                            <File className="w-5 h-5 text-brand-600" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-portal-text truncate max-w-[200px]">
+                              {msg.attachmentName || 'File attachment'}
+                            </p>
+                            <p className="text-xs text-portal-soft">Click to download</p>
+                          </div>
+                          <Download className="w-4 h-4 text-portal-soft group-hover:text-brand-600 transition-colors" />
+                        </a>
                       )}
                     </div>
                   )}
-                </div>
 
-                {/* Thread Replies Indicator & Expansion */}
-                {(msg.replyCount ?? 0) > 0 && (
-                  <div className="mt-2">
-                    <button
-                      onClick={() => toggleThreadExpansion(msg.id)}
-                      className="flex items-center gap-2 text-sm text-brand-600 hover:text-brand-700 transition-colors"
-                    >
-                      <MessageSquare className="w-4 h-4" />
-                      <span className="font-medium">
-                        {msg.replyCount} {msg.replyCount === 1 ? 'reply' : 'replies'}
-                      </span>
-                      {expandedThreads.has(msg.id) ? (
-                        <ChevronUp className="w-4 h-4" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4" />
-                      )}
-                    </button>
-
-                    {/* Expanded Thread Replies */}
-                    {expandedThreads.has(msg.id) && (
-                      <div className="mt-3 ml-4 pl-4 border-l-2 border-brand-200 space-y-3">
-                        {loadingThreads.has(msg.id) ? (
-                          <div className="flex items-center gap-2 text-sm text-portal-soft">
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Loading replies...
+                  {/* Edit form or bubble */}
+                  {editingMessageId === msg.id ? (
+                    <div className="w-full space-y-2">
+                      <textarea
+                        value={editingText}
+                        onChange={(e) => setEditingText(e.target.value)}
+                        className="w-full p-2 text-xs md:text-sm border border-white/[0.07] rounded-lg focus:ring-2 focus:ring-brand-500 outline-none resize-none bg-white text-slate-900"
+                        rows={3}
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleEditMessage(msg.id);
+                          } else if (e.key === 'Escape') {
+                            handleCancelEdit();
+                          }
+                        }}
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleEditMessage(msg.id)}
+                          className="flex items-center gap-1 px-3 py-1 bg-brand-600 hover:bg-brand-700 text-white text-sm rounded-lg transition-colors"
+                        >
+                          <Check className="w-3 h-3" />
+                          Save
+                        </button>
+                        <button
+                          onClick={handleCancelEdit}
+                          className="flex items-center gap-1 px-3 py-1 bg-portal-surface2 text-portal-text text-sm rounded-lg transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <div
+                        className={`relative px-3.5 py-2.5 rounded-2xl text-sm md:text-base ${
+                          isCurrentUser
+                            ? 'bg-brand-600 text-white rounded-tr-sm'
+                            : msg.isAi
+                            ? 'bg-brand-500/10 border border-brand-500/20 text-portal-text rounded-tl-sm'
+                            : 'bg-portal-surface2 text-portal-text rounded-tl-sm'
+                        }`}
+                      >
+                        {isThinking ? (
+                          <div className="flex items-center gap-1.5 py-0.5">
+                            <span className="w-2 h-2 bg-brand-400 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                            <span className="w-2 h-2 bg-brand-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                            <span className="w-2 h-2 bg-brand-400 rounded-full animate-bounce" />
                           </div>
                         ) : (
-                          <>
-                            {(threadReplies[msg.id] || []).map((reply) => (
-                              <div key={reply.id} className="flex gap-2">
-                                <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${reply.isAi ? 'bg-brand-500' : 'bg-portal-surface2'}`}>
-                                  {reply.isAi ? (
-                                    <Bot className="w-3 h-3 text-white" />
-                                  ) : reply.avatar && reply.avatar !== 'user' && reply.avatar.startsWith('http') ? (
-                                    <img src={reply.avatar} alt="" className="w-full h-full rounded-full object-cover" />
-                                  ) : (
-                                    <UserIcon className="w-3 h-3 text-portal-soft" />
-                                  )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-baseline gap-2">
-                                    <span className={`font-semibold text-sm ${isDarkBackground() ? 'text-white' : 'text-white'}`}>{reply.sender}</span>
-                                    <span className={`text-[10px] ${isDarkBackground() ? 'text-portal-soft' : 'text-portal-soft'}`}>
-                                      {formatMessageTime(reply.timestamp)}
-                                      {reply.isEdited && <span className="ml-1 italic">(edited)</span>}
-                                    </span>
+                          <span className="whitespace-pre-wrap">{renderTextWithMentions(msg.text)}</span>
+                        )}
+                        {/* Hover action buttons */}
+                        {!isThinking && (
+                          <div className={`absolute top-1 ${isCurrentUser ? 'right-full mr-1' : 'left-full ml-1'} hidden group-hover:flex items-center gap-0.5 bg-portal-surface border border-white/[0.07] rounded-lg px-1 py-0.5 shadow-lg z-10`}>
+                            {!msg.isAi && msg.senderId === currentUser.id && (
+                              <button
+                                onClick={() => { setEditingMessageId(msg.id); setEditingText(msg.text); }}
+                                className="p-1 text-portal-soft hover:text-brand-500 transition-colors"
+                                title="Edit"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            {!msg.isAi && (currentUser.role === 'Owner' || msg.senderId === currentUser.id) && (
+                              <button
+                                onClick={() => handleDeleteMessage(msg.id, msg.text)}
+                                className="p-1 text-portal-soft hover:text-red-500 transition-colors"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            {!msg.isAi && (
+                              <button
+                                onClick={() => msg.isPinned ? handleUnpinMessage(msg.id) : handlePinMessage(msg.id)}
+                                className={`p-1 transition-colors ${msg.isPinned ? 'text-amber-500 hover:text-portal-soft' : 'text-portal-soft hover:text-amber-500'}`}
+                                title={msg.isPinned ? 'Unpin' : 'Pin'}
+                              >
+                                {msg.isPinned ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
+                              </button>
+                            )}
+                            {!msg.isAi && (
+                              <button
+                                onClick={() => setReplyingToMessage(msg)}
+                                className="p-1 text-portal-soft hover:text-brand-500 transition-colors"
+                                title="Reply"
+                              >
+                                <Reply className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      {msg.isPinned && (
+                        <span className="absolute -top-1.5 -right-1.5 text-amber-500" title="Pinned">
+                          <Pin className="w-3 h-3" />
+                        </span>
+                      )}
+                      {msg.taskLink && renderTaskLinkCard(msg.taskLink)}
+                    </div>
+                  )}
+
+                  {/* Reactions */}
+                  <div className={`mt-1.5 flex flex-wrap items-center gap-1 ${isCurrentUser ? 'justify-end' : ''}`}>
+                    {(messageReactions[msg.id] || []).map((reaction) => (
+                      <button
+                        key={reaction.emoji}
+                        onClick={() => handleReaction(msg.id, reaction.emoji)}
+                        className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-sm transition-all ${
+                          reaction.userIds.includes(currentUser.id)
+                            ? 'bg-brand-100 border-brand-300 border-2'
+                            : 'bg-portal-surface2 border border-white/[0.07] hover:bg-portal-surface2'
+                        }`}
+                        title={reaction.userIds
+                          .map(uid => {
+                            if (uid === currentUser.id) return 'You';
+                            const profile = profiles.find(p => p.id === uid);
+                            return profile?.full_name || 'Unknown';
+                          })
+                          .join(', ')}
+                      >
+                        <span>{reaction.emoji}</span>
+                        <span className="text-xs font-medium text-portal-soft">
+                          {reaction.userIds
+                            .map(uid => {
+                              if (uid === currentUser.id) return 'You';
+                              const profile = profiles.find(p => p.id === uid);
+                              return profile?.full_name?.split(' ')[0] || 'Unknown';
+                            })
+                            .join(', ')}
+                        </span>
+                      </button>
+                    ))}
+                    {!msg.isAi && (
+                      <div className="relative">
+                        <button
+                          onClick={() => setShowReactionPicker(showReactionPicker === msg.id ? null : msg.id)}
+                          className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-portal-surface2 border border-white/[0.07] transition-opacity"
+                          title="Add reaction"
+                        >
+                          <SmilePlus className="w-4 h-4" />
+                        </button>
+                        {showReactionPicker === msg.id && (
+                          <div className={`absolute ${isCurrentUser ? 'right-0' : 'left-0'} bottom-full mb-2 bg-portal-surface rounded-lg shadow-xl border border-white/[0.07] p-2 z-50 flex gap-1`}>
+                            {['👍', '❤️', '😂', '😮', '😢', '👏', '🎉', '🔥'].map((emoji) => (
+                              <button
+                                key={emoji}
+                                onClick={() => handleReaction(msg.id, emoji)}
+                                className="text-2xl hover:scale-125 transition-transform p-1"
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Thread Replies */}
+                  {(msg.replyCount ?? 0) > 0 && (
+                    <div className="mt-2">
+                      <button
+                        onClick={() => toggleThreadExpansion(msg.id)}
+                        className="flex items-center gap-2 text-sm text-brand-600 hover:text-brand-700 transition-colors"
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                        <span className="font-medium">
+                          {msg.replyCount} {msg.replyCount === 1 ? 'reply' : 'replies'}
+                        </span>
+                        {expandedThreads.has(msg.id) ? (
+                          <ChevronUp className="w-4 h-4" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4" />
+                        )}
+                      </button>
+                      {expandedThreads.has(msg.id) && (
+                        <div className="mt-3 ml-4 pl-4 border-l-2 border-brand-200 space-y-3">
+                          {loadingThreads.has(msg.id) ? (
+                            <div className="flex items-center gap-2 text-sm text-portal-soft">
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Loading replies...
+                            </div>
+                          ) : (
+                            <>
+                              {(threadReplies[msg.id] || []).map((reply) => (
+                                <div key={reply.id} className="flex gap-2">
+                                  <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${reply.isAi ? 'bg-brand-500' : 'bg-portal-surface2'}`}>
+                                    {reply.isAi ? (
+                                      <Bot className="w-3 h-3 text-white" />
+                                    ) : reply.avatar && reply.avatar !== 'user' && reply.avatar.startsWith('http') ? (
+                                      <img src={reply.avatar} alt="" className="w-full h-full rounded-full object-cover" />
+                                    ) : (
+                                      <UserIcon className="w-3 h-3 text-portal-soft" />
+                                    )}
                                   </div>
-                                  {reply.attachmentUrl && (
-                                    <div className="mt-1 mb-1">
-                                      {reply.attachmentType === 'image' ? (
-                                        <a href={reply.attachmentUrl} target="_blank" rel="noopener noreferrer">
-                                          <img src={reply.attachmentUrl} alt="Attachment" className="max-h-32 rounded-lg border border-white/[0.07]" />
-                                        </a>
-                                      ) : (
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-baseline gap-2">
+                                      <span className="font-semibold text-sm text-white">{reply.sender}</span>
+                                      <span className="text-[10px] text-portal-soft">
+                                        {formatMessageTime(reply.timestamp)}
+                                        {reply.isEdited && <span className="ml-1 italic">(edited)</span>}
+                                      </span>
+                                    </div>
+                                    {reply.attachmentUrl && (
+                                      <div className="mt-1 mb-1">
+                                        {reply.attachmentType === 'image' ? (
+                                          <a href={reply.attachmentUrl} target="_blank" rel="noopener noreferrer">
+                                            <img src={reply.attachmentUrl} alt="Attachment" className="max-h-32 rounded-lg border border-white/[0.07]" />
+                                          </a>
+                                        ) : (
                                         <a href={reply.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-brand-600 hover:underline">
                                           {reply.attachmentName || 'Attachment'}
                                         </a>
@@ -2974,7 +3017,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                 )}
               </div>
             </div>
-          ))}
+          );
+          })}
           {loading && <div className="text-sm text-portal-soft italic px-6">Echo is typing...</div>}
           <div ref={messagesEndRef} />
         </div>
