@@ -139,12 +139,12 @@ const ContentTool: React.FC = () => {
 
           <div>
             <label className="block text-sm font-medium text-portal-text mb-2">
-              Content Brief <span className="text-portal-soft font-normal">(optional)</span>
+              Writing Instructions <span className="text-portal-soft font-normal">(optional)</span>
             </label>
             <textarea
               className="w-full p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none bg-white text-slate-900 resize-none"
               rows={4}
-              placeholder="Audience, angle, sections to cover, things to avoid, competitor URLs to beat, client-specific requirements…"
+              placeholder="Tell the AI how to write it — audience, angle, what to cover, what to avoid, competitor URLs, client requirements…"
               value={brief}
               onChange={(e) => setBrief(e.target.value)}
             />
