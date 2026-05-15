@@ -114,6 +114,12 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [workspaces, activeId]);
 
+  const isOwner = currentUser.role === 'Owner';
+
+  // Available models — Claude only for Owner
+  const availableModels = (Object.entries(MODEL_CONFIG) as [WorkspaceModel, typeof MODEL_CONFIG[WorkspaceModel]][])
+    .filter(([key]) => key !== 'claude' || isOwner);
+
   const activeWorkspace = workspaces.find(w => w.id === activeId) ?? workspaces[0];
 
   const updateWorkspace = useCallback((id: string, updater: (w: Workspace) => Workspace) => {
@@ -246,6 +252,7 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
       echo: { cls: 'bg-amber-500/20 text-amber-300', label: 'Local' },
       hermes: { cls: 'bg-blue-500/20 text-blue-300', label: 'Claude' },
       'hermes-fallback': { cls: 'bg-yellow-500/20 text-yellow-300', label: 'Claude (fallback)' },
+      'hermes-escalated': { cls: 'bg-orange-500/20 text-orange-300', label: 'Claude (live data)' },
       batch: { cls: 'bg-green-500/20 text-green-300', label: 'Batch' },
     };
     const m = map[routedTo] || { cls: 'bg-white/10 text-white/50', label: routedTo };
@@ -332,7 +339,8 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
       </div>
 
       {/* Active workspace messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0">
+      <div className="flex-1 overflow-y-auto py-4 min-h-0">
+        <div className="max-w-3xl mx-auto px-4 space-y-4">
         {activeWorkspace.messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
             <Bot size={32} className="text-white/20" />
@@ -389,6 +397,7 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
         )}
 
         <div ref={messagesEndRef} />
+        </div>
       </div>
 
       {/* Input */}
@@ -408,7 +417,7 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
 
             {modelPickerOpen && (
               <div className="absolute bottom-full mb-1 left-0 w-64 bg-portal-surface border border-white/[0.1] rounded-xl shadow-xl shadow-black/40 overflow-hidden z-50">
-                {(Object.entries(MODEL_CONFIG) as [WorkspaceModel, typeof MODEL_CONFIG[WorkspaceModel]][]).map(([key, cfg]) => (
+                {availableModels.map(([key, cfg]) => (
                   <button
                     key={key}
                     onClick={() => setWorkspaceModel(activeWorkspace.id, key)}
