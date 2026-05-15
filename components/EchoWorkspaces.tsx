@@ -12,7 +12,7 @@ import { User, ToastType } from '../types';
 const BRIDGE_URL = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_BRIDGE_URL) || 'http://localhost:18790';
 const BRIDGE_SECRET = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_ECHO_BRIDGE_SECRET) || 'brightforge-echo-bridge-2026';
 
-type WorkspaceModel = 'sassin' | 'claude' | 'gemini';
+type WorkspaceModel = 'sassin' | 'claude' | 'echo';
 
 const MODEL_CONFIG: Record<WorkspaceModel, {
   label: string;
@@ -28,19 +28,19 @@ const MODEL_CONFIG: Record<WorkspaceModel, {
     dot: 'bg-purple-400',
     description: 'Local model — fast, free, no API cost',
   },
+  echo: {
+    label: 'Little Echo',
+    badge: 'Local',
+    badgeClass: 'bg-amber-500/20 text-amber-300',
+    dot: 'bg-amber-400',
+    description: 'Local content model — good for drafts and writing tasks',
+  },
   claude: {
     label: 'Claude',
     badge: 'Cloud',
     badgeClass: 'bg-blue-500/20 text-blue-300',
     dot: 'bg-blue-400',
     description: 'Claude via Hermes — best quality, uses API credits',
-  },
-  gemini: {
-    label: 'Gemini',
-    badge: 'Cloud',
-    badgeClass: 'bg-emerald-500/20 text-emerald-300',
-    dot: 'bg-emerald-400',
-    description: 'Gemini Flash — cloud, fast, requires Gemini key',
   },
 };
 
@@ -243,9 +243,9 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
     const map: Record<string, { cls: string; label: string }> = {
       sassin: { cls: 'bg-purple-500/20 text-purple-300', label: 'Local' },
       'sassin-member': { cls: 'bg-purple-500/20 text-purple-300', label: 'Local' },
+      echo: { cls: 'bg-amber-500/20 text-amber-300', label: 'Local' },
       hermes: { cls: 'bg-blue-500/20 text-blue-300', label: 'Claude' },
       'hermes-fallback': { cls: 'bg-yellow-500/20 text-yellow-300', label: 'Claude (fallback)' },
-      gemini: { cls: 'bg-emerald-500/20 text-emerald-300', label: 'Gemini' },
       batch: { cls: 'bg-green-500/20 text-green-300', label: 'Batch' },
     };
     const m = map[routedTo] || { cls: 'bg-white/10 text-white/50', label: routedTo };
