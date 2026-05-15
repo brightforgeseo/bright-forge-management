@@ -5,14 +5,17 @@ const BRIDGE_URL = (typeof import.meta !== 'undefined' && (import.meta as any).e
 const BRIDGE_SECRET = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_ECHO_BRIDGE_SECRET) || 'brightforge-echo-bridge-2026';
 
 /**
- * Generate SEO content using Little Echo (trained Gemma 2 9B running locally via LM Studio).
- * Zero API cost. Falls back to Claude if Little Echo is unavailable.
+ * Generate SEO content using the portal bridge pipeline.
+ * mode='edit'  (default) — Echo draft → Gemma 4B edit. Fast (~30s).
+ * mode='full'            — Echo outline → Sassin full article. Quality (~90s).
+ * Zero API cost. Falls back to Claude if bridge unavailable.
  */
 export const generateLittleEchoContent = async (
   topic: string,
   tone: string,
   keywords: string,
-  clientName?: string
+  clientName?: string,
+  mode: 'edit' | 'full' = 'edit'
 ): Promise<ContentResult> => {
   const primaryKeyword = keywords.split(',')[0]?.trim() || keywords;
 
@@ -36,7 +39,7 @@ Return ONLY valid JSON in this exact format:
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${BRIDGE_SECRET}`,
     },
-    body: JSON.stringify({ prompt, maxTokens: 4000, temperature: 0.7 }),
+    body: JSON.stringify({ prompt, maxTokens: 4000, temperature: 0.7, mode }),
   });
 
   if (!res.ok) throw new Error(`Little Echo bridge error: ${res.status}`);
