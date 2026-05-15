@@ -249,10 +249,11 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
     const map: Record<string, { cls: string; label: string }> = {
       sassin: { cls: 'bg-purple-500/20 text-purple-300', label: 'Local' },
       'sassin-member': { cls: 'bg-purple-500/20 text-purple-300', label: 'Local' },
+      'sassin-live': { cls: 'bg-purple-500/20 text-purple-300', label: 'Local + live data' },
       echo: { cls: 'bg-amber-500/20 text-amber-300', label: 'Local' },
+      'echo-live': { cls: 'bg-amber-500/20 text-amber-300', label: 'Local + live data' },
       hermes: { cls: 'bg-blue-500/20 text-blue-300', label: 'Claude' },
       'hermes-fallback': { cls: 'bg-yellow-500/20 text-yellow-300', label: 'Claude (fallback)' },
-      'hermes-escalated': { cls: 'bg-orange-500/20 text-orange-300', label: 'Claude (live data)' },
       batch: { cls: 'bg-green-500/20 text-green-300', label: 'Batch' },
     };
     const m = map[routedTo] || { cls: 'bg-white/10 text-white/50', label: routedTo };
