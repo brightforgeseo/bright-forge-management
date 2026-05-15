@@ -1,35 +1,14 @@
 import React, { useState } from 'react';
-import { PenTool, Copy, Check, Sparkles, Zap, Star, FileText } from 'lucide-react';
+import { PenTool, Copy, Check, Sparkles, Zap, Star, FileText, ArrowUpCircle } from 'lucide-react';
 import { generateContent } from '../services/geminiService';
 import { ContentResult } from '../types';
 
 type ContentMode = 'edit' | 'full';
 
-const MODE_CONFIG: Record<ContentMode, {
-  label: string;
-  description: string;
-  badge: string;
-  badgeColor: string;
-  icon: React.ReactNode;
-  time: string;
-}> = {
-  edit: {
-    label: 'Fast Draft',
-    description: 'Echo drafts → Gemma edits. Ready in ~30s.',
-    badge: 'Fast',
-    badgeColor: 'bg-emerald-500/20 text-emerald-400',
-    icon: <Zap className="w-4 h-4" />,
-    time: '~30s',
-  },
-  full: {
-    label: 'Full Article',
-    description: 'Echo outlines → Sassin writes. Higher quality, ~90s.',
-    badge: 'Quality',
-    badgeColor: 'bg-brand-500/20 text-brand-400',
-    icon: <Star className="w-4 h-4" />,
-    time: '~90s',
-  },
-};
+interface ExtendedResult extends ContentResult {
+  rawDraft?: string;
+  mode?: string;
+}
 
 const ContentTool: React.FC = () => {
   const [topic, setTopic] = useState('');
@@ -38,37 +17,35 @@ const ContentTool: React.FC = () => {
   const [mode, setMode] = useState<ContentMode>('edit');
   const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState('');
-  const [result, setResult] = useState<ContentResult | null>(null);
-  const [draft, setDraft] = useState<string | null>(null);
+  const [result, setResult] = useState<ExtendedResult | null>(null);
   const [activeTab, setActiveTab] = useState<'final' | 'draft'>('final');
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleGenerate = async () => {
+  const runGenerate = async (overrideMode?: ContentMode, upgradeDraft?: string) => {
     if (!topic.trim()) return;
+    const effectiveMode = overrideMode ?? mode;
     setLoading(true);
     setError(null);
-    setResult(null);
-    setDraft(null);
     setActiveTab('final');
 
-    const msgs = mode === 'full'
-      ? ['Echo is building the outline…', 'Sassin is writing the full article…', 'Wrapping up…']
-      : ['Echo is drafting the article…', 'Gemma is editing and polishing…', 'Almost done…'];
+    const msgs = upgradeDraft
+      ? ['Sending draft to Sassin…', 'Sassin is expanding the article…', 'Almost done…']
+      : effectiveMode === 'full'
+        ? ['Echo is building the outline…', 'Sassin is writing the full article…', 'Wrapping up…']
+        : ['Echo is drafting the article…', 'Gemma is editing and polishing…', 'Almost done…'];
 
     let msgIdx = 0;
     setLoadingMsg(msgs[0]);
     const ticker = setInterval(() => {
       msgIdx = Math.min(msgIdx + 1, msgs.length - 1);
       setLoadingMsg(msgs[msgIdx]);
-    }, mode === 'full' ? 30000 : 15000);
+    }, effectiveMode === 'full' ? 30000 : 15000);
 
     try {
-      const data = await (generateContent as any)(topic, tone, keywords, mode);
-      setResult(data);
-      // Try to grab the raw draft if the bridge returned it
-      // (bridge returns { content, draft, mode } — but service unwraps to ContentResult)
-      // For now show outline/draft tab only if we have it
+      const data = await (generateContent as any)(topic, tone, keywords, effectiveMode, upgradeDraft);
+      setResult(data as ExtendedResult);
+      if (effectiveMode === 'full') setMode('full');
     } catch (err: any) {
       setError(err?.message || 'Content generation failed. Check that the bridge is running.');
     } finally {
@@ -78,6 +55,15 @@ const ContentTool: React.FC = () => {
     }
   };
 
+  const handleGenerate = () => runGenerate();
+
+  const handleUpgrade = () => {
+    if (!result) return;
+    // Pass the current content as the draft to upgrade from
+    const draftContent = result.rawDraft || result.content;
+    runGenerate('full', draftContent);
+  };
+
   const handleCopy = () => {
     if (!result) return;
     const text = result.title ? `# ${result.title}\n\n${result.content}` : result.content;
@@ -85,6 +71,9 @@ const ContentTool: React.FC = () => {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const isDraft = result?.mode === 'edit';
+  const hasDraftTab = !!result?.rawDraft;
 
   return (
     <div className="p-8 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -100,35 +89,32 @@ const ContentTool: React.FC = () => {
           <div>
             <label className="block text-sm font-medium text-portal-text mb-3">Pipeline Mode</label>
             <div className="grid grid-cols-2 gap-2">
-              {(Object.keys(MODE_CONFIG) as ContentMode[]).map((m) => {
-                const cfg = MODE_CONFIG[m];
+              {(['edit', 'full'] as ContentMode[]).map((m) => {
+                const cfg = m === 'edit'
+                  ? { label: 'Fast Draft', desc: 'Echo → Gemma edit. ~30s.', badge: '~30s', color: 'text-emerald-400', activeBorder: 'border-emerald-500 bg-emerald-500/10', icon: <Zap className="w-4 h-4" /> }
+                  : { label: 'Full Article', desc: 'Echo outline → Sassin. ~90s.', badge: '~90s', color: 'text-brand-400', activeBorder: 'border-brand-500 bg-brand-500/10', icon: <Star className="w-4 h-4" /> };
                 const active = mode === m;
                 return (
                   <button
                     key={m}
                     onClick={() => setMode(m)}
                     className={`relative flex flex-col items-start gap-1 p-3 rounded-xl border text-left transition-all ${
-                      active
-                        ? 'border-brand-500 bg-brand-500/10'
-                        : 'border-white/[0.07] hover:border-white/20 bg-portal-dark/50'
+                      active ? cfg.activeBorder : 'border-white/[0.07] hover:border-white/20 bg-portal-dark/50'
                     }`}
                   >
                     <div className="flex items-center gap-2 w-full">
-                      <span className={`${active ? 'text-brand-400' : 'text-portal-soft'}`}>{cfg.icon}</span>
+                      <span className={active ? cfg.color : 'text-portal-soft'}>{cfg.icon}</span>
                       <span className={`text-sm font-semibold ${active ? 'text-white' : 'text-portal-text'}`}>{cfg.label}</span>
-                      <span className={`ml-auto text-xs font-medium px-1.5 py-0.5 rounded-full ${cfg.badgeColor}`}>{cfg.time}</span>
+                      <span className="ml-auto text-xs text-portal-soft">{cfg.badge}</span>
                     </div>
-                    <p className="text-xs text-portal-soft leading-snug">{cfg.description}</p>
-                    {active && (
-                      <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-brand-500" />
-                    )}
+                    <p className="text-xs text-portal-soft leading-snug">{cfg.desc}</p>
+                    {active && <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-brand-500" />}
                   </button>
                 );
               })}
             </div>
           </div>
 
-          {/* Topic */}
           <div>
             <label className="block text-sm font-medium text-portal-text mb-2">Topic / Title</label>
             <input
@@ -140,7 +126,6 @@ const ContentTool: React.FC = () => {
             />
           </div>
 
-          {/* Keywords */}
           <div>
             <label className="block text-sm font-medium text-portal-text mb-2">Target Keywords</label>
             <input
@@ -151,7 +136,6 @@ const ContentTool: React.FC = () => {
             />
           </div>
 
-          {/* Tone */}
           <div>
             <label className="block text-sm font-medium text-portal-text mb-2">Tone of Voice</label>
             <select
@@ -177,34 +161,37 @@ const ContentTool: React.FC = () => {
               : <Sparkles className="w-5 h-5" />}
             {loading ? loadingMsg : 'Generate Article'}
           </button>
-        </div>
 
-        {/* Mode info card */}
-        <div className="bg-portal-dark/60 border border-white/[0.05] rounded-xl p-4 text-xs text-portal-soft space-y-1">
-          <p className="font-semibold text-portal-text">How it works</p>
-          {mode === 'edit' ? (
-            <>
-              <p>1. <span className="text-portal-text">Little Echo</span> writes a full draft</p>
-              <p>2. <span className="text-portal-text">Gemma 4B</span> edits and polishes</p>
-              <p className="text-emerald-400">Fast — good for quick turnarounds</p>
-            </>
-          ) : (
-            <>
-              <p>1. <span className="text-portal-text">Little Echo</span> builds a structured outline</p>
-              <p>2. <span className="text-portal-text">Little Sassin</span> writes the full article</p>
-              <p className="text-brand-400">Slower — better quality, longer articles</p>
-            </>
+          {/* Upgrade button — only shows after a Fast Draft result */}
+          {isDraft && !loading && (
+            <button
+              onClick={handleUpgrade}
+              className="w-full py-3 bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/40 text-brand-400 rounded-xl font-semibold transition-all flex items-center justify-center gap-2"
+            >
+              <ArrowUpCircle className="w-5 h-5" />
+              Upgrade to Full Article
+            </button>
           )}
         </div>
+
+        {/* Tip card */}
+        {isDraft && !loading && (
+          <div className="bg-brand-500/5 border border-brand-500/20 rounded-xl p-4 text-xs text-portal-soft space-y-1">
+            <p className="font-semibold text-brand-400">You have a Fast Draft</p>
+            <p>Happy with the direction? Hit <strong className="text-portal-text">Upgrade to Full Article</strong> and Sassin will expand it into a longer, polished piece — no outline step needed.</p>
+          </div>
+        )}
       </div>
 
       {/* Output Column */}
       <div className="lg:col-span-2">
-        {loading && !result && (
+        {loading && (
           <div className="h-full min-h-[400px] flex flex-col items-center justify-center text-portal-soft border-2 border-dashed border-brand-500/30 rounded-2xl bg-portal-dark/50 gap-4">
             <div className="animate-spin rounded-full h-10 w-10 border-2 border-brand-500 border-t-transparent" />
             <p className="text-portal-text font-medium">{loadingMsg}</p>
-            <p className="text-xs opacity-60">This takes {MODE_CONFIG[mode].time} — hang tight</p>
+            <p className="text-xs opacity-60">
+              {mode === 'full' ? 'This takes ~90s' : 'This takes ~30s'} — hang tight
+            </p>
           </div>
         )}
 
@@ -218,9 +205,7 @@ const ContentTool: React.FC = () => {
 
         {result && !loading && (
           <div className="bg-portal-surface rounded-2xl shadow-lg shadow-black/20 border border-white/[0.07] overflow-hidden h-full flex flex-col">
-            {/* Header */}
             <div className="p-4 border-b border-white/[0.07] flex justify-between items-center bg-portal-dark gap-4">
-              {/* Tabs */}
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setActiveTab('final')}
@@ -229,9 +214,9 @@ const ContentTool: React.FC = () => {
                   }`}
                 >
                   <Sparkles className="w-3.5 h-3.5" />
-                  Final
+                  {isDraft ? 'Draft' : 'Full Article'}
                 </button>
-                {draft && (
+                {hasDraftTab && (
                   <button
                     onClick={() => setActiveTab('draft')}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
@@ -239,15 +224,18 @@ const ContentTool: React.FC = () => {
                     }`}
                   >
                     <FileText className="w-3.5 h-3.5" />
-                    {mode === 'full' ? 'Outline' : 'Draft'}
+                    Raw Echo
                   </button>
                 )}
               </div>
 
               <div className="flex items-center gap-2 ml-auto">
-                <span className={`text-xs font-medium px-2 py-1 rounded-full ${MODE_CONFIG[mode].badgeColor}`}>
-                  {MODE_CONFIG[mode].label}
-                </span>
+                {isDraft && (
+                  <span className="text-xs font-medium px-2 py-1 rounded-full bg-emerald-500/20 text-emerald-400">Fast Draft</span>
+                )}
+                {result.mode === 'full' && (
+                  <span className="text-xs font-medium px-2 py-1 rounded-full bg-brand-500/20 text-brand-400">Full Article</span>
+                )}
                 <button
                   onClick={handleCopy}
                   className="flex items-center gap-2 text-sm font-medium text-brand-400 hover:bg-brand-500/10 px-3 py-1.5 rounded-lg transition-colors"
@@ -258,7 +246,6 @@ const ContentTool: React.FC = () => {
               </div>
             </div>
 
-            {/* Content */}
             <div className="p-8 overflow-y-auto max-h-[800px] prose prose-slate max-w-none">
               {activeTab === 'final' ? (
                 <>
@@ -275,8 +262,8 @@ const ContentTool: React.FC = () => {
                   </div>
                 </>
               ) : (
-                <div className="whitespace-pre-wrap text-portal-text leading-relaxed text-sm font-mono">
-                  {draft}
+                <div className="whitespace-pre-wrap text-portal-text leading-relaxed text-sm font-mono opacity-80">
+                  {result.rawDraft}
                 </div>
               )}
             </div>

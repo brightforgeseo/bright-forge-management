@@ -15,8 +15,9 @@ export const generateLittleEchoContent = async (
   tone: string,
   keywords: string,
   clientName?: string,
-  mode: 'edit' | 'full' = 'edit'
-): Promise<ContentResult> => {
+  mode: 'edit' | 'full' = 'edit',
+  upgradeDraft?: string
+): Promise<ContentResult & { rawDraft?: string; mode?: string }> => {
   const primaryKeyword = keywords.split(',')[0]?.trim() || keywords;
 
   const prompt = `Write a comprehensive SEO article about "${topic}".
@@ -39,23 +40,25 @@ Return ONLY valid JSON in this exact format:
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${BRIDGE_SECRET}`,
     },
-    body: JSON.stringify({ prompt, maxTokens: 4000, temperature: 0.7, mode }),
+    body: JSON.stringify({ prompt, maxTokens: 4000, temperature: 0.7, mode, ...(upgradeDraft ? { upgradeDraft } : {}) }),
   });
 
   if (!res.ok) throw new Error(`Little Echo bridge error: ${res.status}`);
 
   const data = await res.json();
   const text: string = data.content || '';
+  const rawDraft: string | undefined = data.draft;
 
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (jsonMatch) {
-    return JSON.parse(jsonMatch[0]) as ContentResult;
+    return { ...JSON.parse(jsonMatch[0]) as ContentResult, rawDraft, mode: data.mode };
   }
 
-  // If model didn't return JSON, wrap the raw output
   return {
     title: topic,
     content: text,
     metaDescription: `${primaryKeyword} — expert guide covering everything you need to know.`,
+    rawDraft,
+    mode: data.mode,
   };
 };
