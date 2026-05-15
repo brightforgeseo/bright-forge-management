@@ -13,6 +13,7 @@ interface ExtendedResult extends ContentResult {
 const ContentTool: React.FC = () => {
   const [topic, setTopic] = useState('');
   const [keywords, setKeywords] = useState('');
+  const [brief, setBrief] = useState('');
   const [tone, setTone] = useState('Professional');
   const [mode, setMode] = useState<ContentMode>('edit');
   const [loading, setLoading] = useState(false);
@@ -43,7 +44,7 @@ const ContentTool: React.FC = () => {
     }, effectiveMode === 'full' ? 30000 : 15000);
 
     try {
-      const data = await (generateContent as any)(topic, tone, keywords, effectiveMode, upgradeDraft);
+      const data = await (generateContent as any)(topic, tone, keywords, effectiveMode, upgradeDraft, brief);
       setResult(data as ExtendedResult);
       if (effectiveMode === 'full') setMode('full');
     } catch (err: any) {
@@ -133,6 +134,19 @@ const ContentTool: React.FC = () => {
               placeholder="seo agency philippines, best seo company"
               value={keywords}
               onChange={(e) => setKeywords(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-portal-text mb-2">
+              Content Brief <span className="text-portal-soft font-normal">(optional)</span>
+            </label>
+            <textarea
+              className="w-full p-3 rounded-xl border border-white/[0.07] focus:ring-2 focus:ring-brand-500 outline-none bg-white text-slate-900 resize-none"
+              rows={4}
+              placeholder="Audience, angle, sections to cover, things to avoid, competitor URLs to beat, client-specific requirements…"
+              value={brief}
+              onChange={(e) => setBrief(e.target.value)}
             />
           </div>
 

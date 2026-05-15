@@ -72,10 +72,10 @@ export const generateKeywords = async (seedKeyword: string): Promise<KeywordResu
   }
 };
 
-export const generateContent = async (topic: string, tone: string, keywords: string, mode: 'edit' | 'full' = 'edit', upgradeDraft?: string): Promise<ContentResult & { rawDraft?: string; mode?: string }> => {
+export const generateContent = async (topic: string, tone: string, keywords: string, mode: 'edit' | 'full' = 'edit', upgradeDraft?: string, brief?: string): Promise<ContentResult & { rawDraft?: string; mode?: string }> => {
   // Try Little Echo first (local, zero cost), fall back to Claude, then Gemini
   try {
-    return await generateLittleEchoContent(topic, tone, keywords, undefined, mode, upgradeDraft);
+    return await generateLittleEchoContent(topic, tone, keywords, undefined, mode, upgradeDraft, brief);
   } catch (echoError) {
     console.warn("Little Echo unavailable, falling back to Claude:", echoError);
   }

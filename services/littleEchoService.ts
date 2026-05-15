@@ -16,8 +16,9 @@ export const generateLittleEchoContent = async (
   keywords: string,
   clientName?: string,
   mode: 'edit' | 'full' = 'edit',
-  upgradeDraft?: string
-): Promise<ContentResult & { rawDraft?: string; mode?: string }> => {
+  upgradeDraft?: string,
+  brief?: string
+): Promise<ContentResult> => {
   const primaryKeyword = keywords.split(',')[0]?.trim() || keywords;
 
   const prompt = `Write a comprehensive SEO article about "${topic}".
@@ -26,6 +27,7 @@ Tone: ${tone}
 Primary keyword: ${primaryKeyword}
 Secondary keywords: ${keywords}
 ${clientName ? `Client: ${clientName}` : ''}
+${brief ? `\nContent brief / additional instructions:\n${brief}` : ''}
 
 Return ONLY valid JSON in this exact format:
 {
