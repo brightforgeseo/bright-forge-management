@@ -40,7 +40,7 @@ Return ONLY valid JSON in this exact format:
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${BRIDGE_SECRET}`,
     },
-    body: JSON.stringify({ prompt, maxTokens: 4000, temperature: 0.7, mode, ...(upgradeDraft ? { upgradeDraft } : {}) }),
+    body: JSON.stringify({ prompt, maxTokens: mode === 'full' ? 8000 : 4000, temperature: 0.7, mode, ...(upgradeDraft ? { upgradeDraft } : {}) }),
   });
 
   if (!res.ok) throw new Error(`Little Echo bridge error: ${res.status}`);
