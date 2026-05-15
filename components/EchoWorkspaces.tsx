@@ -12,7 +12,7 @@ import { User, ToastType } from '../types';
 const BRIDGE_URL = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_BRIDGE_URL) || 'http://localhost:18790';
 const BRIDGE_SECRET = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_ECHO_BRIDGE_SECRET) || 'brightforge-echo-bridge-2026';
 
-type WorkspaceModel = 'sassin' | 'claude' | 'echo';
+type WorkspaceModel = 'sassin' | 'hermes' | 'echo';
 
 const MODEL_CONFIG: Record<WorkspaceModel, {
   label: string;
@@ -35,12 +35,12 @@ const MODEL_CONFIG: Record<WorkspaceModel, {
     dot: 'bg-amber-400',
     description: 'Local content model — good for drafts and writing tasks',
   },
-  claude: {
-    label: 'Claude',
+  hermes: {
+    label: 'Gemini 3.1 Pro',
     badge: 'Cloud',
     badgeClass: 'bg-blue-500/20 text-blue-300',
     dot: 'bg-blue-400',
-    description: 'Claude via Hermes — best quality, uses API credits',
+    description: 'Gemini 3.1 Pro via Hermes — best quality, uses API credits',
   },
 };
 
@@ -145,7 +145,7 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
 
   // Available models — Claude only for Owner
   const availableModels = (Object.entries(MODEL_CONFIG) as [WorkspaceModel, typeof MODEL_CONFIG[WorkspaceModel]][])
-    .filter(([key]) => key !== 'claude' || isOwner);
+    .filter(([key]) => key !== 'hermes' || isOwner);
 
   const activeWorkspace = workspaces.find(w => w.id === activeId) ?? workspaces[0];
 
@@ -279,7 +279,7 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
       'sassin-live': { cls: 'bg-purple-500/20 text-purple-300', label: 'Local + live data' },
       echo: { cls: 'bg-amber-500/20 text-amber-300', label: 'Local' },
       'echo-live': { cls: 'bg-amber-500/20 text-amber-300', label: 'Local + live data' },
-      hermes: { cls: 'bg-blue-500/20 text-blue-300', label: 'Claude' },
+      hermes: { cls: 'bg-blue-500/20 text-blue-300', label: 'Gemini 3.1 Pro' },
       'hermes-fallback': { cls: 'bg-yellow-500/20 text-yellow-300', label: 'Claude (fallback)' },
       batch: { cls: 'bg-green-500/20 text-green-300', label: 'Batch' },
     };
