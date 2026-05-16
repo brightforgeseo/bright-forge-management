@@ -341,7 +341,7 @@ ${currentUser.name}`;
   const renderContent = () => {
     const view = (() => {
       switch (currentView) {
-        case ToolView.KEYWORD_RESEARCH: return <KeywordTool />;
+        case ToolView.KEYWORD_RESEARCH: return <KeywordTool onNavigateToContent={() => setCurrentView(ToolView.CONTENT_GENERATOR)} />;
         case ToolView.CONTENT_GENERATOR: return <ContentTool />;
         case ToolView.SITE_AUDIT: return <AuditTool />;
         case ToolView.QA_CHECKER: return <QAChecker />;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { PenTool, Copy, Check, Sparkles, Zap, Star, FileText, ArrowUpCircle } from 'lucide-react';
 import { generateContent } from '../services/geminiService';
 import { ContentResult } from '../types';
@@ -22,6 +22,27 @@ const ContentTool: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'final' | 'draft'>('final');
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const applyKeywordSeed = (payload: any) => {
+      if (!payload) return;
+      if (payload.topic) setTopic(String(payload.topic));
+      if (payload.keywords) setKeywords(String(payload.keywords));
+      if (payload.aiPrompt) setBrief(String(payload.aiPrompt));
+    };
+
+    try {
+      const saved = localStorage.getItem('keywordResearchContentSeed');
+      if (saved) {
+        applyKeywordSeed(JSON.parse(saved));
+        localStorage.removeItem('keywordResearchContentSeed');
+      }
+    } catch {}
+
+    const handler = (event: Event) => applyKeywordSeed((event as CustomEvent).detail);
+    window.addEventListener('keywordResearchContentSeed', handler);
+    return () => window.removeEventListener('keywordResearchContentSeed', handler);
+  }, []);
 
   const runGenerate = async (overrideMode?: ContentMode, upgradeDraft?: string) => {
     if (!topic.trim()) return;
