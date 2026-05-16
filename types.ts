@@ -71,12 +71,34 @@ export enum ToolView {
   SETTINGS = 'SETTINGS',
 }
 
+export type KeywordIntent = 'Informational' | 'Commercial' | 'Transactional' | 'Local' | 'Navigational';
+export type KeywordDifficulty = 'Low' | 'Medium' | 'High';
+export type KeywordPriority = 'Quick Win' | 'Build Page' | 'Support Existing' | 'Monitor' | 'Ignore';
+export type KeywordUseCase = 'Blog' | 'Service Page' | 'FAQ' | 'GBP' | 'Category' | 'Landing Page' | 'Supporting Article';
+
 export interface KeywordResult {
   keyword: string;
   searchVolume: number;
-  difficulty: string;
+  difficulty: KeywordDifficulty | string;
   competition: number;
   trend: number[];
+  intent?: KeywordIntent | string;
+  cpc?: number;
+  opportunityScore?: number;
+  serpFeatures?: string[];
+  cluster?: string;
+  recommendedUse?: KeywordUseCase | string;
+  priority?: KeywordPriority | string;
+  reason?: string;
+  contentAngle?: string;
+}
+
+export interface KeywordResearchOptions {
+  source?: string;
+  mode?: 'related' | 'long_tail' | 'questions' | 'content_plan' | 'competitor_gap';
+  domain?: string;
+  competitors?: string[];
+  limit?: number;
 }
 
 export interface AuditResult {

@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { KeywordResult, AuditResult, ContentResult, Task, QACorrection } from "../types";
+import { KeywordResult, KeywordResearchOptions, AuditResult, ContentResult, Task, QACorrection } from "../types";
 import { generateLittleEchoContent } from "./littleEchoService";
 import { runEchoAgent } from "./echoAgent";
 
@@ -22,23 +22,53 @@ const ECHO_BRIDGE_SECRET = (typeof import.meta !== 'undefined' && (import.meta a
 function normaliseKeywordResults(raw: unknown): KeywordResult[] {
   if (!Array.isArray(raw)) return [];
 
+  const cleanList = (value: any): string[] => {
+    if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean).slice(0, 5);
+    if (typeof value === 'string') return value.split(',').map((item) => item.trim()).filter(Boolean).slice(0, 5);
+    return [];
+  };
+
+  const cleanText = (value: any, fallback = '') => String(value || fallback).trim();
+  const cleanDifficulty = (value: any) => {
+    const raw = String(value || '').toLowerCase();
+    if (raw.includes('high')) return 'High';
+    if (raw.includes('low')) return 'Low';
+    return 'Medium';
+  };
+
   return raw
-    .map((item: any) => ({
-      keyword: String(item?.keyword || '').trim(),
-      searchVolume: Number(item?.searchVolume ?? item?.volume ?? 0),
-      difficulty: ['Low', 'Medium', 'High'].includes(item?.difficulty) ? item.difficulty : 'Medium',
-      competition: Math.max(0, Math.min(100, Number(item?.competition ?? item?.competitionScore ?? 50))),
-      trend: Array.isArray(item?.trend)
-        ? item.trend.slice(0, 6).map((n: any) => Math.max(0, Math.min(100, Number(n) || 0)))
-        : [50, 52, 54, 55, 57, 60],
-    }))
+    .map((item: any) => {
+      const competition = Math.max(0, Math.min(100, Number(item?.competition ?? item?.competitionScore ?? item?.paidCompetition ?? 50)));
+      const volume = Number(item?.searchVolume ?? item?.volume ?? item?.monthlySearchVolume ?? 0);
+      const difficulty = cleanDifficulty(item?.difficulty ?? item?.keywordDifficulty);
+      const opportunityScore = Math.max(0, Math.min(100, Number(item?.opportunityScore ?? item?.opportunity ?? Math.round((volume > 0 ? Math.min(40, Math.log10(volume + 1) * 10) : 10) + (difficulty === 'Low' ? 30 : difficulty === 'Medium' ? 18 : 8) + ((100 - competition) * 0.3)))));
+
+      return {
+        keyword: cleanText(item?.keyword || item?.query),
+        searchVolume: Number.isFinite(volume) ? volume : 0,
+        difficulty,
+        competition,
+        trend: Array.isArray(item?.trend)
+          ? item.trend.slice(0, 6).map((n: any) => Math.max(0, Math.min(100, Number(n) || 0)))
+          : [50, 52, 54, 55, 57, 60],
+        intent: cleanText(item?.intent, 'Informational'),
+        cpc: Number.isFinite(Number(item?.cpc)) ? Number(item?.cpc) : undefined,
+        opportunityScore,
+        serpFeatures: cleanList(item?.serpFeatures),
+        cluster: cleanText(item?.cluster, 'General Opportunities'),
+        recommendedUse: cleanText(item?.recommendedUse || item?.useCase, 'Supporting Article'),
+        priority: cleanText(item?.priority, opportunityScore >= 70 ? 'Quick Win' : opportunityScore >= 45 ? 'Build Page' : 'Monitor'),
+        reason: cleanText(item?.reason, 'Relevant opportunity for the seed topic.'),
+        contentAngle: cleanText(item?.contentAngle),
+      };
+    })
     .filter((item) => item.keyword && Number.isFinite(item.searchVolume))
-    .slice(0, 10);
+    .slice(0, 50);
 }
 
-export const generateKeywords = async (seedKeyword: string): Promise<KeywordResult[]> => {
+export const generateKeywords = async (seedKeyword: string, options: KeywordResearchOptions = {}): Promise<KeywordResult[]> => {
   // Primary path: ChatGPT via Hermes bridge, with SE Ranking MCP tools available server-side.
-  // Keeps the old keyword-result shape so the UI does not need changing.
+  // Keeps the old keyword-result shape while allowing richer SEO fields for the upgraded UI.
   try {
     const res = await fetch(`${ECHO_BRIDGE_URL}/keywords`, {
       method: 'POST',
@@ -46,8 +76,8 @@ export const generateKeywords = async (seedKeyword: string): Promise<KeywordResu
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${ECHO_BRIDGE_SECRET}`,
       },
-      body: JSON.stringify({ seedKeyword }),
-      signal: AbortSignal.timeout(150_000),
+      body: JSON.stringify({ seedKeyword, ...options }),
+      signal: AbortSignal.timeout(180_000),
     });
 
     if (!res.ok) throw new Error(`Keyword bridge error ${res.status}: ${await res.text()}`);
@@ -64,10 +94,11 @@ export const generateKeywords = async (seedKeyword: string): Promise<KeywordResu
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: `Generate 5-7 related long-tail keywords for "${seedKeyword}".
+      contents: `Generate 10 related SEO keyword opportunities for "${seedKeyword}".
       For each keyword, estimate a monthly search volume (100-50000), a difficulty level (Low, Medium, High),
-      a competition score (0-100), and a 6-month search trend array (6 numbers between 0-100 representing relative interest).
-      Return ONLY a valid JSON array using this shape: [{"keyword":"keyword phrase","searchVolume":1000,"difficulty":"Low","competition":40,"trend":[45,50,55,60,65,70]}]`,
+      a competition score (0-100), CPC, intent, opportunity score, SERP features, topic cluster, recommended use,
+      priority, a short senior SEO reason, content angle, and a 6-month search trend array.
+      Return ONLY a valid JSON array using this shape: [{"keyword":"keyword phrase","searchVolume":1000,"difficulty":"Low","competition":40,"trend":[45,50,55,60,65,70],"intent":"Commercial","cpc":3.5,"opportunityScore":78,"serpFeatures":["AI Overview","PAA"],"cluster":"Service modifiers","recommendedUse":"Service Page","priority":"Quick Win","reason":"Good commercial relevance with manageable competition.","contentAngle":"Build a comparison-led service page."}]`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -82,7 +113,19 @@ export const generateKeywords = async (seedKeyword: string): Promise<KeywordResu
               trend: {
                 type: Type.ARRAY,
                 items: { type: Type.NUMBER }
-              }
+              },
+              intent: { type: Type.STRING },
+              cpc: { type: Type.NUMBER },
+              opportunityScore: { type: Type.NUMBER },
+              serpFeatures: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING }
+              },
+              cluster: { type: Type.STRING },
+              recommendedUse: { type: Type.STRING },
+              priority: { type: Type.STRING },
+              reason: { type: Type.STRING },
+              contentAngle: { type: Type.STRING }
             },
             required: ["keyword", "searchVolume", "difficulty", "competition", "trend"]
           }
