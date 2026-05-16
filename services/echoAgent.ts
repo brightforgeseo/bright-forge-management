@@ -29,7 +29,7 @@ import { getChatSystemPrompt } from './skillsLoader';
 
 const K1 = 'sk-ant-api03-FM3mh6FtduBlSZR63Sdx8zM2xsKNtuE';
 const K2 = '_IxCsXAgHA-QFdT-0P2Ip3Tpypg7SVQAPr8TA7p0S2dvHyFi9D0mpjQ-z388AAAA';
-const CLAUDE_SONNET = 'claude-sonnet-4-6';
+const GEMINI_PRO = 'gemini-3.1-pro-preview';
 
 const MAX_HOPS = 12;
 const MAX_TOKENS = 16000;
@@ -1118,7 +1118,7 @@ The acting user is **${executingUser.name}** — attribute actions and notificat
 
   for (let hop = 0; hop < MAX_HOPS; hop++) {
     const response = await client.messages.create({
-      model: CLAUDE_SONNET,
+      model: GEMINI_PRO,
       max_tokens: MAX_TOKENS,
       system: [{ type: 'text', text: fullSystemPrompt, cache_control: { type: 'ephemeral' } }],
       tools: TOOLS,

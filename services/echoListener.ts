@@ -20,7 +20,7 @@ import { ChatChannel, User } from '../types';
 // message MIGHT be a follow-up. Avoids running on every chat message.
 const K1 = 'sk-ant-api03-FM3mh6FtduBlSZR63Sdx8zM2xsKNtuE';
 const K2 = '_IxCsXAgHA-QFdT-0P2Ip3Tpypg7SVQAPr8TA7p0S2dvHyFi9D0mpjQ-z388AAAA';
-const CLASSIFIER_MODEL = 'claude-haiku-4-5-20251001';
+const CLASSIFIER_MODEL = 'gemini-haiku-4-5-20251001';
 const FOLLOWUP_WINDOW_MS = 5 * 60 * 1000;       // 5 min after Echo speaks, treat next msgs as possibly addressed to him
 
 const classifierClient = new Anthropic({ apiKey: K1 + K2, dangerouslyAllowBrowser: true });

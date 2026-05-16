@@ -36,11 +36,11 @@ const MODEL_CONFIG: Record<WorkspaceModel, {
     description: 'Local content model — good for drafts and writing tasks',
   },
   hermes: {
-    label: 'Gemini 3.1 Pro',
+    label: 'ChatGPT 5.5',
     badge: 'Cloud',
     badgeClass: 'bg-blue-500/20 text-blue-300',
     dot: 'bg-blue-400',
-    description: 'Gemini 3.1 Pro via Hermes — best quality, uses API credits',
+    description: 'ChatGPT 5.5 via Hermes, best quality, uses ChatGPT credits',
   },
 };
 
@@ -143,7 +143,7 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
 
   const isOwner = currentUser.role === 'Owner';
 
-  // Available models — Claude only for Owner
+  // Available models — ChatGPT only for Owner
   const availableModels = (Object.entries(MODEL_CONFIG) as [WorkspaceModel, typeof MODEL_CONFIG[WorkspaceModel]][])
     .filter(([key]) => key !== 'hermes' || isOwner);
 
@@ -279,8 +279,8 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
       'sassin-live': { cls: 'bg-purple-500/20 text-purple-300', label: 'Local + live data' },
       echo: { cls: 'bg-amber-500/20 text-amber-300', label: 'Local' },
       'echo-live': { cls: 'bg-amber-500/20 text-amber-300', label: 'Local + live data' },
-      hermes: { cls: 'bg-blue-500/20 text-blue-300', label: 'Gemini 3.1 Pro' },
-      'hermes-fallback': { cls: 'bg-yellow-500/20 text-yellow-300', label: 'Claude (fallback)' },
+      hermes: { cls: 'bg-blue-500/20 text-blue-300', label: 'ChatGPT 5.5' },
+      'hermes-fallback': { cls: 'bg-yellow-500/20 text-yellow-300', label: 'ChatGPT fallback' },
       batch: { cls: 'bg-green-500/20 text-green-300', label: 'Batch' },
     };
     const m = map[routedTo] || { cls: 'bg-white/10 text-white/50', label: routedTo };

@@ -1,14 +1,14 @@
 # Bright Forge SEO Skills Package
 
 ## Overview
-This package contains all the standardized SEO guidelines, processes, and templates for Bright Forge SEO agency operations and Claude API integration.
+This package contains all the standardized SEO guidelines, processes, and templates for Bright Forge SEO agency operations and Gemini API integration.
 
 ## Files Included (21 Total)
 
 ### Core Guidelines
 1. **bright-forge-seo-main.md** - Agency overview, standards, and business principles
 2. **content-standards.md** - Writing quality requirements and structure guidelines
-3. **api-system-prompt.md** - Main system prompt for Claude API integration
+3. **api-system-prompt.md** - Main system prompt for Gemini API integration
 
 ### SEO Optimization
 4. **keyword-integration.md** - Critical keyword usage rules (PRIMARY: 3-5x, SECONDARY: 2-4x)
@@ -36,7 +36,7 @@ This package contains all the standardized SEO guidelines, processes, and templa
 ### Technical SEO
 19. **technical-seo-audit.md** - Complete technical audit checklist
 
-## How to Use with Claude API
+## How to Use with Gemini API
 
 ### Basic Implementation
 
@@ -61,7 +61,7 @@ const response = await fetch('https://api.anthropic.com/v1/messages', {
     'content-type': 'application/json'
   },
   body: JSON.stringify({
-    model: 'claude-sonnet-4-20250514',
+    model: 'gemini-sonnet-4-20250514',
     max_tokens: 4096,
     messages: [
       {

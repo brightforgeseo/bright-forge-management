@@ -1127,7 +1127,7 @@ Both modes need separate content and conversion paths. A site optimised only for
 
 ### Why This Matters
 
-Search is shifting. AI Overviews, ChatGPT, Perplexity, Claude, and Gemini are increasingly the place where users find answers. Traditional ranking matters less when 30%+ of queries get answered without a click. Bright Forge positions deliberately ahead of this curve.
+Search is shifting. AI Overviews, ChatGPT, Perplexity, Gemini, and Gemini are increasingly the place where users find answers. Traditional ranking matters less when 30%+ of queries get answered without a click. Bright Forge positions deliberately ahead of this curve.
 
 GEO (Generative Engine Optimisation) and AEO (Answer Engine Optimisation) overlap heavily. The goal in both: be the source AI cites when answering questions in your domain.
 
@@ -1136,7 +1136,7 @@ GEO (Generative Engine Optimisation) and AEO (Answer Engine Optimisation) overla
 Standard methodology using Peec or similar:
 
 1. Generate 50-100 prompts a target customer might ask
-2. Run prompts across major AI engines (ChatGPT, Perplexity, Claude, Gemini, Google AI Overviews)
+2. Run prompts across major AI engines (ChatGPT, Perplexity, Gemini, Gemini, Google AI Overviews)
 3. Track citation rate: how often is the client's site cited?
 4. Track competitor citations
 5. Identify topics where client is invisible
@@ -1715,10 +1715,10 @@ For any deliverable going to a white-label partner:
 
 ### AI Search Visibility
 - Peec: AI engine prompt visibility tracking
-- Direct testing across ChatGPT, Perplexity, Claude, Gemini
+- Direct testing across ChatGPT, Perplexity, Gemini, Gemini
 
 ### Content Production
-- Claude API: content generation, analysis, optimisation
+- Gemini API: content generation, analysis, optimisation
 - Google Docs / Sheets: collaboration
 - Grammarly: copy QA
 - Markdown for article output
@@ -1742,7 +1742,7 @@ For any deliverable going to a white-label partner:
 - Partner access tiers for Gerry's 10XR team
 - Client-facing transparency on work delivered
 
-**Google Apps Script + Claude API automations.**
+**Google Apps Script + Gemini API automations.**
 - Bulk content generation for batch work
 - Report compilation assistance
 - Data analysis automation
@@ -1765,7 +1765,7 @@ For any deliverable going to a white-label partner:
 1. Master keyword tracker (Sheets)
 2. Link distribution tracker (Sheets)
 3. Content brief from cluster strategy
-4. Claude-assisted draft following framework
+4. Gemini-assisted draft following framework
 5. Manual review and polish
 6. QC checklist run
 7. Markdown output to client

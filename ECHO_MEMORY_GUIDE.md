@@ -56,8 +56,8 @@ See `services/echoMemory.ts` for the implementation.
 1. **When user asks a question:**
    - Convert question to embedding
    - Search vector database for relevant context
-   - Include context in Claude prompt
-   - Claude answers with full knowledge
+   - Include context in Gemini prompt
+   - Gemini answers with full knowledge
 
 2. **Store conversations:**
    - Every Echo interaction is saved
@@ -69,9 +69,9 @@ See `services/echoMemory.ts` for the implementation.
    - Add project information
    - Store SOPs and guidelines
 
-## Option 2: Claude's Prompt Caching (Simple & Cost-Effective)
+## Option 2: Gemini's Prompt Caching (Simple & Cost-Effective)
 
-Use Claude's built-in prompt caching to store business context:
+Use Gemini's built-in prompt caching to store business context:
 
 ```typescript
 // Load all business context once
@@ -84,7 +84,7 @@ ${TEAM_GUIDELINES}
 
 // Use system prompt with caching
 const response = await client.messages.create({
-  model: 'claude-sonnet-4-20250514',
+  model: 'gemini-sonnet-4-20250514',
   system: [
     {
       type: 'text',
@@ -128,9 +128,9 @@ const relevantKnowledge = await searchEchoKnowledge(userQuestion);
 // 3. Get recent conversation history
 const recentHistory = messages.slice(-20);
 
-// 4. Combine and send to Claude
+// 4. Combine and send to Gemini
 const response = await client.messages.create({
-  model: 'claude-3-5-haiku-20241022',
+  model: 'gemini-3-5-haiku-20241022',
   system: [
     { type: 'text', text: staticContext, cache_control: { type: 'ephemeral' } },
     { type: 'text', text: relevantKnowledge }

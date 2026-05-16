@@ -124,6 +124,31 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
     };
   }, [allTasks]);
 
+  // Keyboard shortcuts: N = focus add-task input, / = focus search input, Escape = clear selection
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const tag = target.tagName.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || target.isContentEditable) return;
+
+      if (e.key === 'n' || e.key === 'N') {
+        const addInput = document.querySelector<HTMLInputElement>('[data-add-task-input]');
+        if (addInput) { e.preventDefault(); addInput.focus(); }
+      } else if (e.key === '/') {
+        const searchInput = document.querySelector<HTMLInputElement>('[data-search-input]');
+        if (searchInput) { e.preventDefault(); searchInput.focus(); }
+      } else if (e.key === 'Escape') {
+        setIsTaskModalOpen(false);
+        setSelectedTask(null);
+        setShowStatusPicker(false);
+        setShowPriorityPicker(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const loadData = async () => {
     setLoading(true);
     const [boards, profiles] = await Promise.all([fetchClientBoards(), fetchProfiles()]);

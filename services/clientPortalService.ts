@@ -14,7 +14,7 @@ import {
   PreviousTaskSummary,
 } from '../types-portal';
 import { ClientBoard, TaskComment } from '../types';
-import { generateClientEmail } from './claudeService';
+import { generateClientEmail } from './geminiService';
 
 // ============================================
 // PARTNER ACCOUNT OPERATIONS
@@ -916,7 +916,7 @@ export const togglePartnerActive = async (
 };
 
 // ============================================
-// EMAIL GENERATION (uses Claude Haiku 3.5)
+// EMAIL GENERATION (uses Gemini Haiku 3.5)
 // ============================================
 
 // Helper to fetch previous tasks for a client to give AI context about the SEO project
@@ -999,7 +999,7 @@ export const generateEmailWithAI = async (
       );
     }
 
-    // Call Claude Haiku to generate the email
+    // Call Gemini Haiku to generate the email
     const result = await generateClientEmail(enrichedContext);
     return result;
   } catch (err) {

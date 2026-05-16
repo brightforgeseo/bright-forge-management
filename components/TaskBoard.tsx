@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Plus, Sparkles, ChevronDown, ChevronUp, ChevronRight, Trash2, Briefcase, CheckCircle2, Settings, Mail, Phone, Globe, X, Image as ImageIcon, Edit3, Palette, Loader2, Upload, UserCircle, Link as LinkIcon, MessageCircle, Send, Search, Share2, Hash, Users, Archive, RotateCcw, UserPlus, GripVertical } from 'lucide-react';
+import { Plus, Sparkles, ChevronDown, ChevronUp, ChevronRight, Trash2, Briefcase, CheckCircle2, Settings, Mail, Phone, Globe, X, Image as ImageIcon, Edit3, Palette, Loader2, Upload, UserCircle, Link as LinkIcon, MessageCircle, Send, Search, Share2, Hash, Users, Archive, RotateCcw, UserPlus, GripVertical, CheckSquare } from 'lucide-react';
 import AssignToPartnerModal from './client-portal/AssignToPartnerModal';
 import { Task, TaskGroup, User, ClientBoard, ToastType, LabelDefinition, Profile, TaskComment, ChatChannel, ChatMessage, ArchivedTask } from '../types';
 import { generateProjectTasks } from '../services/geminiService';
@@ -424,6 +424,10 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   const [draggedGroupId, setDraggedGroupId] = useState<string | null>(null);
   const [dragOverGroupPosition, setDragOverGroupPosition] = useState<string | null>(null);
 
+  // Bulk task selection state
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
+  const [bulkActionOpen, setBulkActionOpen] = useState(false);
+
   // Track in-flight saves to prevent realtime from overwriting them
   const pendingSaveRef = useRef<{ taskId: string; boardId: string } | null>(null);
 
@@ -486,6 +490,18 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   }, [selectedClientId]);
 
   const activeClient = clients.find(c => c.id === selectedClientId);
+
+  // Keyboard shortcut: Escape clears bulk selection
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedTaskIds.size > 0) {
+        setSelectedTaskIds(new Set());
+        setBulkActionOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedTaskIds]);
 
   // Open share modal and load channels
   const handleOpenShareModal = async () => {

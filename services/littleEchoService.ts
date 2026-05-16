@@ -8,7 +8,7 @@ const BRIDGE_SECRET = (typeof import.meta !== 'undefined' && (import.meta as any
  * Generate SEO content using the portal bridge pipeline.
  * mode='edit'  (default) — Echo draft → Gemma 4B edit. Fast (~30s).
  * mode='full'            — Echo outline → Sassin full article. Quality (~90s).
- * Zero API cost. Falls back to Claude if bridge unavailable.
+ * Zero API cost. Falls back to Gemini if bridge unavailable.
  */
 export const generateLittleEchoContent = async (
   topic: string,

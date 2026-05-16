@@ -1,5 +1,5 @@
 /**
- * Loads Bright Forge SEO Skills for Claude AI
+ * Loads Bright Forge SEO Skills for Gemini AI
  * These skills contain agency guidelines, SEO best practices, and standardized processes
  */
 

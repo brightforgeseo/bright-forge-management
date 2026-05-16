@@ -10,7 +10,7 @@
 // industry playbooks, reporting, voice, QC, tooling, risk, and Ben's notes.
 import masterKnowledge from 'bundle-text:../skills/master-knowledge-base.md';
 import brightForgeMain from 'bundle-text:../skills/bright-forge-seo-main.md';
-import apiSystemPrompt from 'bundle-text:../skills/api-system-prompt.md';
+
 import articleEditing from 'bundle-text:../skills/article-editing-optimization.md';
 import clickLossReport from 'bundle-text:../skills/click-loss-report.md';
 import clientBrief from 'bundle-text:../skills/client-brief-template.md';
@@ -49,10 +49,6 @@ ${masterKnowledge}
 ---
 
 ${brightForgeMain}
-
----
-
-${apiSystemPrompt}
 
 ---
 
@@ -132,7 +128,7 @@ ${technicalSEO}
 export const skills = {
   masterKnowledge,
   brightForgeMain,
-  apiSystemPrompt,
+
   articleEditing,
   clickLossReport,
   clientBrief,

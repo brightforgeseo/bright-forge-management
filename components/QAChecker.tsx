@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { CheckCircle, AlertCircle, Copy, Check, FileText } from 'lucide-react';
-import { checkContentQA } from '../services/claudeService';
+import { checkContentQA } from '../services/geminiService';
 import { QACorrection } from '../types';
 
 const QAChecker: React.FC = () => {
