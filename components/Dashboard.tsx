@@ -11,6 +11,33 @@ type TaskWithContext = {
   task: Task;
   boardId: string;
   boardName: string;
+  groupTitle: string;
+  statusDefs: ClientBoard['statusDefs'];
+};
+
+const COMPLETED_STATUS_KEYWORDS = ['done', 'complete', 'finished', 'closed', 'approved', 'shipped', 'delivered', 'resolved', 'sent to client', 'ben to check', 'archived'];
+const COMPLETED_STATUS_COLORS = ['#00c875', '#00ca72', '#22c55e', '#16a34a', '#15803d', '#166534', '#4ade80', '#86efac', 'green'];
+const COMPLETED_GROUP_TITLES = ['done', 'completed', 'cancelled', 'canceled', 'archived', 'closed'];
+
+const isCompletedGroup = (groupTitle?: string): boolean => {
+  const title = (groupTitle || '').trim().toLowerCase();
+  return COMPLETED_GROUP_TITLES.includes(title);
+};
+
+const isCompletedStatus = (statusId: string, statusDefs: ClientBoard['statusDefs'] = []): boolean => {
+  if (!statusId) return false;
+  if (['Done', 'Completed', 'status-8'].includes(statusId)) return true;
+
+  const statusDef = statusDefs.find(s => s.id === statusId);
+  if (!statusDef) return false;
+
+  const label = (statusDef.label || '').toLowerCase();
+  const color = (statusDef.color || '').toLowerCase();
+  return COMPLETED_STATUS_KEYWORDS.some(keyword => label.includes(keyword)) || COMPLETED_STATUS_COLORS.includes(color);
+};
+
+const isTaskCompleted = (task: Task, statusDefs: ClientBoard['statusDefs'], groupTitle?: string): boolean => {
+  return isCompletedGroup(groupTitle) || isCompletedStatus(task.status, statusDefs);
 };
 
 const todayStr = (): string => new Date().toISOString().slice(0, 10);
@@ -119,14 +146,20 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, setCurrentView }) =>
   const activityWindowStart = dateOffset(-14);
   const activityWindowEnd = dateOffset(14);
 
-  // Flatten all tasks with board context
+  // Flatten all tasks with board and group context so dashboard counts match the task board.
   const allTasks: TaskWithContext[] = boards.flatMap(board =>
     board.groups.flatMap(group =>
-      group.tasks.map(task => ({ task, boardId: board.id, boardName: board.name }))
+      group.tasks.map(task => ({
+        task,
+        boardId: board.id,
+        boardName: board.name,
+        groupTitle: group.title,
+        statusDefs: board.statusDefs || [],
+      }))
     )
   );
 
-  const openTasks = allTasks.filter(t => t.task.status !== 'Done');
+  const openTasks = allTasks.filter(t => !isTaskCompleted(t.task, t.statusDefs, t.groupTitle));
 
   const overdueTasks = openTasks.filter(
     t => t.task.dueDate && t.task.dueDate < today
@@ -138,20 +171,22 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, setCurrentView }) =>
 
   // Clients with no open task due within the 14-day activity window (past or future)
   const inactiveClients = boards.filter(board => {
-    const openBoardTasks = board.groups.flatMap(g => g.tasks).filter(t => t.status !== 'Done');
+    const openBoardTasks = board.groups
+      .flatMap(group => group.tasks.map(task => ({ task, groupTitle: group.title })))
+      .filter(({ task, groupTitle }) => !isTaskCompleted(task, board.statusDefs || [], groupTitle));
     if (openBoardTasks.length === 0) return true;
     const hasActivity = openBoardTasks.some(
-      t => t.dueDate && t.dueDate >= activityWindowStart && t.dueDate <= activityWindowEnd
+      ({ task }) => task.dueDate && task.dueDate >= activityWindowStart && task.dueDate <= activityWindowEnd
     );
     return !hasActivity;
   });
 
-  // Needs Attention: clients with overdue tasks, sorted by overdue count desc
+  // Needs Attention: clients with overdue open tasks, sorted by overdue count desc
   const clientOverdueList = boards
     .map(board => {
       const count = board.groups
-        .flatMap(g => g.tasks)
-        .filter(t => t.status !== 'Done' && t.dueDate && t.dueDate < today).length;
+        .flatMap(group => group.tasks.map(task => ({ task, groupTitle: group.title })))
+        .filter(({ task, groupTitle }) => !isTaskCompleted(task, board.statusDefs || [], groupTitle) && task.dueDate && task.dueDate < today).length;
       return { board, overdueCount: count };
     })
     .filter(x => x.overdueCount > 0)
