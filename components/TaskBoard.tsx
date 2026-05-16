@@ -340,6 +340,32 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
     };
   }, [clients.length]);
 
+  // Dashboard drilldowns select the relevant board/person before opening Tasks.
+  useEffect(() => {
+    const applyDashboardDrilldown = () => {
+      const raw = localStorage.getItem('dashboardTaskDrilldown');
+      if (!raw || clients.length === 0) return;
+
+      try {
+        const payload = JSON.parse(raw) as { boardId?: string; profileId?: string; filter?: string; label?: string };
+        if (payload.boardId && clients.some(board => board.id === payload.boardId)) {
+          setSelectedClientId(payload.boardId);
+        }
+        setSelectedPersonFilter(payload.profileId || '');
+        const filterLabel = payload.filter && payload.filter !== 'all' ? ` (${payload.filter.replace('-', ' ')})` : '';
+        addToast('info', `Opened dashboard drilldown${filterLabel}${payload.label ? `: ${payload.label}` : ''}`);
+      } catch (e) {
+        console.error('Error processing dashboard drilldown:', e);
+      } finally {
+        localStorage.removeItem('dashboardTaskDrilldown');
+      }
+    };
+
+    applyDashboardDrilldown();
+    window.addEventListener('dashboardTaskDrilldown', applyDashboardDrilldown);
+    return () => window.removeEventListener('dashboardTaskDrilldown', applyDashboardDrilldown);
+  }, [clients, addToast]);
+
   // Debounced Save Logic
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveCounterRef = useRef(0);

@@ -38,7 +38,18 @@ export type WorkloadRow = {
   highPriorityCount: number;
   blockedCount: number;
   completedThisWeek: number;
+  accountabilityScore: number;
   risk: 'Overloaded' | 'Busy' | 'Healthy';
+};
+
+export type CommandItem = {
+  id: string;
+  label: string;
+  detail: string;
+  tone: 'red' | 'amber' | 'green' | 'blue' | 'brand' | 'slate';
+  boardId?: string;
+  profileId?: string;
+  filter?: 'overdue' | 'blocked' | 'unassigned' | 'due-week' | 'stale' | 'all';
 };
 
 export type PipelineMetric = {
@@ -81,6 +92,7 @@ export type DashboardMetrics = {
   unassignedTasks: TaskWithContext[];
   noDueDateTasks: TaskWithContext[];
   staleClients: ClientRisk[];
+  commandItems: CommandItem[];
   clientRisks: ClientRisk[];
   workloadRows: WorkloadRow[];
   pipelineMetrics: PipelineMetric[];
@@ -176,6 +188,7 @@ export const buildDashboardMetrics = (boards: ClientBoard[], profiles: Profile[]
     const unassignedCount = open.filter(t => t.assigneeIds.length === 0).length;
     const noDueDateCount = open.filter(t => !t.task.dueDate).length;
     const boardStaleDays = daysSince((board as any).updated_at || (board as any).updatedAt);
+    const completedRecently = boardTasks.some(t => t.isCompleted && !!t.task.dueDate && t.task.dueDate >= weekStart && t.task.dueDate <= today);
 
     let score = 0;
     score += overdue.length * 4;
@@ -185,6 +198,7 @@ export const buildDashboardMetrics = (boards: ClientBoard[], profiles: Profile[]
     score += Math.min(noDueDateCount, 25);
     if (open.length > 50) score += 20;
     if (boardStaleDays !== null && boardStaleDays > 14) score += 15;
+    if (open.length > 0 && !completedRecently && dueThisWeek === 0) score += 10;
     if (dueThisWeek > 20) score += 8;
 
     const reasons: string[] = [];
@@ -194,6 +208,7 @@ export const buildDashboardMetrics = (boards: ClientBoard[], profiles: Profile[]
     if (unassignedCount) reasons.push(`${unassignedCount} unassigned`);
     if (noDueDateCount) reasons.push(`${noDueDateCount} no due date`);
     if (boardStaleDays !== null && boardStaleDays > 14) reasons.push(`No update ${boardStaleDays}d`);
+    if (open.length > 0 && !completedRecently && dueThisWeek === 0) reasons.push('No recent completions');
     if (!reasons.length && open.length) reasons.push(`${open.length} open`);
 
     return {
@@ -214,7 +229,10 @@ export const buildDashboardMetrics = (boards: ClientBoard[], profiles: Profile[]
     .filter(risk => risk.score > 0 || risk.openCount === 0)
     .sort((a, b) => b.score - a.score || b.overdueCount - a.overdueCount);
 
-  const staleClients = clientRisks.filter(risk => risk.staleDays !== null && risk.staleDays > 14);
+  const staleClients = clientRisks.filter(risk =>
+    (risk.staleDays !== null && risk.staleDays > 14) ||
+    (risk.openCount > 0 && risk.dueThisWeek === 0 && risk.reasons.includes('No recent completions'))
+  );
 
   const workloadRows = profiles.map(profile => {
     const assignedOpen = openTasks.filter(t => t.assigneeIds.includes(profile.id));
@@ -223,6 +241,7 @@ export const buildDashboardMetrics = (boards: ClientBoard[], profiles: Profile[]
     const blockedCount = assignedOpen.filter(isBlockedTask).length;
     const highPriorityCount = assignedOpen.filter(t => t.isHighPriority).length;
     const dueThisWeekCount = assignedOpen.filter(t => !!t.task.dueDate && t.task.dueDate >= today && t.task.dueDate <= weekEnd).length;
+    const accountabilityScore = overdueCount * 5 + blockedCount * 4 + highPriorityCount * 2 + dueThisWeekCount;
     const risk: WorkloadRow['risk'] = overdueCount > 20 || assignedOpen.length > 55 ? 'Overloaded' : overdueCount > 5 || assignedOpen.length > 30 ? 'Busy' : 'Healthy';
     return {
       profile,
@@ -232,11 +251,12 @@ export const buildDashboardMetrics = (boards: ClientBoard[], profiles: Profile[]
       highPriorityCount,
       blockedCount,
       completedThisWeek: assignedCompleted.length,
+      accountabilityScore,
       risk,
     };
   })
     .filter(row => row.openCount > 0 || row.completedThisWeek > 0)
-    .sort((a, b) => b.overdueCount - a.overdueCount || b.openCount - a.openCount);
+    .sort((a, b) => b.accountabilityScore - a.accountabilityScore || b.overdueCount - a.overdueCount || b.openCount - a.openCount);
 
   const pipelineLabels: Record<string, string> = {
     content: 'Content',
@@ -323,11 +343,59 @@ export const buildDashboardMetrics = (boards: ClientBoard[], profiles: Profile[]
 
   const topRisk = clientRisks[0];
   const overloaded = workloadRows.filter(row => row.risk === 'Overloaded');
+  const topAccountability = workloadRows[0];
+  const topBlocked = clientRisks.find(risk => risk.blockedCount > 0);
+  const topUnassigned = clientRisks.find(risk => risk.unassignedCount > 0);
+  const topStale = staleClients[0];
+  const commandItems: CommandItem[] = [
+    topRisk && topRisk.overdueCount > 0 ? {
+      id: `risk-${topRisk.board.id}`,
+      label: `Start with ${topRisk.board.name}`,
+      detail: `${topRisk.overdueCount} overdue, ${topRisk.highPriorityOverdue} high-priority overdue, ${topRisk.blockedCount} blocked.`,
+      tone: topRisk.level === 'Critical' ? 'red' : 'amber',
+      boardId: topRisk.board.id,
+      filter: 'overdue',
+    } : null,
+    topAccountability ? {
+      id: `person-${topAccountability.profile.id}`,
+      label: `Check ${profileName(topAccountability.profile)}'s queue`,
+      detail: `${topAccountability.overdueCount} overdue, ${topAccountability.blockedCount} blocked, ${topAccountability.dueThisWeekCount} due this week.`,
+      tone: topAccountability.risk === 'Overloaded' ? 'red' : topAccountability.risk === 'Busy' ? 'amber' : 'blue',
+      profileId: topAccountability.profile.id,
+      filter: 'overdue',
+    } : null,
+    topBlocked ? {
+      id: `blocked-${topBlocked.board.id}`,
+      label: `Unblock ${topBlocked.board.name}`,
+      detail: `${topBlocked.blockedCount} task${topBlocked.blockedCount === 1 ? '' : 's'} look blocked or waiting.`,
+      tone: 'amber',
+      boardId: topBlocked.board.id,
+      filter: 'blocked',
+    } : null,
+    topUnassigned ? {
+      id: `unassigned-${topUnassigned.board.id}`,
+      label: `Assign ownership on ${topUnassigned.board.name}`,
+      detail: `${topUnassigned.unassignedCount} open task${topUnassigned.unassignedCount === 1 ? '' : 's'} have no owner.`,
+      tone: 'brand',
+      boardId: topUnassigned.board.id,
+      filter: 'unassigned',
+    } : null,
+    topStale ? {
+      id: `stale-${topStale.board.id}`,
+      label: `Wake up ${topStale.board.name}`,
+      detail: topStale.staleDays ? `No board update for ${topStale.staleDays} days.` : 'Open work but no recent completion or due-date momentum.',
+      tone: 'blue',
+      boardId: topStale.board.id,
+      filter: 'stale',
+    } : null,
+  ].filter(Boolean).slice(0, 5) as CommandItem[];
+
   const briefing = [
     topRisk ? `${topRisk.board.name} is the highest-risk board: ${topRisk.reasons.slice(0, 4).join(', ')}.` : 'No client risk signals detected.',
     overdueTasks.length ? `${overdueTasks.length} open tasks are overdue across ${clientRisks.filter(r => r.overdueCount > 0).length} clients.` : 'No overdue open tasks. Suspiciously civilised.',
     blockedTasks.length ? `${blockedTasks.length} tasks look blocked or waiting and need unblocking before more work gets piled on.` : 'No obvious blocked-task pile-up detected.',
     overloaded.length ? `${overloaded.map(row => profileName(row.profile)).slice(0, 3).join(', ')} ${overloaded.length === 1 ? 'looks' : 'look'} overloaded.` : 'Team workload is not screaming from the data.',
+    staleClients.length ? `${staleClients.length} client${staleClients.length === 1 ? '' : 's'} look stale or neglected.` : 'No obvious stale-client graveyard today.',
     hygieneIssues.length ? `${hygieneIssues[0].count} ${hygieneIssues[0].label.toLowerCase()} is the biggest data hygiene problem.` : 'Data hygiene looks clean enough to trust the dashboard.',
   ];
 
@@ -345,6 +413,7 @@ export const buildDashboardMetrics = (boards: ClientBoard[], profiles: Profile[]
     unassignedTasks,
     noDueDateTasks,
     staleClients,
+    commandItems,
     clientRisks,
     workloadRows,
     pipelineMetrics,

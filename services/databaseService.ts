@@ -390,7 +390,7 @@ const parseBoardRows = (data: any[]): ClientBoard[] => {
     const boardId = row.board_data?.id;
     if (boardId && !seen.has(boardId)) {
       seen.add(boardId);
-      boards.push({ ...row.board_data, db_id: row.id });
+      boards.push({ ...row.board_data, db_id: row.id, updated_at: row.updated_at, created_at: row.created_at });
     }
   }
   return boards;
