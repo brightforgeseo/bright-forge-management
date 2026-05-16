@@ -16,14 +16,58 @@ const getAiClient = () => {
   return new GoogleGenAI({ apiKey: apiKey || 'dummy_key_to_prevent_init_crash' });
 };
 
+const ECHO_BRIDGE_URL = (typeof import.meta !== 'undefined' && ((import.meta as any).env?.VITE_BRIDGE_URL || (import.meta as any).env?.VITE_ECHO_BRIDGE_URL)) || 'http://localhost:18790';
+const ECHO_BRIDGE_SECRET = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_ECHO_BRIDGE_SECRET) || 'brightforge-echo-bridge-2026';
+
+function normaliseKeywordResults(raw: unknown): KeywordResult[] {
+  if (!Array.isArray(raw)) return [];
+
+  return raw
+    .map((item: any) => ({
+      keyword: String(item?.keyword || '').trim(),
+      searchVolume: Number(item?.searchVolume ?? item?.volume ?? 0),
+      difficulty: ['Low', 'Medium', 'High'].includes(item?.difficulty) ? item.difficulty : 'Medium',
+      competition: Math.max(0, Math.min(100, Number(item?.competition ?? item?.competitionScore ?? 50))),
+      trend: Array.isArray(item?.trend)
+        ? item.trend.slice(0, 6).map((n: any) => Math.max(0, Math.min(100, Number(n) || 0)))
+        : [50, 52, 54, 55, 57, 60],
+    }))
+    .filter((item) => item.keyword && Number.isFinite(item.searchVolume))
+    .slice(0, 10);
+}
+
 export const generateKeywords = async (seedKeyword: string): Promise<KeywordResult[]> => {
+  // Primary path: ChatGPT via Hermes bridge, with SE Ranking MCP tools available server-side.
+  // Keeps the old keyword-result shape so the UI does not need changing.
+  try {
+    const res = await fetch(`${ECHO_BRIDGE_URL}/keywords`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${ECHO_BRIDGE_SECRET}`,
+      },
+      body: JSON.stringify({ seedKeyword }),
+      signal: AbortSignal.timeout(150_000),
+    });
+
+    if (!res.ok) throw new Error(`Keyword bridge error ${res.status}: ${await res.text()}`);
+
+    const data = await res.json();
+    const results = normaliseKeywordResults(data.keywords || data);
+    if (results.length > 0) return results;
+    throw new Error('Keyword bridge returned no usable keywords');
+  } catch (bridgeError) {
+    console.warn("ChatGPT keyword research failed, falling back to Gemini:", bridgeError);
+  }
+
   const ai = getAiClient();
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: `Generate 5 related long-tail keywords for "${seedKeyword}".
+      contents: `Generate 5-7 related long-tail keywords for "${seedKeyword}".
       For each keyword, estimate a monthly search volume (100-50000), a difficulty level (Low, Medium, High),
-      a competition score (0-100), and a 6-month search trend array (6 numbers between 0-100 representing relative interest).`,
+      a competition score (0-100), and a 6-month search trend array (6 numbers between 0-100 representing relative interest).
+      Return ONLY a valid JSON array using this shape: [{"keyword":"keyword phrase","searchVolume":1000,"difficulty":"Low","competition":40,"trend":[45,50,55,60,65,70]}]`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -47,7 +91,7 @@ export const generateKeywords = async (seedKeyword: string): Promise<KeywordResu
     });
 
     if (response.text) {
-      return JSON.parse(response.text) as KeywordResult[];
+      return normaliseKeywordResults(JSON.parse(response.text));
     }
     return [];
   } catch (error) {
@@ -178,9 +222,6 @@ export const generateProjectTasks = async (goal: string): Promise<Task[]> => {
     throw error;
   }
 };
-
-const ECHO_BRIDGE_URL = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_ECHO_BRIDGE_URL) || 'http://localhost:18790';
-const ECHO_BRIDGE_SECRET = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_ECHO_BRIDGE_SECRET) || ['brightforge', 'echo', 'bridge', '2026'].join('-');
 
 async function callEchoBridge(
   history: string,
