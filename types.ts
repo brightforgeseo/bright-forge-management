@@ -101,14 +101,44 @@ export interface KeywordResearchOptions {
   limit?: number;
 }
 
+export type AuditMode = 'content' | 'url' | 'technical';
+export type AuditSeverity = 'high' | 'medium' | 'low';
+export type AuditCategory = 'Indexability' | 'Crawlability' | 'On-page' | 'Content' | 'Performance' | 'Schema' | 'Local SEO' | 'Trust' | 'Conversion';
+
+export interface AuditOptions {
+  mode?: AuditMode;
+  url?: string;
+  primaryKeyword?: string;
+  source?: string;
+  includeTechnical?: boolean;
+  competitor?: string;
+}
+
+export interface AuditIssue {
+  severity: AuditSeverity;
+  message: string;
+  recommendation: string;
+  category?: AuditCategory | string;
+  impact?: string;
+  effort?: 'Low' | 'Medium' | 'High' | string;
+  priority?: number;
+  evidence?: string;
+}
+
 export interface AuditResult {
   score: number;
-  issues: {
-    severity: 'high' | 'medium' | 'low';
-    message: string;
-    recommendation: string;
-  }[];
+  issues: AuditIssue[];
   summary: string;
+  strengths?: string[];
+  quickWins?: string[];
+  nextActions?: string[];
+  metadata?: {
+    mode?: AuditMode | string;
+    url?: string;
+    primaryKeyword?: string;
+    source?: string;
+    routedTo?: string;
+  };
 }
 
 export interface ContentResult {

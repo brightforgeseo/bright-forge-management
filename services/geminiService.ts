@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { KeywordResult, KeywordResearchOptions, AuditResult, ContentResult, Task, QACorrection } from "../types";
+import { KeywordResult, KeywordResearchOptions, AuditOptions, AuditResult, AuditIssue, ContentResult, Task, QACorrection } from "../types";
 import { generateLittleEchoContent } from "./littleEchoService";
 import { runEchoAgent } from "./echoAgent";
 
@@ -183,16 +183,95 @@ export const generateContent = async (topic: string, tone: string, keywords: str
   }
 };
 
-export const analyzeText = async (text: string): Promise<AuditResult> => {
+function normaliseAuditResult(raw: any, options: AuditOptions = {}): AuditResult {
+  const cleanSeverity = (value: any): 'high' | 'medium' | 'low' => {
+    const severity = String(value || '').toLowerCase();
+    if (severity.includes('high') || severity.includes('critical')) return 'high';
+    if (severity.includes('low') || severity.includes('notice')) return 'low';
+    return 'medium';
+  };
+
+  const cleanList = (value: any): string[] => {
+    if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean).slice(0, 8);
+    if (typeof value === 'string') return value.split(/\n|;/).map((item) => item.replace(/^[-*]\s*/, '').trim()).filter(Boolean).slice(0, 8);
+    return [];
+  };
+
+  const issues: AuditIssue[] = (Array.isArray(raw?.issues) ? raw.issues : [])
+    .map((issue: any, index: number) => ({
+      severity: cleanSeverity(issue?.severity),
+      category: String(issue?.category || issue?.area || 'On-page').trim(),
+      message: String(issue?.message || issue?.issue || '').trim(),
+      recommendation: String(issue?.recommendation || issue?.fix || '').trim(),
+      impact: String(issue?.impact || '').trim(),
+      effort: String(issue?.effort || 'Medium').trim(),
+      priority: Number.isFinite(Number(issue?.priority)) ? Number(issue.priority) : index + 1,
+      evidence: String(issue?.evidence || '').trim(),
+    }))
+    .filter((issue) => issue.message && issue.recommendation)
+    .slice(0, 12);
+
+  const score = Math.max(0, Math.min(100, Number(raw?.score ?? raw?.seoScore ?? 50)));
+
+  return {
+    score,
+    summary: String(raw?.summary || raw?.executiveSummary || 'Audit completed. Review the prioritised recommendations below.').trim(),
+    issues,
+    strengths: cleanList(raw?.strengths),
+    quickWins: cleanList(raw?.quickWins || raw?.quick_wins),
+    nextActions: cleanList(raw?.nextActions || raw?.next_actions || raw?.actionPlan),
+    metadata: {
+      mode: raw?.metadata?.mode || options.mode || 'content',
+      url: raw?.metadata?.url || options.url,
+      primaryKeyword: raw?.metadata?.primaryKeyword || options.primaryKeyword,
+      source: raw?.metadata?.source || options.source,
+      routedTo: raw?.routed_to || raw?.metadata?.routedTo,
+    },
+  };
+}
+
+export const analyzeText = async (text: string, options: AuditOptions = {}): Promise<AuditResult> => {
+  const payload = {
+    input: text,
+    text,
+    mode: options.mode || (options.url ? 'url' : 'content'),
+    ...options,
+  };
+
+  try {
+    const res = await fetch(`${ECHO_BRIDGE_URL}/audit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${ECHO_BRIDGE_SECRET}`,
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(180_000),
+    });
+
+    if (!res.ok) throw new Error(`Audit bridge error ${res.status}: ${await res.text()}`);
+    const data = await res.json();
+    return normaliseAuditResult(data.audit || data, options);
+  } catch (bridgeError) {
+    console.warn("Hermes audit bridge failed, falling back to Gemini:", bridgeError);
+  }
+
   const ai = getAiClient();
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: `Analyze the following text content for SEO optimization opportunities.
-      Text: "${text.substring(0, 2000)}..."
-      Provide an overall SEO score (0-100).
-      List 3-5 specific issues found (categorized by severity: high, medium, low) and actionable recommendations.
-      Provide a brief summary.`,
+      contents: `You are a senior Bright Forge SEO auditor. Run a practical SEO audit.
+      Audit mode: ${payload.mode}
+      URL, if supplied: ${options.url || 'not supplied'}
+      Primary keyword, if supplied: ${options.primaryKeyword || 'not supplied'}
+      Regional source: ${options.source || 'us'}
+      Competitor, if supplied: ${options.competitor || 'not supplied'}
+
+      Input:
+      "${text.substring(0, 8000)}"
+
+      Score the page/content from 0-100. Prioritise indexability, crawlability, on-page basics, content intent match, E-E-A-T, schema, performance risks, and conversion issues. Be specific, not generic.
+      Return JSON only.`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -200,16 +279,24 @@ export const analyzeText = async (text: string): Promise<AuditResult> => {
           properties: {
             score: { type: Type.NUMBER },
             summary: { type: Type.STRING },
+            strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
+            quickWins: { type: Type.ARRAY, items: { type: Type.STRING } },
+            nextActions: { type: Type.ARRAY, items: { type: Type.STRING } },
             issues: {
               type: Type.ARRAY,
               items: {
                 type: Type.OBJECT,
                 properties: {
                   severity: { type: Type.STRING, enum: ["high", "medium", "low"] },
+                  category: { type: Type.STRING },
                   message: { type: Type.STRING },
-                  recommendation: { type: Type.STRING }
+                  recommendation: { type: Type.STRING },
+                  impact: { type: Type.STRING },
+                  effort: { type: Type.STRING },
+                  priority: { type: Type.NUMBER },
+                  evidence: { type: Type.STRING }
                 },
-                required: ["severity", "message", "recommendation"]
+                required: ["severity", "category", "message", "recommendation"]
               }
             }
           },
@@ -218,9 +305,7 @@ export const analyzeText = async (text: string): Promise<AuditResult> => {
       }
     });
 
-    if (response.text) {
-      return JSON.parse(response.text) as AuditResult;
-    }
+    if (response.text) return normaliseAuditResult(JSON.parse(response.text), options);
     throw new Error("Analysis failed");
   } catch (error) {
     console.error("Audit failed:", error);
