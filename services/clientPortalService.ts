@@ -180,6 +180,10 @@ export const fetchPartnerTasksByClient = async (
   return data as PartnerTask[];
 };
 
+const COMPLETED_STATUS_KEYWORDS = ['done', 'complete', 'finished', 'closed', 'approved', 'shipped', 'delivered', 'resolved', 'sent to client', 'ben to check', 'archived'];
+const COMPLETED_STATUS_COLORS = ['#00c875', '#00ca72', '#22c55e', '#16a34a', '#15803d', '#166534', '#4ade80', '#86efac', 'green'];
+const COMPLETED_GROUP_TITLES = ['done', 'completed', 'cancelled', 'canceled', 'archived', 'closed'];
+
 // Helper to check if a status indicates task is done/completed
 const isCompletedStatus = (statusId: string, statusDefs: any[]): boolean => {
   if (!statusDefs || !statusId) return false;
@@ -190,15 +194,21 @@ const isCompletedStatus = (statusId: string, statusDefs: any[]): boolean => {
   const label = (statusDef.label || '').toLowerCase();
   const color = (statusDef.color || '').toLowerCase();
 
-  // Keywords that indicate completion
-  const completedKeywords = ['done', 'complete', 'finished', 'closed', 'approved', 'shipped', 'delivered', 'resolved', 'sent to client', 'ben to check', 'archived'];
-  // Green colors that typically indicate completion
-  const completedColors = ['#00c875', '#00ca72', '#22c55e', '#16a34a', '#15803d', '#166534', '#4ade80', '#86efac', 'green'];
-
-  if (completedKeywords.some(keyword => label.includes(keyword))) return true;
-  if (completedColors.includes(color)) return true;
+  if (COMPLETED_STATUS_KEYWORDS.some(keyword => label.includes(keyword))) return true;
+  if (COMPLETED_STATUS_COLORS.includes(color)) return true;
 
   return false;
+};
+
+// Many client boards use a physical group called "Done" rather than changing each task status.
+// Treating those tasks as active makes partner/client dashboards show nonsense totals like 150+ tasks.
+const isCompletedGroup = (groupTitle?: string): boolean => {
+  const title = (groupTitle || '').trim().toLowerCase();
+  return COMPLETED_GROUP_TITLES.includes(title);
+};
+
+const isClientBoardTaskCompleted = (statusId: string, statusDefs: any[], groupTitle?: string): boolean => {
+  return isCompletedStatus(statusId, statusDefs) || isCompletedGroup(groupTitle);
 };
 
 // Fetch ALL tasks from client boards the partner has access to
@@ -236,7 +246,7 @@ export const fetchAllClientTasksForPartner = async (
         const existingEntry = existingTaskMap.get(task.id);
 
         // Check if task is marked as done in main portal
-        const isMainTaskDone = isCompletedStatus(task.status, statusDefs);
+        const isMainTaskDone = isClientBoardTaskCompleted(task.status, statusDefs, group.title);
 
         // Determine partner status:
         // - If main task is done, show as completed

@@ -29,6 +29,7 @@ const ClientPortalDashboard: React.FC<ClientPortalDashboardProps> = ({
 }) => {
   const [clients, setClients] = useState<ClientBoard[]>([]);
   const [stats, setStats] = useState<PortalStats | null>(null);
+  const [activeTasks, setActiveTasks] = useState<PartnerTask[]>([]);
   const [recentTasks, setRecentTasks] = useState<PartnerTask[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -46,8 +47,13 @@ const ClientPortalDashboard: React.FC<ClientPortalDashboardProps> = ({
 
       setClients(clientsData);
       setStats(statsData);
-      // Show most recent tasks (sorted by assigned_at or just take first 5)
-      const sortedTasks = [...tasks].sort((a, b) =>
+
+      // Use active/open tasks for the dashboard. Completed tasks remain available on the task board,
+      // but old done work should not inflate projected-task counts.
+      const openTasks = tasks.filter(t => t.partner_status !== 'completed');
+      setActiveTasks(openTasks);
+
+      const sortedTasks = [...openTasks].sort((a, b) =>
         new Date(b.assigned_at).getTime() - new Date(a.assigned_at).getTime()
       );
       setRecentTasks(sortedTasks.slice(0, 5));
@@ -183,7 +189,10 @@ const ClientPortalDashboard: React.FC<ClientPortalDashboardProps> = ({
                 </p>
               </div>
             ) : (
-              clients.map((client) => (
+              clients.map((client) => {
+                const openTaskCount = activeTasks.filter(task => task.client_board_id === client.id).length;
+
+                return (
                 <button
                   key={client.id}
                   onClick={() => onNavigateToTasks(client.id)}
@@ -206,12 +215,13 @@ const ClientPortalDashboard: React.FC<ClientPortalDashboardProps> = ({
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-white truncate">{client.name}</p>
                     <p className="text-sm text-portal-soft">
-                      {client.groups?.reduce((acc, g) => acc + g.tasks.length, 0) || 0} tasks
+                      {openTaskCount} open tasks
                     </p>
                   </div>
                   <ArrowRight className="w-4 h-4 text-portal-soft" />
                 </button>
-              ))
+                );
+              })
             )}
           </div>
         </div>
