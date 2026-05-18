@@ -224,7 +224,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   useEffect(() => {
     const loadData = async () => {
       setIsLoadingData(true);
-      const [boards, archived, profiles] = await Promise.all([fetchClientBoards(), fetchArchivedBoards(), fetchProfiles()]);
+      const [boards, profiles] = await Promise.all([fetchClientBoards(), fetchProfiles()]);
       const defaultBoardId = boards.length > 0 ? boards[0].id : '';
 
       if (boards.length > 0) {
@@ -232,7 +232,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
         clientsRef.current = boards;
         setSelectedClientId(defaultBoardId);
       }
-      setArchivedBoards(archived);
+      // archivedBoards starts as [] by default, loaded lazily when user opens archive panel
       setTeamProfiles(profiles);
       setIsLoadingData(false);
     };
@@ -457,63 +457,67 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   // Track in-flight saves to prevent realtime from overwriting them
   const pendingSaveRef = useRef<{ taskId: string; boardId: string } | null>(null);
 
+  // Ref to track selected client id without causing subscription teardown on every board switch
+  const selectedClientIdRef = useRef<string>(selectedClientId);
+  useEffect(() => {
+    selectedClientIdRef.current = selectedClientId;
+  }, [selectedClientId]);
+
   // Realtime subscription for client_boards changes
   useEffect(() => {
     const boardsSub = supabase.channel('public:client_boards')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'client_boards' }, async (payload) => {
-        console.log('[TaskBoard] Realtime update received:', payload.eventType);
-
-        // Skip realtime update if we have a pending save to prevent race condition
         if (pendingSaveRef.current) {
-          console.log('[TaskBoard] Skipping realtime update - save in progress for task:', pendingSaveRef.current.taskId);
+          console.log('[TaskBoard] Skipping realtime update - save in progress');
           return;
         }
 
-        // Refetch all boards to get the latest data
-        const boards = await fetchClientBoards();
-
-        if (boards.length > 0) {
-          // Preserve the currently selected board if it still exists
-          const currentSelectedId = selectedClientId;
-          setClients(boards);
-          clientsRef.current = boards;
-
-          // If the currently selected board still exists, keep it selected
-          if (currentSelectedId && boards.find(b => b.id === currentSelectedId)) {
-            // Keep current selection
-          } else if (boards.length > 0) {
-            setSelectedClientId(boards[0].id);
+        if (payload.eventType === 'DELETE') {
+          const deletedId = (payload.old as any)?.id;
+          if (deletedId) {
+            setClients(prev => prev.filter(c => (c as any).db_id !== deletedId));
+            clientsRef.current = clientsRef.current.filter(c => (c as any).db_id !== deletedId);
           }
+          return;
+        }
 
-          // Update task modal if open - use functional update to get current state
-          setTaskModal(currentTaskModal => {
-            if (currentTaskModal) {
-              const board = boards.find(b => b.id === currentTaskModal.clientId);
-              if (board) {
-                for (const group of board.groups) {
-                  const task = group.tasks.find(t => t.id === currentTaskModal.task.id);
-                  if (task) {
-                    return {
-                      ...currentTaskModal,
-                      task,
-                      groupId: group.id,
-                      groupTitle: group.title,
-                      groupColor: group.color
-                    };
-                  }
-                }
+        const row = payload.new as any;
+        if (!row?.id) return;
+
+        let boardData = row.board_data;
+        if (typeof boardData === 'string') boardData = JSON.parse(boardData);
+        const updatedBoard: ClientBoard = { ...boardData, db_id: row.id, updated_at: row.updated_at, created_at: row.created_at };
+
+        console.log('[TaskBoard] Realtime update for board:', updatedBoard.name);
+
+        setClients(prev => {
+          const exists = prev.some(c => (c as any).db_id === row.id);
+          const updated = exists
+            ? prev.map(c => (c as any).db_id === row.id ? updatedBoard : c)
+            : [...prev, updatedBoard];
+          clientsRef.current = updated;
+          return updated;
+        });
+
+        // Update task modal if it's showing a task on this board
+        setTaskModal(currentTaskModal => {
+          if (currentTaskModal && currentTaskModal.clientId === row.id) {
+            for (const group of updatedBoard.groups) {
+              const task = group.tasks.find(t => t.id === currentTaskModal.task.id);
+              if (task) {
+                return { ...currentTaskModal, task, groupId: group.id, groupTitle: group.title, groupColor: group.color };
               }
             }
-            return currentTaskModal;
-          });
-        }
+          }
+          return currentTaskModal;
+        });
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(boardsSub);
     };
-  }, [selectedClientId]);
+  }, []); // Empty deps - subscription handles all boards, doesn't need to be recreated on board switch
 
   const activeClient = clients.find(c => c.id === selectedClientId);
 
@@ -1495,7 +1499,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                  </div>
                  <div className="p-2 border-t border-white/[0.07] bg-portal-dark space-y-1">
                     <button
-                      onClick={() => { setShowBoardArchivePanel(true); setIsClientDropdownOpen(false); }}
+                      onClick={async () => { setShowBoardArchivePanel(true); setIsClientDropdownOpen(false); if (archivedBoards.length === 0) { const archived = await fetchArchivedBoards(); setArchivedBoards(archived); } }}
                       className="w-full py-2 flex items-center justify-center gap-2 text-sm font-semibold text-amber-600 hover:bg-amber-50 rounded-lg border border-transparent hover:border-amber-200 transition-all"
                     >
                       <Archive className="w-4 h-4" />

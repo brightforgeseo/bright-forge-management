@@ -101,6 +101,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [loadingMoreMessages, setLoadingMoreMessages] = useState(false);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
 
   // Search state
   const [showSearch, setShowSearch] = useState(false);
@@ -1044,10 +1045,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
     const loadMessages = async () => {
       console.log('[TeamChat] Switching to channel:', currentChannelId);
-      console.log('[TeamChat] Fetching fresh messages from database');
-
-      // Clear current messages, reactions, and thread state immediately
-      setMessages([]);
+      setIsLoadingMessages(true);
+      // DO NOT clear messages here - keep previous channel's messages visible while loading
       setMessageReactions({});
       setHasMoreMessages(false);
       setReplyingToMessage(null);
@@ -1061,12 +1060,15 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       // If they did, don't update state with stale data
       if (activeChannelRef.current !== currentChannelId) {
         console.log('[TeamChat] Channel changed during fetch, discarding stale messages');
+        setIsLoadingMessages(false);
         return;
       }
 
       console.log(`[TeamChat] Loaded ${msgs.length} messages from database`);
 
+      // Atomic swap: clear and set in one render cycle
       setMessages(msgs);
+      setIsLoadingMessages(false);
       // If we got exactly 100 messages, there might be more
       setHasMoreMessages(msgs.length === 100);
       scrollToBottom();
@@ -2713,9 +2715,18 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
         )}
 
         <div
-          className={`flex-1 overflow-y-auto p-3 md:p-6 space-y-4 md:space-y-6 ${getCurrentBackgroundStyle()} bg-cover bg-center bg-fixed`}
+          className={`relative flex-1 overflow-y-auto p-3 md:p-6 space-y-4 md:space-y-6 ${getCurrentBackgroundStyle()} bg-cover bg-center bg-fixed`}
           style={getCurrentBackgroundImage() ? { backgroundImage: `url(${getCurrentBackgroundImage()})` } : undefined}
         >
+          {isLoadingMessages && (
+            <div className="absolute inset-0 flex items-center justify-center bg-portal-bg/50 z-10">
+              <div className="flex gap-1">
+                <div className="w-2 h-2 bg-brand-400 rounded-full animate-bounce" style={{animationDelay: '0ms'}} />
+                <div className="w-2 h-2 bg-brand-400 rounded-full animate-bounce" style={{animationDelay: '150ms'}} />
+                <div className="w-2 h-2 bg-brand-400 rounded-full animate-bounce" style={{animationDelay: '300ms'}} />
+              </div>
+            </div>
+          )}
           {/* Load More Messages Button */}
           {hasMoreMessages && (
             <div className="flex justify-center">
