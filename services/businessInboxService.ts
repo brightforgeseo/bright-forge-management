@@ -32,6 +32,14 @@ export interface BusinessInboxResponse {
   messages: BusinessInboxMessage[];
 }
 
+export interface BusinessEmailMessageResponse {
+  ok: boolean;
+  account: string;
+  folder: string;
+  syncedAt: string;
+  message: BusinessInboxMessage;
+}
+
 export interface SendBusinessEmailPayload {
   to: string;
   cc?: string;
@@ -61,8 +69,12 @@ async function postBusinessInbox<T>(userId: string, payload: Record<string, any>
   return data as T;
 }
 
-export async function fetchBusinessInbox(userId: string, limit = 25, folder = 'INBOX'): Promise<BusinessInboxResponse> {
-  return postBusinessInbox<BusinessInboxResponse>(userId, { mode: 'list', limit, folder, includeBody: true });
+export async function fetchBusinessInbox(userId: string, limit = 20, folder = 'INBOX'): Promise<BusinessInboxResponse> {
+  return postBusinessInbox<BusinessInboxResponse>(userId, { mode: 'list', limit, folder, includeBody: false });
+}
+
+export async function fetchBusinessEmailMessage(userId: string, folder: string, uid: string): Promise<BusinessEmailMessageResponse> {
+  return postBusinessInbox<BusinessEmailMessageResponse>(userId, { mode: 'message', folder, uid });
 }
 
 export async function sendBusinessEmail(userId: string, payload: SendBusinessEmailPayload): Promise<{ ok: boolean; sentAt: string; messageId: string }> {

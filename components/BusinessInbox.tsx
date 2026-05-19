@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Archive, Edit3, Inbox, Mail, Paperclip, RefreshCw, Reply, Search, Send, ShieldCheck, Trash2, X } from 'lucide-react';
 import { User } from '../types';
-import { BusinessEmailAction, BusinessInboxMessage, fetchBusinessInbox, runBusinessEmailAction, sendBusinessEmail } from '../services/businessInboxService';
+import { BusinessEmailAction, BusinessInboxMessage, fetchBusinessEmailMessage, fetchBusinessInbox, runBusinessEmailAction, sendBusinessEmail } from '../services/businessInboxService';
 
 const BEN_USER_IDS = new Set([
   'f9f11222-d2a9-4ae8-a327-8c4621d90b7c',
@@ -48,6 +48,17 @@ const replySubject = (subject: string) => /^re:/i.test(subject || '') ? subject 
 const forwardSubject = (subject: string) => /^fwd?:/i.test(subject || '') ? subject : `Fwd: ${subject || '(No subject)'}`;
 const quoteMessage = (message: BusinessInboxMessage) => `\n\n---\nOn ${formatDate(message.date)}, ${message.from} wrote:\n${message.body || message.snippet || ''}`;
 
+const formatEmailBody = (value: string) => String(value || '')
+  .replace(/(\n)?(From: .+?\nTo: .+?\nDate: .+?\nSubject: .+?)/g, '\n\n$2')
+  .replace(/\n{3,}/g, '\n\n')
+  .trim();
+
+const EmailBody: React.FC<{ body: string }> = ({ body }) => {
+  const readable = formatEmailBody(body);
+  if (!readable) return <p>No readable body found for this message.</p>;
+  return <div className="whitespace-pre-wrap break-words font-sans text-[15px] leading-7 text-slate-900">{readable}</div>;
+};
+
 const BusinessInbox: React.FC<Props> = ({ currentUser, addToast }) => {
   const isAllowed = BEN_USER_IDS.has(currentUser.id);
   const [messages, setMessages] = useState<BusinessInboxMessage[]>([]);
@@ -57,6 +68,7 @@ const BusinessInbox: React.FC<Props> = ({ currentUser, addToast }) => {
   const [syncedAt, setSyncedAt] = useState('');
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessageId, setLoadingMessageId] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState('');
   const [compose, setCompose] = useState<ComposeState | null>(null);
@@ -66,7 +78,7 @@ const BusinessInbox: React.FC<Props> = ({ currentUser, addToast }) => {
     setIsLoading(true);
     setError('');
     try {
-      const data = await fetchBusinessInbox(currentUser.id, 40, nextFolder);
+      const data = await fetchBusinessInbox(currentUser.id, 20, nextFolder);
       setMessages(data.messages || []);
       setAccount(data.account || 'seo@brightforgeseo.com');
       setSyncedAt(data.syncedAt || '');
@@ -89,6 +101,25 @@ const BusinessInbox: React.FC<Props> = ({ currentUser, addToast }) => {
   }, [messages, query]);
 
   const selected = filtered.find(m => m.id === selectedId) || filtered[0];
+
+  useEffect(() => {
+    if (!selected || selected.body || loadingMessageId === selected.id) return;
+    let cancelled = false;
+    setLoadingMessageId(selected.id);
+    fetchBusinessEmailMessage(currentUser.id, selected.folder || folder, selected.uid)
+      .then(data => {
+        if (cancelled || !data.message) return;
+        setMessages(prev => prev.map(m => m.id === selected.id ? { ...m, ...data.message } : m));
+      })
+      .catch(e => {
+        const msg = e?.message || 'Could not load this email.';
+        if (!cancelled) setError(msg);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingMessageId('');
+      });
+    return () => { cancelled = true; };
+  }, [selected?.id, selected?.body, selected?.folder, selected?.uid, currentUser.id, folder, loadingMessageId]);
 
   const openReply = (message: BusinessInboxMessage) => setCompose({
     mode: 'reply',
@@ -233,7 +264,7 @@ const BusinessInbox: React.FC<Props> = ({ currentUser, addToast }) => {
                     </div>
                     <span className="text-[11px] text-white/35 whitespace-nowrap">{formatDate(message.date)}</span>
                   </div>
-                  <p className="text-xs text-white/45 line-clamp-2 mt-1.5">{message.snippet || message.body || 'No preview available'}</p>
+                  <p className="text-xs text-white/45 line-clamp-2 mt-1.5">{message.snippet || (message.hasAttachments ? 'Attachment email' : 'Click to read message')}</p>
                   {message.hasAttachments && (
                     <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-white/7 px-2 py-0.5 text-[11px] text-white/50">
                       <Paperclip className="w-3 h-3" /> {message.attachments.length} attachment{message.attachments.length === 1 ? '' : 's'}
@@ -265,19 +296,23 @@ const BusinessInbox: React.FC<Props> = ({ currentUser, addToast }) => {
                   {folder !== 'INBOX.Trash' && <button onClick={() => runAction('delete', selected)} className="inline-flex items-center gap-2 rounded-lg bg-red-500/15 text-red-100 px-3 py-2 text-xs font-semibold hover:bg-red-500/25"><Trash2 className="w-4 h-4" /> Delete</button>}
                 </div>
               </div>
-              <div className="flex-1 overflow-y-auto p-5">
-                <div className="prose prose-invert max-w-none whitespace-pre-wrap text-sm leading-7 text-white/78">
-                  {selected.body || selected.snippet || 'No readable body found for this message.'}
+              <div className="flex-1 overflow-y-auto bg-slate-100 p-4 sm:p-6">
+                <div className="mx-auto max-w-4xl rounded-2xl bg-white p-5 sm:p-7 shadow-xl shadow-black/20 ring-1 ring-slate-200">
+                  {loadingMessageId === selected.id && !selected.body ? (
+                    <div className="py-12 text-center text-sm font-medium text-slate-500">Loading this email…</div>
+                  ) : (
+                    <EmailBody body={selected.body || selected.snippet || ''} />
+                  )}
                 </div>
                 {selected.attachments.length > 0 && (
-                  <div className="mt-6 border-t border-white/10 pt-4">
-                    <h3 className="text-sm font-semibold text-white/70 mb-2">Attachments</h3>
+                  <div className="mx-auto mt-4 max-w-4xl rounded-2xl bg-white p-4 shadow-lg shadow-black/10 ring-1 ring-slate-200">
+                    <h3 className="text-sm font-semibold text-slate-700 mb-2">Attachments</h3>
                     <div className="space-y-2">
                       {selected.attachments.map((att, idx) => (
-                        <div key={`${att.filename}-${idx}`} className="flex items-center gap-2 rounded-xl bg-white/[0.04] border border-white/10 px-3 py-2 text-sm text-white/65">
+                        <div key={`${att.filename}-${idx}`} className="flex items-center gap-2 rounded-xl bg-slate-50 border border-slate-200 px-3 py-2 text-sm text-slate-700">
                           <Paperclip className="w-4 h-4" />
                           <span className="flex-1 truncate">{att.filename}</span>
-                          <span className="text-xs text-white/35">{Math.round(att.size / 1024)} KB</span>
+                          <span className="text-xs text-slate-400">{Math.round(att.size / 1024)} KB</span>
                         </div>
                       ))}
                     </div>
