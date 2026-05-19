@@ -3,7 +3,10 @@ import { AlertTriangle, Archive, Edit3, Inbox, Mail, Paperclip, RefreshCw, Reply
 import { User } from '../types';
 import { BusinessEmailAction, BusinessInboxMessage, fetchBusinessInbox, runBusinessEmailAction, sendBusinessEmail } from '../services/businessInboxService';
 
-const BEN_USER_ID = 'f9f11222-d2a9-4ae8-a327-8c4621d90b7c';
+const BEN_USER_IDS = new Set([
+  'f9f11222-d2a9-4ae8-a327-8c4621d90b7c',
+  'de294f97-3677-43a5-ac1b-54706e29eef0',
+]);
 const FOLDERS = [
   { value: 'INBOX', label: 'Inbox' },
   { value: 'INBOX.Sent', label: 'Sent' },
@@ -46,7 +49,7 @@ const forwardSubject = (subject: string) => /^fwd?:/i.test(subject || '') ? subj
 const quoteMessage = (message: BusinessInboxMessage) => `\n\n---\nOn ${formatDate(message.date)}, ${message.from} wrote:\n${message.body || message.snippet || ''}`;
 
 const BusinessInbox: React.FC<Props> = ({ currentUser, addToast }) => {
-  const isAllowed = currentUser.id === BEN_USER_ID;
+  const isAllowed = BEN_USER_IDS.has(currentUser.id);
   const [messages, setMessages] = useState<BusinessInboxMessage[]>([]);
   const [selectedId, setSelectedId] = useState<string>('');
   const [account, setAccount] = useState('seo@brightforgeseo.com');
@@ -114,13 +117,16 @@ const BusinessInbox: React.FC<Props> = ({ currentUser, addToast }) => {
       return;
     }
     setIsSending(true);
+    setError('');
     try {
       await sendBusinessEmail(currentUser.id, compose);
       addToast?.('success', 'Email sent.');
       setCompose(null);
       if (folder === 'INBOX.Sent') await loadInbox('INBOX.Sent');
     } catch (e: any) {
-      addToast?.('error', e?.message || 'Could not send email.');
+      const msg = e?.message || 'Could not send email.';
+      setError(msg);
+      addToast?.('error', msg);
     } finally {
       setIsSending(false);
     }
@@ -289,8 +295,8 @@ const BusinessInbox: React.FC<Props> = ({ currentUser, addToast }) => {
       </div>
 
       {compose && (
-        <div className="fixed inset-0 z-50 flex items-end justify-end bg-black/45 p-4">
-          <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-portal-surface shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 sm:p-4">
+          <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col rounded-2xl border border-white/10 bg-portal-surface shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
               <div>
                 <h2 className="text-lg font-bold">{compose.mode === 'reply' ? 'Reply' : compose.mode === 'forward' ? 'Forward' : 'New email'}</h2>
@@ -298,7 +304,7 @@ const BusinessInbox: React.FC<Props> = ({ currentUser, addToast }) => {
               </div>
               <button onClick={() => setCompose(null)} className="rounded-lg p-2 text-white/50 hover:bg-white/10 hover:text-white"><X className="w-4 h-4" /></button>
             </div>
-            <div className="p-4 space-y-3">
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
               <input value={compose.to} onChange={e => setCompose({ ...compose, to: e.target.value })} placeholder="To" className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-brand-400/60" />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 <input value={compose.cc} onChange={e => setCompose({ ...compose, cc: e.target.value })} placeholder="Cc" className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-brand-400/60" />
@@ -307,7 +313,7 @@ const BusinessInbox: React.FC<Props> = ({ currentUser, addToast }) => {
               <input value={compose.subject} onChange={e => setCompose({ ...compose, subject: e.target.value })} placeholder="Subject" className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-brand-400/60" />
               <textarea value={compose.body} onChange={e => setCompose({ ...compose, body: e.target.value })} placeholder="Write your email…" rows={13} className="w-full resize-none rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-sm leading-6 outline-none focus:border-brand-400/60" />
             </div>
-            <div className="flex items-center justify-between gap-3 border-t border-white/10 px-4 py-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-white/10 px-4 py-3 bg-portal-surface">
               <p className="text-xs text-white/40">This sends from Hostinger SMTP. Check the wording before sending.</p>
               <button onClick={submitEmail} disabled={isSending} className="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-semibold hover:bg-brand-600 disabled:opacity-60">
                 <Send className="w-4 h-4" /> {isSending ? 'Sending…' : 'Send email'}

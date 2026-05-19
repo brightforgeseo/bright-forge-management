@@ -14,7 +14,10 @@ let faviconFlashTimeout: ReturnType<typeof setTimeout> | null = null;
 let faviconFocusHandler: (() => void) | null = null;
 let originalFaviconHref: string | null = null;
 const notificationFavicon = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%23f97316"/><text x="50" y="70" font-size="60" text-anchor="middle" fill="white">!</text></svg>';
-const BEN_USER_ID = 'f9f11222-d2a9-4ae8-a327-8c4621d90b7c';
+const BEN_USER_IDS = new Set([
+  'f9f11222-d2a9-4ae8-a327-8c4621d90b7c',
+  'de294f97-3677-43a5-ac1b-54706e29eef0',
+]);
 
 // Cleanup function to stop favicon flashing - can be called on component unmount
 const stopFaviconFlash = () => {
@@ -463,7 +466,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         { id: ToolView.TASKS,       label: 'Project Tasks', icon: TableProperties, shortcut: 'G T' },
         { id: ToolView.MY_WORK,     label: 'My Work',       icon: CheckSquare,     shortcut: 'G M' },
         { id: ToolView.TEAM_CHAT,   label: 'Team Chat',     icon: MessageSquare,   shortcut: 'G C' },
-        ...(currentUser.id === BEN_USER_ID ? [{ id: ToolView.BUSINESS_INBOX, label: 'Business Inbox', icon: Mail, shortcut: 'G I' }] : []),
+        ...(BEN_USER_IDS.has(currentUser.id) ? [{ id: ToolView.BUSINESS_INBOX, label: 'Business Inbox', icon: Mail, shortcut: 'G I' }] : []),
       ],
     },
     {
