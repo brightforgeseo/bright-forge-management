@@ -32,19 +32,43 @@ export interface BusinessInboxResponse {
   messages: BusinessInboxMessage[];
 }
 
-export async function fetchBusinessInbox(userId: string, limit = 25): Promise<BusinessInboxResponse> {
+export interface SendBusinessEmailPayload {
+  to: string;
+  cc?: string;
+  bcc?: string;
+  subject: string;
+  body: string;
+  inReplyTo?: string;
+  references?: string;
+}
+
+export type BusinessEmailAction = 'mark-read' | 'mark-unread' | 'archive' | 'delete';
+
+async function postBusinessInbox<T>(userId: string, payload: Record<string, any>): Promise<T> {
   const res = await fetch(`${BRIDGE_URL}/business-inbox`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${BRIDGE_SECRET}`,
     },
-    body: JSON.stringify({ userId, limit, folder: 'INBOX', includeBody: true }),
+    body: JSON.stringify({ userId, ...payload }),
   });
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error(data?.details || data?.error || `Inbox request failed (${res.status})`);
   }
-  return data as BusinessInboxResponse;
+  return data as T;
+}
+
+export async function fetchBusinessInbox(userId: string, limit = 25, folder = 'INBOX'): Promise<BusinessInboxResponse> {
+  return postBusinessInbox<BusinessInboxResponse>(userId, { mode: 'list', limit, folder, includeBody: true });
+}
+
+export async function sendBusinessEmail(userId: string, payload: SendBusinessEmailPayload): Promise<{ ok: boolean; sentAt: string; messageId: string }> {
+  return postBusinessInbox(userId, { mode: 'send', ...payload });
+}
+
+export async function runBusinessEmailAction(userId: string, folder: string, uid: string, action: BusinessEmailAction): Promise<{ ok: boolean; action: BusinessEmailAction; updatedAt: string }> {
+  return postBusinessInbox(userId, { mode: 'action', folder, uid, action });
 }
