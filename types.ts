@@ -68,6 +68,7 @@ export enum ToolView {
   TASKS = 'TASKS',
   MY_WORK = 'MY_WORK',
   TEAM_CHAT = 'TEAM_CHAT',
+  BUSINESS_INBOX = 'BUSINESS_INBOX',
   SETTINGS = 'SETTINGS',
 }
 

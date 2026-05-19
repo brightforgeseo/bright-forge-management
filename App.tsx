@@ -16,6 +16,7 @@ const QAChecker = lazy(() => import('./components/QAChecker'));
 const TaskBoard = lazy(() => import('./components/TaskBoard'));
 const MyWork = lazy(() => import('./components/MyWork'));
 const TeamChat = lazy(() => import('./components/TeamChat'));
+const BusinessInbox = lazy(() => import('./components/BusinessInbox'));
 const Settings = lazy(() => import('./components/Settings'));
 const EchoWorkspaces = lazy(() => import('./components/EchoWorkspaces'));
 
@@ -275,6 +276,7 @@ const App: React.FC = () => {
           'm': ToolView.MY_WORK,
           'c': ToolView.TEAM_CHAT,
           'e': ToolView.ECHO_WORKSPACES,
+          'i': ToolView.BUSINESS_INBOX,
         };
         const target = map[e.key.toLowerCase()];
         if (target) {
@@ -348,6 +350,7 @@ ${currentUser.name}`;
         case ToolView.TASKS: return <TaskBoard currentUser={currentUser} addToast={addToast} />;
         case ToolView.MY_WORK: return <MyWork currentUser={currentUser} addToast={addToast} onNavigateToTasks={() => setCurrentView(ToolView.TASKS)} />;
         case ToolView.TEAM_CHAT: return <TeamChat currentUser={currentUser} addToast={addToast} onNavigateToTask={() => setCurrentView(ToolView.TASKS)} />;
+        case ToolView.BUSINESS_INBOX: return <BusinessInbox currentUser={currentUser} addToast={addToast} />;
         case ToolView.ECHO_WORKSPACES: return <EchoWorkspaces currentUser={currentUser} addToast={addToast} />;
         case ToolView.SETTINGS: return <Settings branding={branding} setBranding={setBranding} addToast={addToast} currentUser={currentUser} />;
         default: return <Dashboard currentUser={currentUser} setCurrentView={setCurrentView} />;
@@ -365,7 +368,7 @@ ${currentUser.name}`;
       }
   }} branding={branding} />;
 
-  const isFullHeight = currentView === ToolView.TASKS || currentView === ToolView.TEAM_CHAT;
+  const isFullHeight = currentView === ToolView.TASKS || currentView === ToolView.TEAM_CHAT || currentView === ToolView.BUSINESS_INBOX;
 
   return (
     <div className="flex h-screen bg-portal-dark overflow-hidden font-sans text-white">
@@ -420,7 +423,7 @@ ${currentUser.name}`;
       </div>
       )}
 
-      <main className={`flex-1 ${isSidebarCollapsed ? 'lg:ml-[60px]' : 'lg:ml-64'} h-full overflow-hidden relative transition-all duration-200 ${isFullHeight ? '' : 'bg-portal-dark'} ${currentView === ToolView.TEAM_CHAT ? '' : 'pt-14'} lg:pt-0 pb-16 lg:pb-0`}>
+      <main className={`flex-1 ${isSidebarCollapsed ? 'lg:ml-[60px]' : 'lg:ml-64'} h-full overflow-hidden relative transition-all duration-200 ${isFullHeight ? '' : 'bg-portal-dark'} ${currentView === ToolView.TEAM_CHAT || currentView === ToolView.BUSINESS_INBOX ? '' : 'pt-14'} lg:pt-0 pb-16 lg:pb-0`}>
         {isFullHeight ? renderContent() : <ScrollablePageWrapper>{renderContent()}</ScrollablePageWrapper>}
       </main>
       <ToastContainer toasts={toasts} removeToast={removeToast} />

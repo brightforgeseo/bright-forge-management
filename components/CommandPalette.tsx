@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, LayoutDashboard, MessageSquare, TableProperties, CheckSquare, PenTool, BarChart, FileCheck, Settings, Zap, Hash, User, ChevronRight } from 'lucide-react';
+import { Search, LayoutDashboard, MessageSquare, TableProperties, CheckSquare, PenTool, BarChart, FileCheck, Settings, Zap, Hash, User, ChevronRight, Mail } from 'lucide-react';
 import { ToolView, User as UserType, Profile } from '../types';
 
 interface CommandItem {
@@ -35,6 +35,7 @@ const VIEW_ICONS: Record<ToolView, React.ReactNode> = {
   [ToolView.TASKS]:              <TableProperties size={16} />,
   [ToolView.MY_WORK]:            <CheckSquare size={16} />,
   [ToolView.TEAM_CHAT]:          <MessageSquare size={16} />,
+  [ToolView.BUSINESS_INBOX]:     <Mail size={16} />,
   [ToolView.ECHO_WORKSPACES]:    <Zap size={16} />,
   [ToolView.SETTINGS]:           <Settings size={16} />,
 };
@@ -48,6 +49,7 @@ const VIEW_LABELS: Record<ToolView, string> = {
   [ToolView.TASKS]:              'Project Tasks',
   [ToolView.MY_WORK]:            'My Work',
   [ToolView.TEAM_CHAT]:          'Team Chat',
+  [ToolView.BUSINESS_INBOX]:     'Business Inbox',
   [ToolView.ECHO_WORKSPACES]:    'Echo Workspaces',
   [ToolView.SETTINGS]:           'Settings',
 };
@@ -58,15 +60,20 @@ const VIEW_SHORTCUTS: Partial<Record<ToolView, string>> = {
   [ToolView.ECHO_WORKSPACES]: 'G E',
   [ToolView.MY_WORK]:         'G M',
   [ToolView.DASHBOARD]:       'G D',
+  [ToolView.BUSINESS_INBOX]:  'G I',
 };
 
-const CommandPalette: React.FC<Props> = ({ isOpen, onClose, onNavigate, clients = [], profiles = [] }) => {
+const BEN_USER_ID = 'f9f11222-d2a9-4ae8-a327-8c4621d90b7c';
+
+const CommandPalette: React.FC<Props> = ({ isOpen, onClose, onNavigate, currentUser, clients = [], profiles = [] }) => {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const navItems: CommandItem[] = Object.values(ToolView).map(view => ({
+  const navItems: CommandItem[] = Object.values(ToolView)
+    .filter(view => view !== ToolView.BUSINESS_INBOX || currentUser.id === BEN_USER_ID)
+    .map(view => ({
     id: `view-${view}`,
     label: VIEW_LABELS[view],
     icon: VIEW_ICONS[view],
