@@ -66,7 +66,9 @@ function showNativeNotification(title, body) {
 const isDev = !app.isPackaged;
 
 // Configure auto-updater
-autoUpdater.autoDownload = false;
+// Team builds are published to GitHub Releases. Download updates silently so users
+// do not miss critical fixes just because they dismissed an "update available" box.
+autoUpdater.autoDownload = true;
 autoUpdater.autoInstallOnAppQuit = true;
 // Disable code signing verification for unsigned builds (required for Mac without Apple Developer cert)
 if (process.platform === 'darwin') {
@@ -116,24 +118,15 @@ function createWindow() {
 
 // Auto-updater event handlers (only active on Windows - Mac is disabled due to code signing requirement)
 autoUpdater.on('update-available', (info) => {
-  console.log('Update available:', info);
+  console.log('Update available, downloading silently:', info);
 
-  // Skip on Mac - auto-update doesn't work without code signing
   if (process.platform === 'darwin') {
-    console.log('Skipping update dialog on Mac - code signing required for auto-updates');
+    console.log('Skipping update download on Mac - code signing required for auto-updates');
     return;
   }
 
-  // Show notification that update is available
-  dialog.showMessageBox(mainWindow, {
-    type: 'info',
-    title: 'Update Available',
-    message: 'A new version is available!',
-    detail: `Version ${info.version} is now available. It will be downloaded in the background.`,
-    buttons: ['OK']
-  });
-
-  autoUpdater.downloadUpdate();
+  // autoDownload=true handles the download. Keep this silent so the whole team
+  // gets the update without needing to click an "available" prompt first.
 });
 
 autoUpdater.on('update-downloaded', (info) => {
@@ -160,27 +153,9 @@ autoUpdater.on('update-downloaded', (info) => {
 autoUpdater.on('error', (err) => {
   console.log('Auto-update error:', err);
 
-  // Never show update errors on Mac - auto-update is disabled anyway
-  if (process.platform === 'darwin') {
-    console.log('Skipping update error on Mac - auto-updates disabled');
-    return;
-  }
-
-  // Don't show dialog for code signature errors (happens in dev/unsigned builds)
-  // Also catch related errors like "Cannot find latest.yml" or signature verification failures
-  const ignoredErrors = ['code signature', 'Code signature', 'ENOENT', 'ERR_UPDATER_INVALID_RELEASE', 'Could not get code signature'];
-  if (err.message && ignoredErrors.some(e => err.message.includes(e))) {
-    console.log('Skipping update error notification - likely unsigned build issue');
-    return;
-  }
-
-  dialog.showMessageBox(mainWindow, {
-    type: 'error',
-    title: 'Update Error',
-    message: 'Error checking for updates',
-    detail: err.message,
-    buttons: ['OK']
-  });
+  // Update checks must never interrupt portal use. If GitHub/network/signing fails,
+  // log it and let the next hourly check or installer release handle it.
+  console.log('Skipping update error dialog:', err && (err.message || err));
 });
 
 // IPC handlers for renderer process communication
@@ -201,11 +176,11 @@ app.whenReady().then(() => {
 
   // Check for updates only in production (disabled on Mac until app is code signed)
   if (!isDev && process.platform !== 'darwin') {
-    autoUpdater.checkForUpdatesAndNotify();
+    autoUpdater.checkForUpdates();
 
     // Check for updates every hour
     setInterval(() => {
-      autoUpdater.checkForUpdatesAndNotify();
+      autoUpdater.checkForUpdates();
     }, 60 * 60 * 1000);
   }
 
