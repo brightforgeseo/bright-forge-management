@@ -291,7 +291,7 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
         }
       });
 
-    const pollTimer = window.setInterval(() => refreshMyWork('poll'), 10000);
+    const pollTimer = window.setInterval(() => refreshMyWork('poll'), 3000);
 
     return () => {
       window.clearInterval(pollTimer);

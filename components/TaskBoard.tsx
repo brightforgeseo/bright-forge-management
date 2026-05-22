@@ -231,7 +231,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
       if (boards.length > 0) {
         setClients(boards);
         clientsRef.current = boards;
-        setSelectedClientId(defaultBoardId);
+        selectClient(defaultBoardId);
       }
       // archivedBoards starts as [] by default, loaded lazily when user opens archive panel
       setTeamProfiles(profiles);
@@ -272,7 +272,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
 
         const board = clients.find(b => b.id === boardId);
         if (board) {
-          setSelectedClientId(board.id);
+          selectClient(board.id);
 
           // First try the specified group
           let group = board.groups.find(g => g.id === groupId);
@@ -354,7 +354,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
       try {
         const payload = JSON.parse(raw) as { boardId?: string; profileId?: string; filter?: string; label?: string };
         if (payload.boardId && clients.some(board => board.id === payload.boardId)) {
-          setSelectedClientId(payload.boardId);
+          selectClient(payload.boardId);
         }
         setSelectedPersonFilter(payload.profileId || '');
         const filterLabel = payload.filter && payload.filter !== 'all' ? ` (${payload.filter.replace('-', ' ')})` : '';
@@ -420,6 +420,18 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   const [isLabelEditorOpen, setIsLabelEditorOpen] = useState(false);
   const [labelEditorType, setLabelEditorType] = useState<'status' | 'priority'>('status');
   const [taskModal, setTaskModal] = useState<{ task: Task, groupId: string, clientId: string, groupTitle: string, groupColor: string } | null>(null);
+
+  function selectClient(clientId: string) {
+    selectedClientIdRef.current = clientId;
+    setSelectedClientId(clientId);
+    setTaskModal(current => current && current.clientId !== clientId ? null : current);
+    setActivePicker(null);
+    setActivePersonPicker(null);
+    setIsClientDropdownOpen(false);
+    setClientSearchQuery('');
+    setIsClientSearchFocused(false);
+  }
+
   const [newComment, setNewComment] = useState('');
   const [mentionDropdown, setMentionDropdown] = useState<{ show: boolean, search: string, position: number } | null>(null);
 
@@ -477,7 +489,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
       if (currentSelectedId && boards.find(b => b.id === currentSelectedId)) {
         // Keep current selection
       } else {
-        setSelectedClientId(boards[0].id);
+        selectClient(boards[0].id);
       }
 
       setTaskModal(currentTaskModal => {
@@ -552,7 +564,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
         }
       });
 
-    const pollTimer = window.setInterval(() => reloadBoards('poll'), 10000);
+    const pollTimer = window.setInterval(() => reloadBoards('poll'), 3000);
 
     return () => {
       window.clearInterval(pollTimer);
@@ -750,7 +762,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
     };
     const newClientList = [...clients, newClient];
     setClients(newClientList);
-    setSelectedClientId(newClient.id);
+    selectClient(newClient.id);
     setNewClientName('');
     setIsAddingClient(false);
     await saveClientBoard(newClient);
@@ -784,8 +796,8 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
       await deleteClientBoard(activeClient.id);
       const newClients = clients.filter(c => c.id !== activeClient.id);
       setClients(newClients);
-      if (newClients.length > 0) setSelectedClientId(newClients[0].id);
-      else setSelectedClientId('');
+      if (newClients.length > 0) selectClient(newClients[0].id);
+      else selectClient('');
       setIsEditingClient(false);
       addToast('info', 'Client deleted.');
   };
@@ -799,8 +811,8 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
     setClients(newClients);
     clientsRef.current = newClients;
     setArchivedBoards(prev => [{ ...activeClient }, ...prev]);
-    if (newClients.length > 0) setSelectedClientId(newClients[0].id);
-    else setSelectedClientId('');
+    if (newClients.length > 0) selectClient(newClients[0].id);
+    else selectClient('');
     setIsEditingClient(false);
     addToast('info', `"${activeClient.name}" archived.`);
   };
@@ -813,7 +825,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
     const newClients = [...clients, board].sort((a, b) => a.name.localeCompare(b.name));
     setClients(newClients);
     clientsRef.current = newClients;
-    setSelectedClientId(board.id);
+    selectClient(board.id);
     setShowBoardArchivePanel(false);
     addToast('success', `"${board.name}" restored.`);
   };
@@ -1489,7 +1501,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                         <button
                           key={c.id}
                           onClick={() => {
-                            setSelectedClientId(c.id);
+                            selectClient(c.id);
                             setClientSearchQuery('');
                             setIsClientSearchFocused(false);
                           }}
@@ -1527,7 +1539,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                     {[...clients].sort((a, b) => a.name.localeCompare(b.name)).map(c => (
                       <button
                         key={c.id}
-                        onClick={() => { setSelectedClientId(c.id); setIsClientDropdownOpen(false); }}
+                        onClick={() => { selectClient(c.id); setIsClientDropdownOpen(false); }}
                         className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 hover:bg-portal-dark transition-colors ${c.id === selectedClientId ? 'bg-brand-50 text-brand-900' : 'text-portal-text'}`}
                       >
                         <div className="w-8 h-8 rounded bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-xs font-bold text-portal-soft uppercase border border-white/[0.07]">

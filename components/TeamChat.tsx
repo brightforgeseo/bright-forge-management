@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check, Smile, Film, SmilePlus, Video, Lock, UserPlus, Menu, ClipboardList, Calendar, ArrowRight, Palette, Paperclip, Download, File, Search, Pin, PinOff, Reply, ChevronDown, ChevronUp, ListTodo } from 'lucide-react';
 import { ChatChannel, ChatMessage, User, ToastType, Profile, MessageReaction } from '../types';
 import { getChatResponse } from '../services/geminiService';
@@ -293,7 +293,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
   const navigateToSearchResult = async (result: SearchResult) => {
     // Switch to the channel containing the message
     if (result.channelId !== activeChannelId) {
-      setActiveChannelId(result.channelId);
+      selectChannel(result.channelId);
     }
     // Close search panel
     setShowSearch(false);
@@ -601,6 +601,25 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     channelsRef.current = channels;
   }, [channels]);
 
+  // Switch channels synchronously so the UI never keeps showing the old chat
+  // while React waits for the channel-loading effect. This also keeps catch-up
+  // polling and realtime handlers pointed at the selected room immediately.
+  const selectChannel = useCallback((channelId: string) => {
+    activeChannelRef.current = channelId;
+    setActivePartnerId(null);
+    setActiveChannelId(channelId);
+    setMessages([]);
+    setMessageReactions({});
+    setPinnedMessages([]);
+    setHasMoreMessages(false);
+    setReplyingToMessage(null);
+    setExpandedThreads(new Set());
+    setThreadReplies({});
+    setIsLoadingMessages(!!channelId);
+    setIsMobileSidebarOpen(false);
+  }, []);
+
+
   // Load Data
   const refreshData = async () => {
     setIsRefreshing(true);
@@ -654,8 +673,12 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
   // Handle selecting a partner chat
   const handleSelectPartner = (partnerId: string) => {
+    activeChannelRef.current = '';
     setActivePartnerId(partnerId);
     setActiveChannelId(''); // Deselect any regular channel
+    setMessages([]);
+    setIsLoadingMessages(false);
+    setIsMobileSidebarOpen(false);
     loadPartnerMessages(partnerId);
   };
 
@@ -726,7 +749,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
           // Find the channel by ID
           const targetChannel = chans.find(c => c.id === chatData.channelId);
           if (targetChannel) {
-            setActiveChannelId(targetChannel.id);
+            selectChannel(targetChannel.id);
             console.log('[TeamChat] Switched to channel:', targetChannel.name);
           } else {
             console.warn('[TeamChat] Channel not found:', chatData.channelId);
@@ -740,7 +763,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       } else if (chans.length > 0 && !activeChannelId) {
         // No notification - default to general
         const general = chans.find(c => c.name === 'general');
-        setActiveChannelId(general ? general.id : chans[0].id);
+        selectChannel(general ? general.id : chans[0].id);
       }
     };
     init();
@@ -765,7 +788,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       const data = (e as CustomEvent).detail
         || (() => { try { return JSON.parse(localStorage.getItem('openChatNotification') || '{}'); } catch { return {}; } })();
       if (!data || !data.channelId) return;
-      setActiveChannelId(data.channelId);
+      selectChannel(data.channelId);
       localStorage.removeItem('openChatNotification');
     };
     window.addEventListener('openChatNotification', handleOpenChatNotification as EventListener);
@@ -1014,10 +1037,10 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       if (!channelId) return;
       try {
         const fresh = await fetchChatMessages(channelId);
-        // Replace the active-channel window, rather than merge-only. Merge-only
-        // keeps messages that were deleted while the socket was asleep, which is
-        // exactly the "not live" behaviour people are seeing.
-        setMessages(fresh);
+        // Replace only if the user has not switched again while we were fetching.
+        if (activeChannelRef.current === channelId) {
+          setMessages(fresh);
+        }
       } catch (e) {
         console.error('[TeamChat] catch-up refetch failed:', e);
       }
@@ -1033,7 +1056,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('online', onOnline);
-    const catchUpTimer = window.setInterval(catchUp, 5000);
+    const catchUpTimer = window.setInterval(catchUp, 2000);
     return () => {
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('online', onOnline);
@@ -1048,8 +1071,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     // Capture the channel ID for this effect run to prevent race conditions
     const currentChannelId = activeChannelId;
 
-    // Update ref
-    activeChannelRef.current = activeChannelId;
+    // Ref is updated synchronously in selectChannel before this effect runs.
+    activeChannelRef.current = currentChannelId;
 
     // Reset reaction loading tracker when changing channels
     lastLoadedMessageCountRef.current = 0;
@@ -1057,7 +1080,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     const loadMessages = async () => {
       console.log('[TeamChat] Switching to channel:', currentChannelId);
       setIsLoadingMessages(true);
-      // DO NOT clear messages here - keep previous channel's messages visible while loading
+      // Never leave the previous channel visible under the new header.
+      setMessages([]);
       setMessageReactions({});
       setHasMoreMessages(false);
       setReplyingToMessage(null);
@@ -1189,7 +1213,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       setShowCreateChannel(false);
       if (newCh) {
         setChannels(prev => [...prev, newCh]);
-        setActiveChannelId(newCh.id);
+        selectChannel(newCh.id);
       }
       addToast('success', `${isPrivateChannel ? 'Private' : 'Public'} channel created`);
     } catch (e) {
@@ -1269,7 +1293,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       if (activeChannelId === id) {
         const remaining = channels.filter(c => c.id !== id);
         const general = remaining.find(c => c.name === 'general');
-        setActiveChannelId(general ? general.id : (remaining[0]?.id || ''));
+        selectChannel(general ? general.id : (remaining[0]?.id || ''));
       }
 
       addToast('success', 'Conversation deleted');
@@ -1299,7 +1323,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
         return [...prev, dmChannel];
       });
 
-      setActiveChannelId(dmChannel.id);
+      selectChannel(dmChannel.id);
       addToast('success', 'DM conversation opened!');
     } catch (e: any) {
       console.error('DM error:', e);
@@ -1322,7 +1346,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
         return [...prev, echoChannel];
       });
 
-      setActiveChannelId(echoChannel.id);
+      selectChannel(echoChannel.id);
       addToast('success', 'Echo AI chat opened!');
     } catch (e: any) {
       console.error('Echo AI error:', e);
@@ -2036,7 +2060,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
               {echoAIChannel ? (
                 <li
                   key={echoAIChannel.id}
-                  onClick={() => setActiveChannelId(echoAIChannel.id)}
+                  onClick={() => selectChannel(echoAIChannel.id)}
                   className={`px-3 py-2.5 md:py-2 flex items-center justify-between cursor-pointer mx-1.5 rounded-lg group active:opacity-80 ${activeChannelId === echoAIChannel.id ? 'bg-portal-accent text-white' : 'text-portal-soft hover:bg-portal-surface2'}`}
                 >
                   <div className="flex items-center gap-2.5 md:gap-2 truncate">
@@ -2078,7 +2102,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                 .map(channel => (
                 <li
                   key={channel.id}
-                  onClick={() => setActiveChannelId(channel.id)}
+                  onClick={() => selectChannel(channel.id)}
                   className={`px-3 py-2.5 md:py-2 flex items-center justify-between cursor-pointer mx-1.5 rounded-lg group active:opacity-80 ${activeChannelId === channel.id ? 'bg-portal-accent text-white' : 'text-portal-soft hover:bg-portal-surface2'}`}
                 >
                   <div className="flex items-center gap-2 md:gap-1.5 truncate min-w-0">
@@ -2141,7 +2165,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                   return (
                     <li
                       key={channel.id}
-                      onClick={() => setActiveChannelId(channel.id)}
+                      onClick={() => selectChannel(channel.id)}
                       className={`px-3 py-2 md:py-1.5 flex items-center gap-2.5 md:gap-2 mx-1.5 rounded-lg group cursor-pointer active:opacity-80 ${activeChannelId === channel.id ? 'bg-portal-accent text-white' : 'text-portal-soft hover:bg-portal-surface2'}`}
                     >
                       <div className="relative w-6 h-6 flex-shrink-0">
