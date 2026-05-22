@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, Table as TableIcon, CheckCircle2, AlertCircle, Clock, ChevronLeft, ChevronRight, Users, Filter, MessageCircle, X, Send } from 'lucide-react';
 import { User, ToastType, Task, TaskGroup, ClientBoard, Profile, TaskComment } from '../types';
-import { fetchClientBoards, fetchProfiles, saveClientBoard, createNotification } from '../services/databaseService';
+import { fetchClientBoards, fetchProfiles, saveClientBoard, createNotification, parseClientBoardRow } from '../services/databaseService';
 import { supabase } from '../lib/supabaseClient';
 
 // Detect @mentions in text
@@ -64,6 +64,7 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
   const [showPriorityPicker, setShowPriorityPicker] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [allBoards, setAllBoards] = useState<ClientBoard[]>([]);
+  const allBoardsRef = useRef<ClientBoard[]>([]);
 
   // Mention dropdown state
   const [mentionDropdown, setMentionDropdown] = useState<{ show: boolean; search: string; position: number } | null>(null);
@@ -71,6 +72,7 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
 
   // Track in-flight saves to prevent realtime from overwriting them
   const pendingSaveRef = useRef<{ taskId: string; boardId: string } | null>(null);
+  const [boardRealtimeGen, setBoardRealtimeGen] = useState(0);
 
   useEffect(() => {
     loadData();
@@ -155,6 +157,7 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
 
     // Store all boards for updating
     setAllBoards(boards);
+    allBoardsRef.current = boards;
 
     // Extract all tasks with context
     const tasks: TaskWithContext[] = [];
@@ -193,73 +196,108 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
     setLoading(false);
   };
 
-  // Realtime subscription for client_boards changes
+  // Realtime subscription for client_boards changes, with polling fallback
   useEffect(() => {
-    const boardsSub = supabase.channel('public:client_boards_mywork')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'client_boards' }, async (payload) => {
-        console.log('[MyWork] Realtime update received:', payload.eventType);
+    const applyBoards = (boards: ClientBoard[], profiles?: Profile[]) => {
+      setAllBoards(boards);
+      allBoardsRef.current = boards;
 
-        // Skip realtime update if we have a pending save to prevent race condition
-        if (pendingSaveRef.current) {
-          console.log('[MyWork] Skipping realtime update - save in progress for task:', pendingSaveRef.current.taskId);
-          return;
-        }
+      const tasks: TaskWithContext[] = [];
+      const taskIds = new Set<string>();
 
-        // Refetch all boards and rebuild the task list
-        const [boards, profiles] = await Promise.all([fetchClientBoards(), fetchProfiles()]);
+      boards.forEach(board => {
+        board.groups.forEach(group => {
+          group.tasks.forEach(task => {
+            const assignedIds = Array.isArray(task.assignedTo)
+              ? task.assignedTo
+              : task.assignedTo ? [task.assignedTo] : [];
 
-        // Store all boards for updating
-        setAllBoards(boards);
+            const taskKey = `${board.id}-${group.id}-${task.id}`;
 
-        // Extract all tasks with context
-        const tasks: TaskWithContext[] = [];
-        const taskIds = new Set<string>();
-
-        boards.forEach(board => {
-          board.groups.forEach(group => {
-            group.tasks.forEach(task => {
-              const assignedIds = Array.isArray(task.assignedTo)
-                ? task.assignedTo
-                : task.assignedTo ? [task.assignedTo] : [];
-
-              const taskKey = `${board.id}-${group.id}-${task.id}`;
-
-              if (assignedIds.length > 0 && !taskIds.has(taskKey)) {
-                taskIds.add(taskKey);
-                tasks.push({
-                  ...task,
-                  groupTitle: group.title,
-                  groupColor: group.color,
-                  clientName: board.name,
-                  clientId: board.id,
-                  groupId: group.id,
-                  boardData: board
-                });
-              }
-            });
+            if (assignedIds.length > 0 && !taskIds.has(taskKey)) {
+              taskIds.add(taskKey);
+              tasks.push({
+                ...task,
+                groupTitle: group.title,
+                groupColor: group.color,
+                clientName: board.name,
+                clientId: board.id,
+                groupId: group.id,
+                boardData: board
+              });
+            }
           });
         });
+      });
 
-        setAllTasks(tasks);
-        setTeamProfiles(profiles);
+      setAllTasks(tasks);
+      if (profiles) setTeamProfiles(profiles);
 
-        // Update selected task if modal is open - use functional update to get current state
-        setSelectedTask(currentSelectedTask => {
-          if (currentSelectedTask && isTaskModalOpen) {
-            const updatedTask = tasks.find(t => t.id === currentSelectedTask.id && t.clientId === currentSelectedTask.clientId);
-            if (updatedTask) {
-              return updatedTask;
-            }
-          }
-          return currentSelectedTask;
-        });
+      setSelectedTask(currentSelectedTask => {
+        if (currentSelectedTask && isTaskModalOpen) {
+          const updatedTask = tasks.find(t => t.id === currentSelectedTask.id && t.clientId === currentSelectedTask.clientId);
+          if (updatedTask) return updatedTask;
+        }
+        return currentSelectedTask;
+      });
+    };
+
+    const refreshMyWork = async (reason: string) => {
+      if (pendingSaveRef.current) {
+        console.log('[MyWork] Skipping refresh - save in progress for task:', pendingSaveRef.current.taskId, reason);
+        return;
+      }
+
+      const [boards, profiles] = await Promise.all([fetchClientBoards(), fetchProfiles()]);
+      applyBoards(boards, profiles);
+    };
+
+    const applyRealtimePayload = async (payload: any) => {
+      if (pendingSaveRef.current) {
+        console.log('[MyWork] Skipping realtime payload - save in progress for task:', pendingSaveRef.current.taskId);
+        return;
+      }
+
+      if (payload.eventType === 'DELETE') {
+        const deletedDbId = payload.old?.id;
+        if (!deletedDbId) return;
+        applyBoards(allBoardsRef.current.filter(board => (board as any).db_id !== deletedDbId));
+        return;
+      }
+
+      const updated = parseClientBoardRow(payload.new);
+      if (!updated) {
+        await refreshMyWork('realtime-fallback');
+        return;
+      }
+
+      const updatedDbId = (updated as any).db_id;
+      const existingIndex = allBoardsRef.current.findIndex(board => (board as any).db_id === updatedDbId || board.id === updated.id);
+      const nextBoards = existingIndex >= 0
+        ? allBoardsRef.current.map((board, index) => index === existingIndex ? updated : board)
+        : [...allBoardsRef.current, updated];
+      applyBoards(nextBoards);
+    };
+
+    const boardsSub = supabase.channel(`public:client_boards_mywork:${boardRealtimeGen}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'client_boards' }, async (payload) => {
+        console.log('[MyWork] Realtime update received:', payload.eventType);
+        await applyRealtimePayload(payload);
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[MyWork] Realtime status:', status);
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          setTimeout(() => setBoardRealtimeGen(g => g + 1), 1500);
+        }
+      });
+
+    const pollTimer = window.setInterval(() => refreshMyWork('poll'), 10000);
 
     return () => {
+      window.clearInterval(pollTimer);
       supabase.removeChannel(boardsSub);
     };
-  }, [isTaskModalOpen]);
+  }, [isTaskModalOpen, boardRealtimeGen]);
 
   // Update task in the source board and save
   const updateTaskInBoard = async (
@@ -275,10 +313,10 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
 
     try {
       // Find the board
-      const boardIndex = allBoards.findIndex(b => b.id === task.clientId);
+      const boardIndex = allBoardsRef.current.findIndex(b => b.id === task.clientId);
       if (boardIndex === -1) throw new Error('Board not found');
 
-      const board = allBoards[boardIndex];
+      const board = allBoardsRef.current[boardIndex];
 
       // Find the task's ACTUAL current group (it may have moved)
       let actualGroupId = task.groupId;
@@ -381,9 +419,10 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
       const updatedBoard = { ...board, groups: updatedGroups };
 
       // Update local state
-      const newBoards = [...allBoards];
+      const newBoards = [...allBoardsRef.current];
       newBoards[boardIndex] = updatedBoard;
       setAllBoards(newBoards);
+      allBoardsRef.current = newBoards;
 
       // Update the task in allTasks (find by task ID only, group may have changed)
       setAllTasks(prev =>

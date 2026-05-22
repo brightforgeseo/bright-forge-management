@@ -939,10 +939,22 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
         const deletedMsg = payload.old as any;
         console.log('[TeamChat] Message DELETE received:', deletedMsg.id);
 
-        // Remove from UI if it's in the current channel
-        if (deletedMsg.channel_id === activeChannelRef.current) {
+        // Supabase DELETE payloads often only include the primary key unless
+        // REPLICA IDENTITY FULL is enabled, so do not rely on channel_id being
+        // present. If the ID is visible anywhere in this chat state, remove it.
+        if (!deletedMsg.channel_id || deletedMsg.channel_id === activeChannelRef.current) {
           // Remove from main messages
           setMessages(prev => prev.filter(m => m.id !== deletedMsg.id));
+
+          // Remove from every expanded thread as a fallback when parent_message_id
+          // is absent from the DELETE payload.
+          setThreadReplies(prev => {
+            const next: Record<string, ChatMessage[]> = {};
+            for (const [parentId, replies] of Object.entries(prev)) {
+              next[parentId] = replies.filter(r => r.id !== deletedMsg.id);
+            }
+            return next;
+          });
 
           // Remove from thread replies if it was a reply
           if (deletedMsg.parent_message_id) {
@@ -1002,13 +1014,10 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       if (!channelId) return;
       try {
         const fresh = await fetchChatMessages(channelId);
-        setMessages(prev => {
-          const byId = new Map(prev.map(m => [m.id, m]));
-          fresh.forEach(m => byId.set(m.id, m));
-          return Array.from(byId.values()).sort(
-            (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-          );
-        });
+        // Replace the active-channel window, rather than merge-only. Merge-only
+        // keeps messages that were deleted while the socket was asleep, which is
+        // exactly the "not live" behaviour people are seeing.
+        setMessages(fresh);
       } catch (e) {
         console.error('[TeamChat] catch-up refetch failed:', e);
       }
@@ -1024,9 +1033,11 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('online', onOnline);
+    const catchUpTimer = window.setInterval(catchUp, 5000);
     return () => {
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('online', onOnline);
+      window.clearInterval(catchUpTimer);
     };
   }, []);
 

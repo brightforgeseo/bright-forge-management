@@ -383,14 +383,28 @@ export const deleteChannel = async (id: string) => {
 
 // --- Client Boards ---
 
+export const parseClientBoardRow = (row: any): ClientBoard | null => {
+  let boardData = row?.board_data;
+  if (!boardData) return null;
+  if (typeof boardData === 'string') {
+    try {
+      boardData = JSON.parse(boardData);
+    } catch (e) {
+      console.error('Error parsing board_data:', e);
+      return null;
+    }
+  }
+  return boardData?.id ? { ...boardData, db_id: row.id, updated_at: row.updated_at } : null;
+};
+
 const parseBoardRows = (data: any[]): ClientBoard[] => {
   const seen = new Set<string>();
   const boards: ClientBoard[] = [];
   for (const row of data) {
-    const boardId = row.board_data?.id;
-    if (boardId && !seen.has(boardId)) {
-      seen.add(boardId);
-      boards.push({ ...row.board_data, db_id: row.id, updated_at: row.updated_at, created_at: row.created_at });
+    const board = parseClientBoardRow(row);
+    if (board?.id && !seen.has(board.id)) {
+      seen.add(board.id);
+      boards.push(board);
     }
   }
   return boards;
@@ -409,6 +423,21 @@ export const fetchClientBoards = async (): Promise<ClientBoard[]> => {
   }
 
   return parseBoardRows(data);
+};
+
+export const fetchClientBoardByDbId = async (dbId: string): Promise<ClientBoard | null> => {
+  const { data, error } = await supabase
+    .from('client_boards')
+    .select('*')
+    .eq('id', dbId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error fetching board:', error);
+    return null;
+  }
+
+  return data ? parseClientBoardRow(data) : null;
 };
 
 export const fetchArchivedBoards = async (): Promise<ClientBoard[]> => {
@@ -700,6 +729,29 @@ export const clearChatHistory = async (channelId: string) => {
 }
 
 export const deleteChatMessage = async (messageId: string) => {
+  // Delete dependent rows first. Some Supabase projects do not have ON DELETE
+  // CASCADE on reactions/thread replies, which makes the UI look broken even
+  // though the button was pressed correctly.
+  const { error: reactionsError } = await supabase
+    .from('message_reactions')
+    .delete()
+    .eq('message_id', messageId);
+
+  if (reactionsError) {
+    console.error('[deleteChatMessage] Reaction cleanup error:', reactionsError.message);
+    throw reactionsError;
+  }
+
+  const { error: repliesError } = await supabase
+    .from('chat_messages')
+    .delete()
+    .eq('parent_message_id', messageId);
+
+  if (repliesError) {
+    console.error('[deleteChatMessage] Reply cleanup error:', repliesError.message);
+    throw repliesError;
+  }
+
   const { data, error } = await supabase
     .from('chat_messages')
     .delete()
@@ -709,6 +761,10 @@ export const deleteChatMessage = async (messageId: string) => {
   if (error) {
     console.error('[deleteChatMessage] Error:', error.message);
     throw error;
+  }
+
+  if (!data || data.length === 0) {
+    throw new Error('Message not deleted. It may already be gone, or your account does not have delete permission.');
   }
 
   return data;

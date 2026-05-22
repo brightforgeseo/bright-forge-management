@@ -4,7 +4,7 @@ import { Plus, Sparkles, ChevronDown, ChevronUp, ChevronRight, Trash2, Briefcase
 import AssignToPartnerModal from './client-portal/AssignToPartnerModal';
 import { Task, TaskGroup, User, ClientBoard, ToastType, LabelDefinition, Profile, TaskComment, ChatChannel, ChatMessage, ArchivedTask } from '../types';
 import { generateProjectTasks } from '../services/geminiService';
-import { fetchClientBoards, fetchArchivedBoards, archiveBoardById, restoreBoardById, deleteBoardByDbId, saveClientBoard, deleteClientBoard, uploadFile, fetchProfiles, createNotification, fetchChannels, sendChatMessage, logActivity } from '../services/databaseService';
+import { fetchClientBoards, fetchArchivedBoards, archiveBoardById, restoreBoardById, deleteBoardByDbId, saveClientBoard, deleteClientBoard, uploadFile, fetchProfiles, createNotification, fetchChannels, sendChatMessage, logActivity, parseClientBoardRow } from '../services/databaseService';
 import { supabase } from '../lib/supabaseClient';
 
 interface TaskBoardProps {
@@ -215,6 +215,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   const clientsRef = useRef<ClientBoard[]>([]); // Keep a ref for immediate access
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
+  const selectedClientIdRef = useRef<string>('');
   const [teamProfiles, setTeamProfiles] = useState<Profile[]>([]);
   const [clientSearchQuery, setClientSearchQuery] = useState('');
   const [isClientSearchFocused, setIsClientSearchFocused] = useState(false);
@@ -238,6 +239,10 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
     };
     loadData();
   }, []);
+
+  useEffect(() => {
+    selectedClientIdRef.current = selectedClientId;
+  }, [selectedClientId]);
 
   // Check for notification deep links when component becomes visible or clients change
   useEffect(() => {
@@ -456,68 +461,104 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
 
   // Track in-flight saves to prevent realtime from overwriting them
   const pendingSaveRef = useRef<{ taskId: string; boardId: string } | null>(null);
+  const [boardRealtimeGen, setBoardRealtimeGen] = useState(0);
 
-  // Ref to track selected client id without causing subscription teardown on every board switch
-  const selectedClientIdRef = useRef<string>(selectedClientId);
+  // Realtime subscription for client_boards changes, with polling fallback.
+  // Supabase sockets do occasionally drop on desktop/mobile sleep, so the board
+  // cannot rely on realtime alone if we want it to feel properly live.
   useEffect(() => {
-    selectedClientIdRef.current = selectedClientId;
-  }, [selectedClientId]);
+    const applyBoards = (boards: ClientBoard[]) => {
+      if (boards.length === 0) return;
 
-  // Realtime subscription for client_boards changes
-  useEffect(() => {
-    const boardsSub = supabase.channel('public:client_boards')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'client_boards' }, async (payload) => {
-        if (pendingSaveRef.current) {
-          console.log('[TaskBoard] Skipping realtime update - save in progress');
-          return;
-        }
+      const currentSelectedId = selectedClientIdRef.current;
+      setClients(boards);
+      clientsRef.current = boards;
 
-        if (payload.eventType === 'DELETE') {
-          const deletedId = (payload.old as any)?.id;
-          if (deletedId) {
-            setClients(prev => prev.filter(c => (c as any).db_id !== deletedId));
-            clientsRef.current = clientsRef.current.filter(c => (c as any).db_id !== deletedId);
-          }
-          return;
-        }
+      if (currentSelectedId && boards.find(b => b.id === currentSelectedId)) {
+        // Keep current selection
+      } else {
+        setSelectedClientId(boards[0].id);
+      }
 
-        const row = payload.new as any;
-        if (!row?.id) return;
-
-        let boardData = row.board_data;
-        if (typeof boardData === 'string') boardData = JSON.parse(boardData);
-        const updatedBoard: ClientBoard = { ...boardData, db_id: row.id, updated_at: row.updated_at, created_at: row.created_at };
-
-        console.log('[TaskBoard] Realtime update for board:', updatedBoard.name);
-
-        setClients(prev => {
-          const exists = prev.some(c => (c as any).db_id === row.id);
-          const updated = exists
-            ? prev.map(c => (c as any).db_id === row.id ? updatedBoard : c)
-            : [...prev, updatedBoard];
-          clientsRef.current = updated;
-          return updated;
-        });
-
-        // Update task modal if it's showing a task on this board
-        setTaskModal(currentTaskModal => {
-          if (currentTaskModal && currentTaskModal.clientId === row.id) {
-            for (const group of updatedBoard.groups) {
+      setTaskModal(currentTaskModal => {
+        if (currentTaskModal) {
+          const board = boards.find(b => b.id === currentTaskModal.clientId);
+          if (board) {
+            for (const group of board.groups) {
               const task = group.tasks.find(t => t.id === currentTaskModal.task.id);
               if (task) {
-                return { ...currentTaskModal, task, groupId: group.id, groupTitle: group.title, groupColor: group.color };
+                return {
+                  ...currentTaskModal,
+                  task,
+                  groupId: group.id,
+                  groupTitle: group.title,
+                  groupColor: group.color
+                };
               }
             }
           }
-          return currentTaskModal;
-        });
+        }
+        return currentTaskModal;
+      });
+    };
+
+    const reloadBoards = async (reason: string) => {
+      if (pendingSaveRef.current) {
+        console.log('[TaskBoard] Skipping board refresh - save in progress for task:', pendingSaveRef.current.taskId, reason);
+        return;
+      }
+
+      const boards = await fetchClientBoards();
+      applyBoards(boards);
+    };
+
+    const applyRealtimePayload = async (payload: any) => {
+      if (pendingSaveRef.current) {
+        console.log('[TaskBoard] Skipping realtime payload - save in progress for task:', pendingSaveRef.current.taskId);
+        return;
+      }
+
+      if (payload.eventType === 'DELETE') {
+        const deletedDbId = payload.old?.id;
+        if (!deletedDbId) return;
+        const nextBoards = clientsRef.current.filter(board => (board as any).db_id !== deletedDbId);
+        applyBoards(nextBoards);
+        return;
+      }
+
+      const updated = parseClientBoardRow(payload.new);
+      if (!updated) {
+        await reloadBoards('realtime-fallback');
+        return;
+      }
+
+      const byDbId = (updated as any).db_id;
+      const existingIndex = clientsRef.current.findIndex(board => (board as any).db_id === byDbId || board.id === updated.id);
+      const nextBoards = existingIndex >= 0
+        ? clientsRef.current.map((board, index) => index === existingIndex ? updated : board)
+        : [...clientsRef.current, updated];
+      applyBoards(nextBoards);
+    };
+
+    const boardsSub = supabase.channel(`public:client_boards:${boardRealtimeGen}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'client_boards' }, async (payload) => {
+        console.log('[TaskBoard] Realtime update received:', payload.eventType);
+        await applyRealtimePayload(payload);
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[TaskBoard] Realtime status:', status);
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          setTimeout(() => setBoardRealtimeGen(g => g + 1), 1500);
+        }
+      });
+
+    const pollTimer = window.setInterval(() => reloadBoards('poll'), 10000);
 
     return () => {
+      window.clearInterval(pollTimer);
       supabase.removeChannel(boardsSub);
     };
-  }, []); // Empty deps - subscription handles all boards, doesn't need to be recreated on board switch
+  }, [boardRealtimeGen]);
 
   const activeClient = clients.find(c => c.id === selectedClientId);
 
