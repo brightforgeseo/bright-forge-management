@@ -37,6 +37,48 @@ interface TeamChatProps {
   onNavigateToTask?: (taskId: string, boardId: string, groupId: string) => void;
 }
 
+const formatChatRow = (row: any): ChatMessage => ({
+  id: row.id,
+  channelId: row.channel_id,
+  sender: row.sender,
+  senderId: row.sender_id,
+  text: row.text,
+  timestamp: row.created_at,
+  isAi: row.is_ai,
+  avatar: row.avatar,
+  attachmentUrl: row.attachment_url,
+  attachmentType: row.attachment_type,
+  attachmentName: row.attachment_name,
+  isEdited: row.is_edited,
+  editedAt: row.edited_at,
+  isPinned: row.is_pinned,
+  pinnedAt: row.pinned_at,
+  pinnedBy: row.pinned_by,
+  taskLink: row.task_link,
+  callRoomId: row.call_room_id,
+  callType: row.call_type,
+  parentMessageId: row.parent_message_id,
+  replyCount: row.reply_count || 0
+});
+
+const optimisticKey = (channelId?: string, senderId?: string, text?: string) =>
+  `${channelId || ''}|${senderId || ''}|${(text || '').trim()}`;
+
+const mergeChatMessages = (existing: ChatMessage[], incoming: ChatMessage[]): ChatMessage[] => {
+  if (incoming.length === 0) return existing;
+  const byId = new Map<string, ChatMessage>();
+  for (const msg of existing) byId.set(msg.id, msg);
+  for (const msg of incoming) byId.set(msg.id, { ...byId.get(msg.id), ...msg });
+  return Array.from(byId.values()).sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+};
+
+const mergeChatChannels = (existing: ChatChannel[], incoming: ChatChannel[]): ChatChannel[] => {
+  const unreadById = new Map(existing.map(ch => [ch.id, ch.unread || 0]));
+  return incoming.map(ch => ({ ...ch, unread: unreadById.get(ch.id) || ch.unread || 0 }));
+};
+
 const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateToTask }) => {
   // SIMPLE STATE MODEL - No caching, no drafts
   const [channels, setChannels] = useState<ChatChannel[]>([]);
@@ -77,6 +119,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
   const fileInputRef = useRef<HTMLInputElement>(null);
   const activeChannelRef = useRef<string>('');
   const channelsRef = useRef<ChatChannel[]>([]);
+  const messageCacheRef = useRef<Map<string, ChatMessage[]>>(new Map());
+  const pendingOptimisticRef = useRef<Record<string, string>>({});
   const [mentionDropdown, setMentionDropdown] = useState<{ show: boolean; search: string; position: number } | null>(null);
 
   // Echo AI Bot User ID (fixed UUID for the bot)
@@ -601,21 +645,29 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     channelsRef.current = channels;
   }, [channels]);
 
+  // Keep a tiny per-channel message cache so channel switches feel instant.
+  useEffect(() => {
+    if (activeChannelId) {
+      messageCacheRef.current.set(activeChannelId, messages);
+    }
+  }, [activeChannelId, messages]);
+
   // Switch channels synchronously so the UI never keeps showing the old chat
   // while React waits for the channel-loading effect. This also keeps catch-up
   // polling and realtime handlers pointed at the selected room immediately.
   const selectChannel = useCallback((channelId: string) => {
     activeChannelRef.current = channelId;
+    const cachedMessages = messageCacheRef.current.get(channelId) || [];
     setActivePartnerId(null);
     setActiveChannelId(channelId);
-    setMessages([]);
+    setMessages(cachedMessages);
     setMessageReactions({});
     setPinnedMessages([]);
     setHasMoreMessages(false);
     setReplyingToMessage(null);
     setExpandedThreads(new Set());
     setThreadReplies({});
-    setIsLoadingMessages(!!channelId);
+    setIsLoadingMessages(!!channelId && cachedMessages.length === 0);
     setIsMobileSidebarOpen(false);
   }, []);
 
@@ -630,7 +682,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       // Only fetch partners for Owners/Admins
       isAdminOrOwner ? fetchAllPartners().catch(() => []) : Promise.resolve([])
     ]);
-    setChannels(chans);
+    setChannels(prev => mergeChatChannels(prev, chans));
     setProfiles(profs);
     setPartners(partnersData);
     setIsRefreshing(false);
@@ -769,12 +821,28 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     init();
 
     // Realtime Channel/Profile Listeners
-    const channelSub = supabase.channel('public:channels')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'channels' }, async () => {
+    const refreshChannelList = async () => {
+      try {
         const newChans = await fetchChannels();
-        setChannels(newChans);
-      })
+        setChannels(prev => mergeChatChannels(prev, newChans));
+      } catch (e) {
+        console.error('[TeamChat] channel list refresh failed:', e);
+      }
+    };
+
+    const channelSub = supabase.channel('public:channels')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'channels' }, refreshChannelList)
       .subscribe();
+
+    // Private-channel membership changes are a separate table, so listen to
+    // them too. Otherwise newly-added private channels can take a manual
+    // refresh to appear. The timer is a cheap safety net for missed websocket
+    // events on flaky networks.
+    const channelMembersSub = supabase.channel('public:channel_members')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'channel_members' }, refreshChannelList)
+      .subscribe();
+
+    const channelListTimer = window.setInterval(refreshChannelList, 5000);
 
     const profileSub = supabase.channel('public:profiles')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, async () => {
@@ -811,7 +879,9 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     })();
 
     return () => {
+      window.clearInterval(channelListTimer);
       supabase.removeChannel(channelSub);
+      supabase.removeChannel(channelMembersSub);
       supabase.removeChannel(profileSub);
       window.removeEventListener('openChatNotification', handleOpenChatNotification as EventListener);
       if (stopEchoListener) stopEchoListener();
@@ -826,26 +896,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
         const newMsg = payload.new as any;
         console.log('[TeamChat] ✅ REALTIME: New message received:', newMsg.id, newMsg);
 
-        const formattedMsg: ChatMessage = {
-          id: newMsg.id,
-          channelId: newMsg.channel_id,
-          sender: newMsg.sender,
-          senderId: newMsg.sender_id,
-          text: newMsg.text,
-          timestamp: newMsg.created_at,
-          isAi: newMsg.is_ai,
-          avatar: newMsg.avatar,
-          attachmentUrl: newMsg.attachment_url,
-          attachmentType: newMsg.attachment_type,
-          attachmentName: newMsg.attachment_name,
-          isEdited: newMsg.is_edited,
-          editedAt: newMsg.edited_at,
-          taskLink: newMsg.task_link,
-          callRoomId: newMsg.call_room_id,
-          callType: newMsg.call_type,
-          parentMessageId: newMsg.parent_message_id,
-          replyCount: newMsg.reply_count || 0
-        };
+        const formattedMsg = formatChatRow(newMsg);
 
         // Play notification sound for messages from other users
         if (!newMsg.is_ai && newMsg.sender_id !== currentUser.id) {
@@ -880,17 +931,30 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
           } else {
             // Regular message (not a reply)
             setMessages(prev => {
-              // Simple duplicate check by ID only
-              if (prev.some(m => m.id === newMsg.id)) {
+              if (prev.some(m => m.id === formattedMsg.id)) {
                 console.log('[TeamChat] Message already exists, skipping');
                 return prev;
               }
+
+              const key = optimisticKey(formattedMsg.channelId, formattedMsg.senderId, formattedMsg.text);
+              const tempId = pendingOptimisticRef.current[key];
+              if (tempId) {
+                delete pendingOptimisticRef.current[key];
+                return prev.map(m => m.id === tempId ? formattedMsg : m);
+              }
+
               console.log('[TeamChat] Adding message to current channel');
               return [...prev, formattedMsg];
             });
           }
           scrollToBottom();
         } else {
+          // Keep per-channel cache warm so switching into a busy room is instant.
+          const cached = messageCacheRef.current.get(newMsg.channel_id);
+          if (cached) {
+            messageCacheRef.current.set(newMsg.channel_id, mergeChatMessages(cached, [formattedMsg]));
+          }
+
           // Message is for different channel - update unread count
           console.log('[TeamChat] Message for different channel, updating unread count');
           // Use ref to access current channels without triggering subscription recreation
@@ -898,8 +962,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
           if (!targetChannel) {
             const updatedChannels = await fetchChannels();
-            setChannels(updatedChannels.map(c =>
-              c.id === newMsg.channel_id ? { ...c, unread: 1 } : c
+            setChannels(prev => mergeChatChannels(prev, updatedChannels).map(c =>
+              c.id === newMsg.channel_id ? { ...c, unread: Math.max(1, c.unread || 0) } : c
             ));
             targetChannel = updatedChannels.find(c => c.id === newMsg.channel_id);
           } else {
@@ -1036,10 +1100,11 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       const channelId = activeChannelRef.current;
       if (!channelId) return;
       try {
-        const fresh = await fetchChatMessages(channelId);
-        // Replace only if the user has not switched again while we were fetching.
+        const fresh = await fetchChatMessages(channelId, 25);
+        // Merge recent messages only. Replacing the full list every poll causes
+        // visible jumps and can overwrite optimistic/realtime updates.
         if (activeChannelRef.current === channelId) {
-          setMessages(fresh);
+          setMessages(prev => mergeChatMessages(prev, fresh));
         }
       } catch (e) {
         console.error('[TeamChat] catch-up refetch failed:', e);
@@ -1056,7 +1121,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('online', onOnline);
-    const catchUpTimer = window.setInterval(catchUp, 2000);
+    const catchUpTimer = window.setInterval(catchUp, 1500);
     return () => {
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('online', onOnline);
@@ -1080,10 +1145,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     const loadMessages = async () => {
       console.log('[TeamChat] Switching to channel:', currentChannelId);
       setIsLoadingMessages(true);
-      // Never leave the previous channel visible under the new header.
-      setMessages([]);
       setMessageReactions({});
-      setHasMoreMessages(false);
       setReplyingToMessage(null);
       setExpandedThreads(new Set());
       setThreadReplies({});
@@ -1101,7 +1163,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
       console.log(`[TeamChat] Loaded ${msgs.length} messages from database`);
 
-      // Atomic swap: clear and set in one render cycle
+      // Atomic swap to the selected channel's fresh history.
+      messageCacheRef.current.set(currentChannelId, msgs);
       setMessages(msgs);
       setIsLoadingMessages(false);
       // If we got exactly 100 messages, there might be more
@@ -1529,7 +1592,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     addToast('success', 'Video call started!');
   };
 
-  // SIMPLIFIED SEND MESSAGE - No optimistic updates, wait for database
+  // Send message with optimistic local rendering so chat feels instant
   const handleSendMessage = async () => {
     console.log('[handleSendMessage] Starting...');
     console.log('[handleSendMessage] Message text:', message);
@@ -1575,12 +1638,20 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     const messageText = message;
     const savedStagedAttachment = stagedAttachment;
     const savedReplyingTo = replyingToMessage;
+    const targetChannelId = activeChannelId;
+    const pendingKey = optimisticKey(userMsg.channelId, userMsg.senderId, userMsg.text);
     setMessage('');
     setStagedAttachment(null);
     setMentionDropdown(null);
     setReplyingToMessage(null); // Clear reply state
 
-    // Send to database - realtime listener will add it to UI
+    if (!savedReplyingTo) {
+      pendingOptimisticRef.current[pendingKey] = userMsg.id;
+      setMessages(prev => prev.some(m => m.id === userMsg.id) ? prev : [...prev, userMsg]);
+      scrollToBottom();
+    }
+
+    // Send to database. Realtime or the insert result will reconcile the temp row.
     console.log('[handleSendMessage] Calling sendChatMessage...');
     try {
       let result;
@@ -1632,35 +1703,17 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
         result = await sendChatMessage(userMsg);
         console.log('[handleSendMessage] Message sent successfully:', result);
 
-        // TEMPORARY WORKAROUND: Manually add message to UI since realtime might not be working
-        console.log('[handleSendMessage] Adding message to UI manually...');
-        const insertedMsg: ChatMessage = {
-          id: result.id,
-          channelId: result.channel_id,
-          sender: result.sender,
-          senderId: result.sender_id,
-          text: result.text,
-          timestamp: result.created_at,
-          isAi: result.is_ai,
-          avatar: result.avatar,
-          attachmentUrl: result.attachment_url,
-          attachmentType: result.attachment_type,
-          attachmentName: result.attachment_name,
-          isEdited: result.is_edited,
-          editedAt: result.edited_at,
-          taskLink: result.task_link,
-          replyCount: 0
-        };
+        const insertedMsg = formatChatRow(result);
+        delete pendingOptimisticRef.current[pendingKey];
 
-        setMessages(prev => {
-          // Check if already exists (in case realtime DID work)
-          if (prev.some(m => m.id === insertedMsg.id)) {
-            console.log('[handleSendMessage] Message already in UI (realtime worked!)');
-            return prev;
-          }
-          console.log('[handleSendMessage] Adding message to UI manually');
-          return [...prev, insertedMsg];
-        });
+        if (activeChannelRef.current === targetChannelId) {
+          setMessages(prev => {
+            const withoutDuplicate = prev.filter(m => m.id !== insertedMsg.id);
+            const replaced = withoutDuplicate.map(m => m.id === userMsg.id ? insertedMsg : m);
+            if (replaced.some(m => m.id === insertedMsg.id)) return replaced;
+            return [...replaced, insertedMsg];
+          });
+        }
       }
       scrollToBottom();
     } catch (error: any) {
@@ -1669,6 +1722,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       const errorMsg = error.message || error.details || 'Unknown error';
       alert(`Message failed: ${errorMsg}\n\nCode: ${error.code || 'none'}\nHint: ${error.hint || 'none'}`);
       addToast('error', `Failed to send message: ${errorMsg}`);
+      delete pendingOptimisticRef.current[pendingKey];
+      setMessages(prev => prev.filter(m => m.id !== userMsg.id));
       setMessage(messageText); // Restore message on error
       setStagedAttachment(savedStagedAttachment); // Restore attachment on error
       setReplyingToMessage(savedReplyingTo); // Restore reply state on error
