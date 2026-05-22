@@ -291,10 +291,30 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
         }
       });
 
-    const pollTimer = window.setInterval(() => refreshMyWork('poll'), 3000);
+    let pollTimer: number | null = null;
+    let stopped = false;
+    const schedulePoll = () => {
+      const delay = document.visibilityState === 'visible' ? 3000 : 15000;
+      pollTimer = window.setTimeout(async () => {
+        if (stopped) return;
+        if (document.visibilityState === 'visible') {
+          await refreshMyWork('poll');
+        }
+        schedulePoll();
+      }, delay);
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshMyWork('visible');
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    schedulePoll();
 
     return () => {
-      window.clearInterval(pollTimer);
+      stopped = true;
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      if (pollTimer !== null) window.clearTimeout(pollTimer);
       supabase.removeChannel(boardsSub);
     };
   }, [isTaskModalOpen, boardRealtimeGen]);

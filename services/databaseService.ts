@@ -1,6 +1,6 @@
 
 import { supabase, supabaseAdmin } from '../lib/supabaseClient';
-import { ClientBoard, ChatMessage, ChatChannel, Profile, AppNotification } from '../types';
+import { ClientBoard, ClientBoardSummary, ChatMessage, ChatChannel, Profile, AppNotification } from '../types';
 
 // --- Profile Management ---
 
@@ -408,6 +408,37 @@ const parseBoardRows = (data: any[]): ClientBoard[] => {
     }
   }
   return boards;
+};
+
+export const fetchClientBoardSummaries = async (): Promise<ClientBoardSummary[]> => {
+  const { data, error } = await supabase
+    .from('client_boards')
+    .select('id, updated_at, board_id:board_data->>id, name:board_data->>name, initials:board_data->>initials, color:board_data->>color')
+    .not('archived', 'eq', true)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching board summaries:', error);
+    return [];
+  }
+
+  const seen = new Set<string>();
+  const summaries: ClientBoardSummary[] = [];
+  for (const row of data || []) {
+    const id = row.board_id || row.id;
+    const name = row.name || 'Untitled Client';
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    summaries.push({
+      id,
+      db_id: row.id,
+      name,
+      initials: row.initials || name.split(' ').map((word: string) => word[0]).join('').slice(0, 3).toUpperCase(),
+      color: row.color || '#3b82f6',
+      updated_at: row.updated_at
+    });
+  }
+  return summaries;
 };
 
 export const fetchClientBoards = async (): Promise<ClientBoard[]> => {

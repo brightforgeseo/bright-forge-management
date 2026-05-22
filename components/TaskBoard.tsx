@@ -564,10 +564,30 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
         }
       });
 
-    const pollTimer = window.setInterval(() => reloadBoards('poll'), 3000);
+    let pollTimer: number | null = null;
+    let stopped = false;
+    const schedulePoll = () => {
+      const delay = document.visibilityState === 'visible' ? 3000 : 15000;
+      pollTimer = window.setTimeout(async () => {
+        if (stopped) return;
+        if (document.visibilityState === 'visible') {
+          await reloadBoards('poll');
+        }
+        schedulePoll();
+      }, delay);
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        reloadBoards('visible');
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    schedulePoll();
 
     return () => {
-      window.clearInterval(pollTimer);
+      stopped = true;
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      if (pollTimer !== null) window.clearTimeout(pollTimer);
       supabase.removeChannel(boardsSub);
     };
   }, [boardRealtimeGen]);

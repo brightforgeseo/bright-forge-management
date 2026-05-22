@@ -42,6 +42,15 @@ export interface LabelDefinition {
   color: string;
 }
 
+export interface ClientBoardSummary {
+  id: string;
+  db_id?: string;
+  name: string;
+  initials: string;
+  color: string;
+  updated_at?: string;
+}
+
 export interface ClientBoard {
   id: string;
   name: string;

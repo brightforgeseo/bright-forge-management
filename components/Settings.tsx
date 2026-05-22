@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { BrandingConfig, ToastType, User, ClientBoard } from '../types';
+import { BrandingConfig, ToastType, User, ClientBoardSummary } from '../types';
 import { PartnerWithStats } from '../types-portal';
 import { Save, Monitor, User as UserIcon, Upload, Loader2, Users, Key, Trash2, Shield, X, Building2, Plus, UserPlus, Check, Copy, Mail } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
-import { uploadFile, fetchAllAuthUsers, resetUserPassword, deleteAuthUser, updateUserRole, AuthUser, fetchClientBoards } from '../services/databaseService';
+import { uploadFile, fetchAllAuthUsers, resetUserPassword, deleteAuthUser, updateUserRole, AuthUser, fetchClientBoardSummaries } from '../services/databaseService';
 import { fetchAllPartners, createPartnerAccount, deletePartnerAccount, togglePartnerActive, grantClientAccess, revokeClientAccess } from '../services/clientPortalService';
 import ActivityLog from './ActivityLog';
 
@@ -38,7 +38,7 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
   const [showDeletePartnerModal, setShowDeletePartnerModal] = useState<{ open: boolean; partner: PartnerWithStats | null }>({ open: false, partner: null });
   const [newPartner, setNewPartner] = useState({ email: '', companyName: '', fullName: '', password: '' });
   const [createdPartnerCreds, setCreatedPartnerCreds] = useState<{ email: string; password: string } | null>(null);
-  const [clients, setClients] = useState<ClientBoard[]>([]);
+  const [clients, setClients] = useState<ClientBoardSummary[]>([]);
   const [partnerClientIds, setPartnerClientIds] = useState<string[]>([]);
   const [partnerActionLoading, setPartnerActionLoading] = useState(false);
 
@@ -78,7 +78,7 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
 
   const loadClients = async () => {
     try {
-      const clientList = await fetchClientBoards();
+      const clientList = await fetchClientBoardSummaries();
       setClients(clientList);
     } catch (error) {
       console.error('Failed to load clients:', error);

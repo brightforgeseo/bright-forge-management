@@ -76,6 +76,8 @@ const startFaviconFlash = () => {
 // unavailable (e.g. older browsers or extreme permission settings).
 let sharedAudioContext: AudioContext | null = null;
 let audioPrimed = false;
+let lastNotificationSoundAt = 0;
+const NOTIFICATION_SOUND_DEBOUNCE_MS = 3000;
 
 const getAudioContext = (): AudioContext | null => {
   if (typeof window === 'undefined') return null;
@@ -111,6 +113,10 @@ if (typeof window !== 'undefined') {
 
 const playNotificationSound = async () => {
   try {
+    const wallClockNow = Date.now();
+    if (wallClockNow - lastNotificationSoundAt < NOTIFICATION_SOUND_DEBOUNCE_MS) return;
+    lastNotificationSoundAt = wallClockNow;
+
     const audioContext = getAudioContext();
     if (!audioContext) return;
     if (audioContext.state === 'suspended') {
@@ -120,30 +126,24 @@ const playNotificationSound = async () => {
     const now = audioContext.currentTime;
     const oscillator1 = audioContext.createOscillator();
     const oscillator2 = audioContext.createOscillator();
-    const oscillator3 = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
 
-    oscillator1.frequency.value = 800;
-    oscillator2.frequency.value = 1000;
-    oscillator3.frequency.value = 1200;
+    oscillator1.frequency.value = 660;
+    oscillator2.frequency.value = 880;
     oscillator1.type = 'sine';
     oscillator2.type = 'sine';
-    oscillator3.type = 'sine';
 
-    gainNode.gain.setValueAtTime(0.18, now);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+    gainNode.gain.setValueAtTime(0.055, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
 
     oscillator1.connect(gainNode);
     oscillator2.connect(gainNode);
-    oscillator3.connect(gainNode);
     gainNode.connect(audioContext.destination);
 
     oscillator1.start(now);
-    oscillator2.start(now + 0.1);
-    oscillator3.start(now + 0.2);
-    oscillator1.stop(now + 0.3);
-    oscillator2.stop(now + 0.4);
-    oscillator3.stop(now + 0.5);
+    oscillator2.start(now + 0.05);
+    oscillator1.stop(now + 0.18);
+    oscillator2.stop(now + 0.22);
   } catch (error) {
     console.error('[Notifications] Failed to play sound:', error);
   }
@@ -272,7 +272,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             icon: '/vite.svg',
             tag: note.id,
             requireInteraction: false,
-            silent: false
+            silent: true
           });
           browserNote.onclick = () => {
             window.focus();

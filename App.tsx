@@ -27,7 +27,7 @@ const ViewFallback: React.FC = () => (
 );
 import { ToolView, BrandingConfig, User, ToastNotification, ToastType, Profile } from './types';
 import { supabase } from './lib/supabaseClient';
-import { addToAllowlist, updateUserProfile, checkDueDateNotifications, fetchClientBoards, fetchProfiles } from './services/databaseService';
+import { addToAllowlist, updateUserProfile, checkDueDateNotifications, fetchClientBoardSummaries, fetchProfiles } from './services/databaseService';
 import { listenForPushClicks } from './lib/pushNotifications';
 import { Copy, X, UserPlus, Check, Mail, RefreshCw, AlertTriangle, MessageSquare } from 'lucide-react';
 
@@ -221,7 +221,7 @@ const App: React.FC = () => {
   // Load palette data once authenticated
   useEffect(() => {
     if (!isAuthenticated) return;
-    fetchClientBoards().then(boards => {
+    fetchClientBoardSummaries().then(boards => {
       setPaletteClients(boards.map(b => ({ id: b.id, name: b.name })));
     }).catch(() => {});
     fetchProfiles().then(setPaletteProfiles).catch(() => {});
