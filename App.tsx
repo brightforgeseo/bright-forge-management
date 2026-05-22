@@ -291,6 +291,18 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent).detail || {};
+      const requested = detail.view as ToolView | undefined;
+      if (requested && Object.values(ToolView).includes(requested)) {
+        setCurrentView(requested);
+      }
+    };
+    window.addEventListener('navigateToView', handler);
+    return () => window.removeEventListener('navigateToView', handler);
+  }, []);
+
   // Generate random password for invites
   const generatePassword = () => {
       const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$';
@@ -368,7 +380,7 @@ ${currentUser.name}`;
       }
   }} branding={branding} />;
 
-  const isFullHeight = currentView === ToolView.TASKS || currentView === ToolView.TEAM_CHAT || currentView === ToolView.BUSINESS_INBOX;
+  const isFullHeight = currentView === ToolView.TASKS || currentView === ToolView.TEAM_CHAT || currentView === ToolView.BUSINESS_INBOX || currentView === ToolView.ECHO_WORKSPACES;
 
   return (
     <div className="flex h-screen bg-portal-dark overflow-hidden font-sans text-white">
