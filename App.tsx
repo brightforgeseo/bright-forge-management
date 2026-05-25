@@ -7,18 +7,48 @@ import Login from './components/Login';
 import CommandPalette from './components/CommandPalette';
 import MobileTabBar from './components/MobileTabBar';
 
-// Heavy tools are code-split — they only download when the user navigates to that view.
-// Initial bundle drops dramatically because TaskBoard + TeamChat alone are most of the weight.
-const KeywordTool = lazy(() => import('./components/KeywordTool'));
-const ContentTool = lazy(() => import('./components/ContentTool'));
-const AuditTool = lazy(() => import('./components/AuditTool'));
-const QAChecker = lazy(() => import('./components/QAChecker'));
-const TaskBoard = lazy(() => import('./components/TaskBoard'));
-const MyWork = lazy(() => import('./components/MyWork'));
-const TeamChat = lazy(() => import('./components/TeamChat'));
-const BusinessInbox = lazy(() => import('./components/BusinessInbox'));
-const Settings = lazy(() => import('./components/Settings'));
-const EchoWorkspaces = lazy(() => import('./components/EchoWorkspaces'));
+// Heavy tools are code-split, then preloaded after login so navigation does not
+// show a spinner every time Ben moves between features.
+const loadKeywordTool = () => import('./components/KeywordTool');
+const loadContentTool = () => import('./components/ContentTool');
+const loadAuditTool = () => import('./components/AuditTool');
+const loadQAChecker = () => import('./components/QAChecker');
+const loadTaskBoard = () => import('./components/TaskBoard');
+const loadMyWork = () => import('./components/MyWork');
+const loadTeamChat = () => import('./components/TeamChat');
+const loadBusinessInbox = () => import('./components/BusinessInbox');
+const loadSettings = () => import('./components/Settings');
+const loadEchoWorkspaces = () => import('./components/EchoWorkspaces');
+
+const preloadViewChunks = () => {
+  const loaders = [
+    loadTaskBoard,
+    loadTeamChat,
+    loadMyWork,
+    loadEchoWorkspaces,
+    loadBusinessInbox,
+    loadContentTool,
+    loadKeywordTool,
+    loadAuditTool,
+    loadQAChecker,
+    loadSettings,
+  ];
+
+  loaders.forEach((loader, index) => {
+    window.setTimeout(() => { loader().catch(() => {}); }, index * 120);
+  });
+};
+
+const KeywordTool = lazy(loadKeywordTool);
+const ContentTool = lazy(loadContentTool);
+const AuditTool = lazy(loadAuditTool);
+const QAChecker = lazy(loadQAChecker);
+const TaskBoard = lazy(loadTaskBoard);
+const MyWork = lazy(loadMyWork);
+const TeamChat = lazy(loadTeamChat);
+const BusinessInbox = lazy(loadBusinessInbox);
+const Settings = lazy(loadSettings);
+const EchoWorkspaces = lazy(loadEchoWorkspaces);
 
 const ViewFallback: React.FC = () => (
   <div className="flex h-full items-center justify-center">
@@ -225,6 +255,28 @@ const App: React.FC = () => {
       setPaletteClients(boards.map(b => ({ id: b.id, name: b.name })));
     }).catch(() => {});
     fetchProfiles().then(setPaletteProfiles).catch(() => {});
+  }, [isAuthenticated]);
+
+  // Warm the lazy-loaded feature chunks after the dashboard is usable. This keeps
+  // code-splitting benefits on login but removes the route-change buffering.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    let idleHandle: number | undefined;
+    const timer = window.setTimeout(() => {
+      if ('requestIdleCallback' in window) {
+        idleHandle = (window as any).requestIdleCallback(preloadViewChunks, { timeout: 2500 });
+      } else {
+        preloadViewChunks();
+      }
+    }, 900);
+
+    return () => {
+      window.clearTimeout(timer);
+      if (idleHandle !== undefined && 'cancelIdleCallback' in window) {
+        (window as any).cancelIdleCallback(idleHandle);
+      }
+    };
   }, [isAuthenticated]);
 
   // Sync sidebar collapsed state from localStorage (Sidebar writes it directly)

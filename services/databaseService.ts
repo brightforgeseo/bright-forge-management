@@ -2,6 +2,26 @@
 import { supabase, supabaseAdmin } from '../lib/supabaseClient';
 import { ClientBoard, ClientBoardSummary, ChatMessage, ChatChannel, Profile, AppNotification } from '../types';
 
+type TimedCache<T> = { value: T; expiresAt: number; inflight?: Promise<T> };
+
+const cloneCachedValue = <T,>(value: T): T => {
+  if (typeof structuredClone === 'function') return structuredClone(value);
+  return JSON.parse(JSON.stringify(value));
+};
+
+const isCacheFresh = <T,>(cache: TimedCache<T> | null) =>
+  !!cache && cache.expiresAt > Date.now();
+
+let profilesCache: TimedCache<Profile[]> | null = null;
+let boardSummariesCache: TimedCache<ClientBoardSummary[]> | null = null;
+let clientBoardsCache: TimedCache<ClientBoard[]> | null = null;
+let channelsCache: TimedCache<ChatChannel[]> | null = null;
+
+const invalidateBoardCaches = () => {
+  boardSummariesCache = null;
+  clientBoardsCache = null;
+};
+
 // --- Profile Management ---
 
 export const ensureProfileExists = async (userId: string, email?: string, fullName?: string) => {
@@ -243,13 +263,23 @@ export const notifyUsers = async (
 // --- Profiles ---
 
 export const fetchProfiles = async (): Promise<Profile[]> => {
-    // Get profiles from profiles table (only users who have logged in have profiles)
-    const { data: profiles } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('full_name', { ascending: true });
+    if (isCacheFresh(profilesCache)) return cloneCachedValue(profilesCache!.value);
+    if (profilesCache?.inflight) return cloneCachedValue(await profilesCache.inflight);
 
-    return (profiles as Profile[]) || [];
+    const inflight = (async () => {
+      // Get profiles from profiles table (only users who have logged in have profiles)
+      const { data: profiles } = await supabase
+          .from('profiles')
+          .select('*')
+          .order('full_name', { ascending: true });
+
+      const value = (profiles as Profile[]) || [];
+      profilesCache = { value, expiresAt: Date.now() + 60_000 };
+      return value;
+    })();
+
+    profilesCache = { value: [], expiresAt: 0, inflight };
+    return cloneCachedValue(await inflight);
 };
 
 export const updateUserProfile = async (fullName: string) => {
@@ -257,54 +287,65 @@ export const updateUserProfile = async (fullName: string) => {
   if (user) {
     await supabase.from('profiles').update({ full_name: fullName }).eq('id', user.id);
     await supabase.auth.updateUser({ data: { full_name: fullName } });
+    profilesCache = null;
   }
 };
 
 // --- Channels & DMs ---
 
 export const fetchChannels = async (): Promise<ChatChannel[]> => {
-  // Get the current user
-  const { data: { user } } = await supabase.auth.getUser();
+  if (isCacheFresh(channelsCache)) return cloneCachedValue(channelsCache!.value);
+  if (channelsCache?.inflight) return cloneCachedValue(await channelsCache.inflight);
 
-  if (!user) {
-    console.error('No authenticated user');
-    return [];
-  }
+  const inflight = (async () => {
+    // Get the current user
+    const { data: { user } } = await supabase.auth.getUser();
 
-  // Fetch all channels
-  const { data: allChannels, error: channelsError } = await supabase
-    .from('channels')
-    .select('*')
-    .order('created_at', { ascending: true });
-
-  if (channelsError) {
-    console.error('Error fetching channels:', channelsError);
-    return [];
-  }
-
-  // Fetch user's channel memberships
-  const { data: memberships, error: membershipsError } = await supabase
-    .from('channel_members')
-    .select('channel_id')
-    .eq('user_id', user.id);
-
-  if (membershipsError) {
-    console.error('Error fetching channel memberships:', membershipsError);
-    return allChannels?.filter(ch => !ch.is_private) || [];
-  }
-
-  // Get set of channel IDs user is a member of
-  const memberChannelIds = new Set(memberships?.map(m => m.channel_id) || []);
-
-  // Filter channels: show all public channels + private channels user is a member of
-  const filteredChannels = allChannels?.filter(channel => {
-    if (!channel.is_private) {
-      return true; // Show all public channels
+    if (!user) {
+      console.error('No authenticated user');
+      return [];
     }
-    return memberChannelIds.has(channel.id); // Only show private channels user is a member of
-  }) || [];
 
-  return filteredChannels as ChatChannel[];
+    // Fetch all channels
+    const { data: allChannels, error: channelsError } = await supabase
+      .from('channels')
+      .select('*')
+      .order('created_at', { ascending: true });
+
+    if (channelsError) {
+      console.error('Error fetching channels:', channelsError);
+      return [];
+    }
+
+    // Fetch user's channel memberships
+    const { data: memberships, error: membershipsError } = await supabase
+      .from('channel_members')
+      .select('channel_id')
+      .eq('user_id', user.id);
+
+    if (membershipsError) {
+      console.error('Error fetching channel memberships:', membershipsError);
+      return allChannels?.filter(ch => !ch.is_private) || [];
+    }
+
+    // Get set of channel IDs user is a member of
+    const memberChannelIds = new Set(memberships?.map(m => m.channel_id) || []);
+
+    // Filter channels: show all public channels + private channels user is a member of
+    const filteredChannels = allChannels?.filter(channel => {
+      if (!channel.is_private) {
+        return true; // Show all public channels
+      }
+      return memberChannelIds.has(channel.id); // Only show private channels user is a member of
+    }) || [];
+
+    const value = filteredChannels as ChatChannel[];
+    channelsCache = { value, expiresAt: Date.now() + 15_000 };
+    return value;
+  })();
+
+  channelsCache = { value: [], expiresAt: 0, inflight };
+  return cloneCachedValue(await inflight);
 };
 
 export const createChannel = async (
@@ -331,6 +372,8 @@ export const createChannel = async (
     console.error('Create channel error:', error);
     throw error;
   }
+
+  channelsCache = null;
 
   // If private channel with owner, add owner as member
   if (isPrivate && ownerId && data) {
@@ -379,6 +422,7 @@ export const getOrCreateDMChannel = async (user1Id: string, user2Id: string) => 
 export const deleteChannel = async (id: string) => {
   const { error } = await supabase.from('channels').delete().eq('id', id);
   if (error) throw error;
+  channelsCache = null;
 };
 
 // --- Client Boards ---
@@ -411,49 +455,69 @@ const parseBoardRows = (data: any[]): ClientBoard[] => {
 };
 
 export const fetchClientBoardSummaries = async (): Promise<ClientBoardSummary[]> => {
-  const { data, error } = await supabase
-    .from('client_boards')
-    .select('id, updated_at, board_id:board_data->>id, name:board_data->>name, initials:board_data->>initials, color:board_data->>color')
-    .not('archived', 'eq', true)
-    .order('created_at', { ascending: true });
+  if (isCacheFresh(boardSummariesCache)) return cloneCachedValue(boardSummariesCache!.value);
+  if (boardSummariesCache?.inflight) return cloneCachedValue(await boardSummariesCache.inflight);
 
-  if (error) {
-    console.error('Error fetching board summaries:', error);
-    return [];
-  }
+  const inflight = (async () => {
+    const { data, error } = await supabase
+      .from('client_boards')
+      .select('id, updated_at, board_id:board_data->>id, name:board_data->>name, initials:board_data->>initials, color:board_data->>color')
+      .not('archived', 'eq', true)
+      .order('created_at', { ascending: true });
 
-  const seen = new Set<string>();
-  const summaries: ClientBoardSummary[] = [];
-  for (const row of data || []) {
-    const id = row.board_id || row.id;
-    const name = row.name || 'Untitled Client';
-    if (!id || seen.has(id)) continue;
-    seen.add(id);
-    summaries.push({
-      id,
-      db_id: row.id,
-      name,
-      initials: row.initials || name.split(' ').map((word: string) => word[0]).join('').slice(0, 3).toUpperCase(),
-      color: row.color || '#3b82f6',
-      updated_at: row.updated_at
-    });
-  }
-  return summaries;
+    if (error) {
+      console.error('Error fetching board summaries:', error);
+      return [];
+    }
+
+    const seen = new Set<string>();
+    const summaries: ClientBoardSummary[] = [];
+    for (const row of data || []) {
+      const id = row.board_id || row.id;
+      const name = row.name || 'Untitled Client';
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      summaries.push({
+        id,
+        db_id: row.id,
+        name,
+        initials: row.initials || name.split(' ').map((word: string) => word[0]).join('').slice(0, 3).toUpperCase(),
+        color: row.color || '#3b82f6',
+        updated_at: row.updated_at
+      });
+    }
+
+    boardSummariesCache = { value: summaries, expiresAt: Date.now() + 60_000 };
+    return summaries;
+  })();
+
+  boardSummariesCache = { value: [], expiresAt: 0, inflight };
+  return cloneCachedValue(await inflight);
 };
 
 export const fetchClientBoards = async (): Promise<ClientBoard[]> => {
-  const { data, error } = await supabase
-    .from('client_boards')
-    .select('*')
-    .not('archived', 'eq', true)
-    .order('created_at', { ascending: true });
+  if (isCacheFresh(clientBoardsCache)) return cloneCachedValue(clientBoardsCache!.value);
+  if (clientBoardsCache?.inflight) return cloneCachedValue(await clientBoardsCache.inflight);
 
-  if (error) {
-    console.error('Error fetching boards:', error);
-    return [];
-  }
+  const inflight = (async () => {
+    const { data, error } = await supabase
+      .from('client_boards')
+      .select('*')
+      .not('archived', 'eq', true)
+      .order('created_at', { ascending: true });
 
-  return parseBoardRows(data);
+    if (error) {
+      console.error('Error fetching boards:', error);
+      return [];
+    }
+
+    const boards = parseBoardRows(data);
+    clientBoardsCache = { value: boards, expiresAt: Date.now() + 20_000 };
+    return boards;
+  })();
+
+  clientBoardsCache = { value: [], expiresAt: 0, inflight };
+  return cloneCachedValue(await inflight);
 };
 
 export const fetchClientBoardByDbId = async (dbId: string): Promise<ClientBoard | null> => {
@@ -492,6 +556,7 @@ export const archiveBoardById = async (dbId: string) => {
     .update({ archived: true, updated_at: new Date().toISOString() })
     .eq('id', dbId);
   if (error) console.error('Error archiving board:', error);
+  else invalidateBoardCaches();
 };
 
 export const restoreBoardById = async (dbId: string) => {
@@ -500,6 +565,7 @@ export const restoreBoardById = async (dbId: string) => {
     .update({ archived: false, updated_at: new Date().toISOString() })
     .eq('id', dbId);
   if (error) console.error('Error restoring board:', error);
+  else invalidateBoardCaches();
 };
 
 export const saveClientBoard = async (board: ClientBoard) => {
@@ -514,6 +580,7 @@ export const saveClientBoard = async (board: ClientBoard) => {
     if (updateError) {
       console.error('Error updating board:', updateError);
     } else {
+      invalidateBoardCaches();
       console.log('Board updated successfully:', board.id, board.name);
     }
   } else {
@@ -524,6 +591,7 @@ export const saveClientBoard = async (board: ClientBoard) => {
     if (insertError) {
       console.error('Error inserting board:', insertError);
     } else {
+      invalidateBoardCaches();
       console.log('Board inserted successfully:', board.id, board.name);
     }
   }
@@ -534,10 +602,12 @@ export const deleteClientBoard = async (boardId: string) => {
     .from('client_boards')
     .delete()
     .filter('board_data->>id', 'eq', boardId);
+  invalidateBoardCaches();
 };
 
 export const deleteBoardByDbId = async (dbId: string) => {
   await supabase.from('client_boards').delete().eq('id', dbId);
+  invalidateBoardCaches();
 };
 
 // --- Chat ---
@@ -1241,6 +1311,7 @@ export const addChannelMember = async (
     .single();
 
   if (error) throw error;
+  channelsCache = null;
   return data;
 };
 
@@ -1252,6 +1323,7 @@ export const removeChannelMember = async (channelId: string, userId: string) => 
     .eq('user_id', userId);
 
   if (error) throw error;
+  channelsCache = null;
 };
 
 export const fetchChannelMembers = async (channelId: string) => {
