@@ -21,22 +21,27 @@ const loadSettings = () => import('./components/Settings');
 const loadEchoWorkspaces = () => import('./components/EchoWorkspaces');
 
 const preloadViewChunks = () => {
-  const loaders = [
+  const priorityLoaders = [
     loadTaskBoard,
     loadTeamChat,
     loadMyWork,
     loadEchoWorkspaces,
     loadBusinessInbox,
     loadContentTool,
-    loadKeywordTool,
-    loadAuditTool,
-    loadQAChecker,
-    loadSettings,
   ];
 
-  loaders.forEach((loader, index) => {
+  priorityLoaders.forEach((loader, index) => {
     window.setTimeout(() => { loader().catch(() => {}); }, index * 120);
   });
+
+  // These routes are useful to warm, but they are not worth competing with the
+  // first post-login board/profile reads. KeywordTool is the heaviest chunk.
+  const deferredLoaders = [loadAuditTool, loadQAChecker, loadSettings, loadKeywordTool];
+  window.setTimeout(() => {
+    deferredLoaders.forEach((loader, index) => {
+      window.setTimeout(() => { loader().catch(() => {}); }, index * 250);
+    });
+  }, 12_000);
 };
 
 const KeywordTool = lazy(loadKeywordTool);
@@ -173,9 +178,11 @@ const App: React.FC = () => {
     const lastCheck = localStorage.getItem('lastDueDateCheck');
 
     if (lastCheck !== today) {
-      checkDueDateNotifications(uid)
+      window.setTimeout(() => {
+        checkDueDateNotifications(uid)
         .then(() => localStorage.setItem('lastDueDateCheck', today))
         .catch(err => console.error('Error checking due dates:', err));
+      }, 6_000);
     }
     }, 100); // 100ms debounce
   };

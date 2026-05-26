@@ -1161,12 +1161,8 @@ export const checkDueDateNotifications = async (currentUserId: string) => {
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
-  const { data: boards, error: boardsError } = await supabase
-    .from('client_boards')
-    .select('*');
-
-  if (boardsError || !boards) {
-    console.error('Error fetching boards for due date check:', boardsError);
+  const boards = await fetchClientBoards();
+  if (!boards.length) {
     return;
   }
 
@@ -1186,7 +1182,7 @@ export const checkDueDateNotifications = async (currentUserId: string) => {
   };
 
   for (const board of boards) {
-    const boardData = board.board_data as any;
+    const boardData = board as any;
     if (!boardData.groups) continue;
 
     // Build a map of status IDs to their label and color
