@@ -502,7 +502,7 @@ export const fetchClientBoards = async (): Promise<ClientBoard[]> => {
   const inflight = (async () => {
     const { data, error } = await supabase
       .from('client_boards')
-      .select('*')
+      .select('id, updated_at, board_data')
       .not('archived', 'eq', true)
       .order('created_at', { ascending: true });
 
@@ -523,7 +523,7 @@ export const fetchClientBoards = async (): Promise<ClientBoard[]> => {
 export const fetchClientBoardByDbId = async (dbId: string): Promise<ClientBoard | null> => {
   const { data, error } = await supabase
     .from('client_boards')
-    .select('*')
+    .select('id, updated_at, board_data')
     .eq('id', dbId)
     .maybeSingle();
 
@@ -538,7 +538,7 @@ export const fetchClientBoardByDbId = async (dbId: string): Promise<ClientBoard 
 export const fetchArchivedBoards = async (): Promise<ClientBoard[]> => {
   const { data, error } = await supabase
     .from('client_boards')
-    .select('*')
+    .select('id, updated_at, board_data')
     .eq('archived', true)
     .order('updated_at', { ascending: false });
 

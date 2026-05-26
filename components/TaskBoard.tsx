@@ -567,7 +567,9 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
     let pollTimer: number | null = null;
     let stopped = false;
     const schedulePoll = () => {
-      const delay = document.visibilityState === 'visible' ? 3000 : 15000;
+      // Realtime handles normal live updates. Polling is only a safety net for dropped sockets.
+      // Full board_data reads are expensive, so do not hammer Supabase every few seconds.
+      const delay = document.visibilityState === 'visible' ? 60000 : 300000;
       pollTimer = window.setTimeout(async () => {
         if (stopped) return;
         if (document.visibilityState === 'visible') {

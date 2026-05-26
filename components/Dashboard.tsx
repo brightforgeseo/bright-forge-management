@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
   AlertTriangle,
@@ -366,6 +366,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, setCurrentView }) =>
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | undefined>();
+  const lastDashboardRefreshRef = useRef(0);
 
   const loadDashboard = useCallback(async (isBackground = false) => {
     if (isBackground) setRefreshing(true);
@@ -376,7 +377,9 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, setCurrentView }) =>
       const [nextBoards, nextProfiles] = await Promise.all([fetchClientBoards(), fetchProfiles()]);
       setBoards(nextBoards);
       setProfiles(nextProfiles);
-      setLastUpdated(new Date());
+      const now = new Date();
+      setLastUpdated(now);
+      lastDashboardRefreshRef.current = now.getTime();
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Dashboard data failed to load';
       setError(message);
@@ -391,20 +394,31 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, setCurrentView }) =>
   }, [loadDashboard]);
 
   useEffect(() => {
+    let debounceTimer: number | null = null;
+    const queueDashboardRefresh = () => {
+      // Batch noisy board/profile events into one full board_data read.
+      if (debounceTimer !== null) window.clearTimeout(debounceTimer);
+      debounceTimer = window.setTimeout(() => loadDashboard(true), 5000);
+    };
+
     const channel = supabase
       .channel('dashboard-ops-cockpit')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'client_boards' }, () => loadDashboard(true))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => loadDashboard(true))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'client_boards' }, queueDashboardRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, queueDashboardRefresh)
       .subscribe();
 
-    const interval = window.setInterval(() => loadDashboard(true), 60000);
+    // Realtime is primary. Polling is only a safety refresh, not a 60-second board-data hoover.
+    const interval = window.setInterval(() => loadDashboard(true), 300000);
     const onVisible = () => {
-      if (document.visibilityState === 'visible') loadDashboard(true);
+      if (document.visibilityState === 'visible' && Date.now() - lastDashboardRefreshRef.current > 120000) {
+        loadDashboard(true);
+      }
     };
     document.addEventListener('visibilitychange', onVisible);
 
     return () => {
       supabase.removeChannel(channel);
+      if (debounceTimer !== null) window.clearTimeout(debounceTimer);
       window.clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisible);
     };
