@@ -1640,6 +1640,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     const savedReplyingTo = replyingToMessage;
     const targetChannelId = activeChannelId;
     const pendingKey = optimisticKey(userMsg.channelId, userMsg.senderId, userMsg.text);
+    let insertedUserMessageId = userMsg.id;
     setMessage('');
     setStagedAttachment(null);
     setMentionDropdown(null);
@@ -1660,6 +1661,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       if (savedReplyingTo) {
         console.log('[handleSendMessage] Sending as reply to:', savedReplyingTo.id);
         result = await sendReplyMessage(userMsg, savedReplyingTo.id);
+        insertedUserMessageId = result.id;
 
         // Update parent message's reply count in local state
         setMessages(prev => prev.map(m =>
@@ -1701,6 +1703,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
         }
       } else {
         result = await sendChatMessage(userMsg);
+        insertedUserMessageId = result.id;
         console.log('[handleSendMessage] Message sent successfully:', result);
 
         const insertedMsg = formatChatRow(result);
@@ -1821,7 +1824,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       // (no more silent lag). We'll edit it with the real reply when ready.
       let placeholderMsgId: string | null = null;
       try {
-        const placeholder = await sendChatMessage({
+        const placeholder = await sendReplyMessage({
           id: '',
           channelId: activeChannelId,
           sender: 'Echo AI',
@@ -1830,7 +1833,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
           timestamp: new Date().toISOString(),
           isAi: true,
           avatar: 'bot'
-        });
+        }, insertedUserMessageId);
         placeholderMsgId = placeholder?.id || null;
       } catch (e) {
         console.error('[Echo] placeholder failed:', e);
@@ -1899,8 +1902,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
           avatar: 'bot'
         };
 
-        const aiResult = await sendChatMessage(aiMsg);
-        // Manually add AI message to UI (same as user messages) since realtime may be unreliable
+        const aiResult = await sendReplyMessage(aiMsg, insertedUserMessageId);
+        // Manually surface the AI reply if realtime is slow, without turning it into a standalone message.
         const insertedAiMsg: ChatMessage = {
           id: aiResult.id,
           channelId: aiResult.channel_id,
@@ -1914,14 +1917,21 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
           attachmentType: aiResult.attachment_type,
           isEdited: aiResult.is_edited,
           editedAt: aiResult.edited_at,
-          taskLink: aiResult.task_link
+          taskLink: aiResult.task_link,
+          parentMessageId: aiResult.parent_message_id
         };
-        setMessages(prev => {
-          if (prev.some(m => m.id === insertedAiMsg.id)) {
-            return prev;
-          }
-          return [...prev, insertedAiMsg];
-        });
+        setMessages(prev => prev.map(m =>
+          m.id === insertedUserMessageId
+            ? { ...m, replyCount: Math.max(m.replyCount || 0, (m.replyCount || 0) + 1) }
+            : m
+        ));
+        if (expandedThreads.has(insertedUserMessageId)) {
+          setThreadReplies(prev => {
+            const existing = prev[insertedUserMessageId] || [];
+            if (existing.some(r => r.id === insertedAiMsg.id)) return prev;
+            return { ...prev, [insertedUserMessageId]: [...existing, insertedAiMsg] };
+          });
+        }
         scrollToBottom();
 
         // Store conversation for future memory

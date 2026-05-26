@@ -355,7 +355,7 @@ async function callEchoBridge(
   history: string,
   message: string,
   executingUser: { id: string; name: string },
-  model: string = 'echo'
+  model: string = 'sassin'
 ): Promise<string> {
   const res = await fetch(`${ECHO_BRIDGE_URL}/chat`, {
     method: 'POST',

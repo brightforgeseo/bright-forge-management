@@ -12,7 +12,7 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import { supabase } from '../lib/supabaseClient';
-import { sendChatMessage, fetchChannels, editChatMessage } from './databaseService';
+import { sendChatMessage, fetchChannels, editChatMessage, sendReplyMessage } from './databaseService';
 import { getChatResponse } from './geminiService';
 import { ChatChannel, User } from '../types';
 
@@ -230,7 +230,7 @@ export const startEchoListener = ({ user, channels, echoBotId, isEchoAIChannel }
       // We'll edit this same row with the real reply once the agent finishes.
       let placeholderId: string | null = null;
       try {
-        const placeholder = await sendChatMessage({
+        const placeholder = await sendReplyMessage({
           id: '',
           channelId: channel.id,
           sender: 'Echo AI',
@@ -239,7 +239,7 @@ export const startEchoListener = ({ user, channels, echoBotId, isEchoAIChannel }
           timestamp: new Date().toISOString(),
           isAi: true,
           avatar: 'bot'
-        });
+        }, raw.id);
         placeholderId = placeholder?.id || null;
       } catch (e) {
         console.error('[EchoListener] placeholder send failed:', e);
@@ -247,7 +247,8 @@ export const startEchoListener = ({ user, channels, echoBotId, isEchoAIChannel }
 
       let reply = '';
       try {
-        // Route through bridge (OpenClaw) → falls back to echoAgent → Gemini
+        // Route portal-channel Echo mentions through the local Sassin bridge path.
+        // Board/chat questions must not dogpile the full Hermes stack just because Ben said "Echo" in General.
         reply = await getChatResponse(formattedHistory, text, { id: user.id, name: user.name });
       } catch (e: any) {
         console.error('[EchoListener] agent failed:', e);
@@ -269,7 +270,7 @@ export const startEchoListener = ({ user, channels, echoBotId, isEchoAIChannel }
           await editChatMessage(placeholderId, trimmed);
         } catch (e) {
           console.error('[EchoListener] edit-placeholder failed, sending fresh message:', e);
-          await sendChatMessage({
+          await sendReplyMessage({
             id: '',
             channelId: channel.id,
             sender: 'Echo AI',
@@ -278,10 +279,10 @@ export const startEchoListener = ({ user, channels, echoBotId, isEchoAIChannel }
             timestamp: new Date().toISOString(),
             isAi: true,
             avatar: 'bot'
-          });
+          }, raw.id);
         }
       } else {
-        await sendChatMessage({
+        await sendReplyMessage({
           id: '',
           channelId: channel.id,
           sender: 'Echo AI',
@@ -290,7 +291,7 @@ export const startEchoListener = ({ user, channels, echoBotId, isEchoAIChannel }
           timestamp: new Date().toISOString(),
           isAi: true,
           avatar: 'bot'
-        });
+        }, raw.id);
       }
       console.log('[EchoListener] replied in', channel.name, isDM ? '(dm)' : '(channel)');
     } catch (e) {
