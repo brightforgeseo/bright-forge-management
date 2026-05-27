@@ -321,7 +321,7 @@ export const generateProjectTasks = async (goal: string): Promise<Task[]> => {
       model: 'gemini-2.5-flash',
       contents: `You are a project manager. Create a comprehensive task list for a new client group with the goal: "${goal}".
       Generate 4-8 specific, actionable tasks.
-      For each task, assign a status (mix of 'Not Started', 'Working on it', 'Stuck'), 
+      For each task, assign a status from the current workflow ('To Do', 'Working on it', 'Review', 'Needs Evidence', 'Send to client', 'Done'),
       a priority (High, Medium, Low), and a realistic due date (YYYY-MM-DD format within next 60 days).`,
       config: {
         responseMimeType: "application/json",
@@ -332,7 +332,7 @@ export const generateProjectTasks = async (goal: string): Promise<Task[]> => {
             properties: {
               id: { type: Type.STRING },
               title: { type: Type.STRING },
-              status: { type: Type.STRING, enum: ['Done', 'Working on it', 'Stuck', 'Not Started'] },
+              status: { type: Type.STRING, enum: ['To Do', 'Working on it', 'Review', 'Needs Evidence', 'Send to client', 'Done'] },
               priority: { type: Type.STRING, enum: ['High', 'Medium', 'Low'] },
               dueDate: { type: Type.STRING }
             },

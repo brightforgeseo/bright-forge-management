@@ -15,7 +15,7 @@ Successfully parsed **30 client boards** with **423 tasks** from your Monday.com
 
 - **All Task Details**:
   ✓ Task titles
-  ✓ Status (To Do, In Progress, Ben To Check, Sent To Client, etc.)
+  ✓ Status (To Do, Working on it, Review, Needs Evidence, Send to client, Done)
   ✓ Priority (Low, Medium, High, Critical)
   ✓ Due dates
   ✓ Person assignments (Ben Lowe, Janin Canonero, Dee Tan, etc.)

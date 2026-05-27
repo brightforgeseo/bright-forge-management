@@ -21,10 +21,12 @@ const LABEL_COLORS = [
 ];
 
 const DEFAULT_STATUS_DEFS: LabelDefinition[] = [
-  { id: 's1', label: 'Done', color: '#22c55e' },
-  { id: 's2', label: 'Working on it', color: '#eab308' },
-  { id: 's3', label: 'Stuck', color: '#ef4444' },
-  { id: 's4', label: 'Not Started', color: '#94a3b8' },
+  { id: 'status-1', label: 'To Do', color: '#C4C4C4' },
+  { id: 'status-2', label: 'Working on it', color: '#FDAB3D' },
+  { id: 'status-3', label: 'Review', color: '#A25DDC' },
+  { id: 'status-needs-evidence', label: 'Needs Evidence', color: '#579BFC' },
+  { id: 'status-6', label: 'Send to client', color: '#579BFC' },
+  { id: 'status-8', label: 'Done', color: '#00D084' },
 ];
 
 const DEFAULT_PRIORITY_DEFS: LabelDefinition[] = [

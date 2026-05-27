@@ -4,8 +4,8 @@
 
 **Latest Update:** The SQL has been regenerated with:
 1. ✅ **Proper JSON encoding** - Fixed syntax errors by using Python's native `json.dumps()`
-2. ✅ **Correct status mappings** - Added "Working on it", "QA", "Review" to statusDefs
-3. ✅ **Normalized status values** - All status variations (e.g., "Ben to check" vs "Ben To Check") are now standardized
+2. ✅ **Correct status mappings** - Uses the current six-status workflow in statusDefs
+3. ✅ **Normalized status values** - All status variations are mapped into the current workflow: To Do, Working on it, Review, Needs Evidence, Send to client, Done
 4. ✅ **All 2,872 comments preserved** - Comments will now appear in the UI after import
 
 ## Summary
@@ -79,7 +79,7 @@ If you want to replace ALL existing boards with the Monday.com data:
 ## What's Included in Each Board
 
 ✓ Task titles
-✓ Status (To Do, In Progress, Ben To Check, Sent To Client, etc.)
+✓ Status (To Do, Working on it, Review, Needs Evidence, Send to client, Done)
 ✓ Priority (Low, Medium, High, Critical)
 ✓ Due dates
 ✓ **Multiple person assignments** (mapped to Supabase users):

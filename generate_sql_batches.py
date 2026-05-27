@@ -89,10 +89,8 @@ for batch_num in range(total_batches):
                 {"id": "status-1", "label": "To Do", "color": "#C4C4C4"},
                 {"id": "status-2", "label": "Working on it", "color": "#FDAB3D"},
                 {"id": "status-3", "label": "Review", "color": "#A25DDC"},
-                {"id": "status-4", "label": "QA", "color": "#9CD326"},
-                {"id": "status-5", "label": "Ben To Check", "color": "#00C875"},
-                {"id": "status-6", "label": "Sent To Client", "color": "#579BFC"},
-                {"id": "status-7", "label": "Revisions Required", "color": "#E44258"},
+                {"id": "status-needs-evidence", "label": "Needs Evidence", "color": "#579BFC"},
+                {"id": "status-6", "label": "Send to client", "color": "#579BFC"},
                 {"id": "status-8", "label": "Done", "color": "#00D084"}
             ],
             "priorityDefs": [

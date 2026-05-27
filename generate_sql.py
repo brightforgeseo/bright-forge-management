@@ -51,14 +51,20 @@ def normalize_status(status):
 
     status = status.strip()
 
-    # Normalize common variations to standard labels
+    # Normalize common variations to the current six-status workflow.
     status_map = {
-        'ben to check': 'Ben To Check',
-        'bent to check': 'Ben To Check',
-        'sent to client': 'Sent To Client',
-        'send to client': 'Sent To Client',
-        'sent to check': 'Ben To Check',
-        'required revisions': 'Revisions Required',
+        'ben to check': 'Review',
+        'bent to check': 'Review',
+        'qa': 'Review',
+        'on review': 'Review',
+        'sent to check': 'Review',
+        'sent to client': 'Send to client',
+        'send to client': 'Send to client',
+        'required revisions': 'Working on it',
+        'revisions required': 'Working on it',
+        'stuck': 'Working on it',
+        'not started': 'To Do',
+        'pending': 'To Do',
         'live video': 'Working on it',
         'need video for training': 'Working on it'
     }
@@ -72,10 +78,8 @@ def normalize_status(status):
         'To Do': 'status-1',
         'Working on it': 'status-2',
         'Review': 'status-3',
-        'QA': 'status-4',
-        'Ben To Check': 'status-5',
-        'Sent To Client': 'status-6',
-        'Revisions Required': 'status-7',
+        'Needs Evidence': 'status-needs-evidence',
+        'Send to client': 'status-6',
         'Done': 'status-8'
     }
 
@@ -196,10 +200,8 @@ for board_idx, board in enumerate(all_boards, 1):
             {"id": "status-1", "label": "To Do", "color": "#C4C4C4"},
             {"id": "status-2", "label": "Working on it", "color": "#FDAB3D"},
             {"id": "status-3", "label": "Review", "color": "#A25DDC"},
-            {"id": "status-4", "label": "QA", "color": "#9CD326"},
-            {"id": "status-5", "label": "Ben To Check", "color": "#00C875"},
-            {"id": "status-6", "label": "Sent To Client", "color": "#579BFC"},
-            {"id": "status-7", "label": "Revisions Required", "color": "#E44258"},
+            {"id": "status-needs-evidence", "label": "Needs Evidence", "color": "#579BFC"},
+            {"id": "status-6", "label": "Send to client", "color": "#579BFC"},
             {"id": "status-8", "label": "Done", "color": "#00D084"}
         ],
         "priorityDefs": [
