@@ -429,7 +429,13 @@ const sortDrilldownTasks = (a: TaskWithContext, b: TaskWithContext): number => {
   return (a.task.dueDate || '9999-12-31').localeCompare(b.task.dueDate || '9999-12-31') || a.boardName.localeCompare(b.boardName);
 };
 
-const DrilldownPanel: React.FC<{ payload: DrilldownPayload; tasks: TaskWithContext[]; profiles: Profile[]; onClose: () => void }> = ({ payload, tasks, profiles, onClose }) => {
+const DrilldownPanel: React.FC<{
+  payload: DrilldownPayload;
+  tasks: TaskWithContext[];
+  profiles: Profile[];
+  onClose: () => void;
+  onOpenTask: (task: TaskWithContext) => void;
+}> = ({ payload, tasks, profiles, onClose, onOpenTask }) => {
   const profileMap = useMemo(() => new Map(profiles.map(profile => [profile.id, profile])), [profiles]);
   const affectedClients = new Set(tasks.map(task => task.boardId)).size;
   const overdueCount = tasks.filter(task => !!task.task.dueDate && task.task.dueDate < todayIso() && !task.isCompleted).length;
@@ -464,7 +470,13 @@ const DrilldownPanel: React.FC<{ payload: DrilldownPayload; tasks: TaskWithConte
           {tasks.slice(0, 150).map(task => {
             const dueTone: KpiTone = task.task.dueDate && task.task.dueDate < todayIso() ? 'red' : task.task.dueDate ? 'brand' : 'slate';
             return (
-              <div key={`${task.boardId}-${task.groupId}-${task.task.id}`} className="px-5 py-4 hover:bg-portal-surface2/70 transition-colors">
+              <button
+                key={`${task.boardId}-${task.groupId}-${task.task.id}`}
+                type="button"
+                onClick={() => onOpenTask(task)}
+                className="w-full px-5 py-4 text-left hover:bg-portal-surface2/70 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-inset"
+                title={`Open ${task.task.title}`}
+              >
                 <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2 mb-1.5">
@@ -482,7 +494,7 @@ const DrilldownPanel: React.FC<{ payload: DrilldownPayload; tasks: TaskWithConte
                     <ReasonChip tone={isBlockedTask(task) ? 'amber' : 'slate'}>{task.statusLabel}</ReasonChip>
                   </div>
                 </div>
-              </div>
+              </button>
             );
           })}
           {tasks.length > 150 ? <div className="px-5 py-3 text-xs text-portal-soft bg-portal-surface2/50">Showing first 150 of {tasks.length}. Tighten the signal if this is too noisy.</div> : null}
@@ -592,6 +604,25 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, setCurrentView }) =>
     window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
   };
 
+  const openExactTask = (task: TaskWithContext) => {
+    const linkData = {
+      taskId: task.task.id,
+      boardId: task.boardId,
+      groupId: task.groupId,
+    };
+
+    try {
+      localStorage.setItem('openTaskModal', JSON.stringify(linkData));
+    } catch (e) {
+      console.error('[Dashboard] Failed to store task deep link:', e);
+    }
+
+    setCurrentView(ToolView.TASKS);
+    window.requestAnimationFrame(() => {
+      window.dispatchEvent(new CustomEvent('openTaskModal', { detail: linkData }));
+    });
+  };
+
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center h-64">
@@ -643,7 +674,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, setCurrentView }) =>
       ) : null}
 
       {activeDrilldown ? (
-        <DrilldownPanel payload={activeDrilldown} tasks={drilldownTasks} profiles={profiles} onClose={() => setActiveDrilldown(null)} />
+        <DrilldownPanel payload={activeDrilldown} tasks={drilldownTasks} profiles={profiles} onClose={() => setActiveDrilldown(null)} onOpenTask={openExactTask} />
       ) : null}
 
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
