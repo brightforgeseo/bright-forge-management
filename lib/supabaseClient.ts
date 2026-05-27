@@ -1,26 +1,22 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Production is intentionally served from Ben's local PC via Tailscale Funnel.
-// Rollback target, hosted Supabase: https://mvkbmozwplhsduiiakql.supabase.co
-const LOCAL_SUPABASE_URL = 'https://echo-ai.tailfdbc33.ts.net:10000';
-const LOCAL_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+// Hosted Supabase remains the production fallback. Local development can override via .env.local.
+const PROJECT_ID = 'mvkbmozwplhsduiiakql';
+const HOSTED_SUPABASE_URL = `https://${PROJECT_ID}.supabase.co`;
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || HOSTED_SUPABASE_URL;
 
-const getSupabaseUrl = () => {
-  if (typeof window !== 'undefined' && window.location.protocol.startsWith('http')) {
-    return `${window.location.origin}/supabase`;
-  }
-  return LOCAL_SUPABASE_URL;
-};
+// Hosted anon key remains the production fallback. Local development can override via .env.local.
+const HOSTED_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im12a2Jtb3p3cGxoc2R1aWlha3FsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ3MjMxNjYsImV4cCI6MjA3MDI5OTE2Nn0.pHAgLhD7KM-1dSMdfIM25QQq-n6iAM8fXIguGC-_d9k';
+const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || HOSTED_SUPABASE_ANON_KEY;
 
-const SUPABASE_URL = getSupabaseUrl();
-const SUPABASE_ANON_KEY = LOCAL_SUPABASE_ANON_KEY;
+// Hosted service role key remains the production fallback. Local development can override via .env.local.
+const HOSTED_SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im12a2Jtb3p3cGxoc2R1aWlha3FsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NDcyMzE2NiwiZXhwIjoyMDcwMjk5MTY2fQ.tZrqZjGl_wspvHCOAXBT4-4m_EC8v3w7bdXWud4D5W4';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || HOSTED_SUPABASE_SERVICE_ROLE_KEY;
 
-// Browser code must not bundle a service-role key. Keep the admin export for legacy imports,
-// but bind it to the publishable/anon key so privileged operations still require server-side routes.
-const SUPABASE_SERVICE_ROLE_KEY = LOCAL_SUPABASE_ANON_KEY;
-
+// Create the client with explicit parameters to avoid any process.env ambiguity
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// Admin client for user management (only use for admin operations)
 export const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: {
     autoRefreshToken: false,
