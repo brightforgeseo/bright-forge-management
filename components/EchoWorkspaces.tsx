@@ -15,7 +15,7 @@ const MAX_WORKSPACES = 10;
 const MAX_CONTEXT_FILES = 20;
 const MAX_STAGED_FILES = 8;
 
-type WorkspaceModel = 'sassin' | 'hermes' | 'echo';
+type WorkspaceModel = 'sassin' | 'hermes';
 type WorkspaceTemplateId = 'blank' | 'client-strategy' | 'technical-seo' | 'content-planning' | 'rankings' | 'ai-readiness' | 'team-ops' | 'client-reply';
 type WorkspaceStatus = 'Idle' | 'Preparing context' | 'Reading workspace files' | 'Checking pinned client' | 'Writing answer';
 
@@ -27,14 +27,6 @@ const MODEL_CONFIG: Record<WorkspaceModel, { label: string; badge: string; badge
     dot: 'bg-purple-400',
     description: 'Fast portal and task context answers with no API cost',
     bestFor: 'Quick board checks, team ops, status questions',
-  },
-  echo: {
-    label: 'Little Echo',
-    badge: 'Local',
-    badgeClass: 'bg-amber-500/20 text-amber-300',
-    dot: 'bg-amber-400',
-    description: 'SEO copy, content planning, briefs and draft shaping',
-    bestFor: 'Content, AI Prompts, outlines, SEO recommendations',
   },
   hermes: {
     label: 'ChatGPT 5.5',
@@ -74,7 +66,7 @@ const WORKSPACE_TEMPLATES: Record<WorkspaceTemplateId, { label: string; descript
   'content-planning': {
     label: 'Content Planning',
     description: 'Topics, briefs, AI Prompts, clusters and article direction',
-    model: 'echo',
+    model: 'hermes',
     starter: 'Build a content plan with target keywords, article angles, internal links and AI Prompts.',
     operatingMode: 'Content planning workspace. Use Bright Forge terminology. The user-facing instruction field is AI Prompt, not brief.',
     outputHint: 'Return clusters, article titles, target keywords, AI Prompts and priority order.',
@@ -234,15 +226,20 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
       const saved = localStorage.getItem('echo-workspaces');
       if (saved) {
         const parsed = JSON.parse(saved) as Workspace[];
-        return parsed.map(w => ({
-          ...w,
-          templateId: w.templateId || 'blank',
-          savedOutputs: w.savedOutputs || [],
-          isThinking: false,
-          status: 'Idle',
-          input: w.input || '',
-          contextFiles: (w.contextFiles || []).map(safeStoredAttachment),
-        }));
+        return parsed.map(w => {
+          const savedModel = (w as any).model;
+          const model: WorkspaceModel = savedModel === 'hermes' || savedModel === 'sassin' ? savedModel : 'sassin';
+          return {
+            ...w,
+            model,
+            templateId: w.templateId || 'blank',
+            savedOutputs: w.savedOutputs || [],
+            isThinking: false,
+            status: 'Idle',
+            input: w.input || '',
+            contextFiles: (w.contextFiles || []).map(safeStoredAttachment),
+          };
+        });
       }
     } catch {}
     return [makeWorkspace('Workspace 1')];
@@ -358,7 +355,8 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
       addToast('warning', `Maximum ${MAX_WORKSPACES} active workspaces open at once`);
       return;
     }
-    const ws = makeWorkspace(undefined, templateId, client);
+    const base = makeWorkspace(undefined, templateId, client);
+    const ws = base.model === 'hermes' && !isOwner ? { ...base, model: 'sassin' as WorkspaceModel } : base;
     setWorkspaces(prev => [...prev, ws]);
     setActiveId(ws.id);
     setTemplatePickerOpen(false);
