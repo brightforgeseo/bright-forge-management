@@ -61,7 +61,7 @@ const ViewFallback: React.FC = () => (
   </div>
 );
 import { ToolView, BrandingConfig, User, ToastNotification, ToastType, Profile } from './types';
-import { supabase } from './lib/supabaseClient';
+import { supabase, normalizeSupabaseAssetUrl } from './lib/supabaseClient';
 import { addToAllowlist, updateUserProfile, checkDueDateNotifications, fetchClientBoardSummaries, fetchProfiles } from './services/databaseService';
 import { listenForPushClicks } from './lib/pushNotifications';
 import { Copy, X, UserPlus, Check, Mail, RefreshCw, AlertTriangle, MessageSquare } from 'lucide-react';
@@ -162,7 +162,7 @@ const App: React.FC = () => {
             .single();
 
         if (profile) {
-            if (profile.avatar_url) avatarUrl = profile.avatar_url;
+            if (profile.avatar_url) avatarUrl = normalizeSupabaseAssetUrl(profile.avatar_url) || profile.avatar_url;
             if (profile.full_name) name = profile.full_name;
         }
     } catch (e) {

@@ -1,5 +1,5 @@
 
-import { supabase, supabaseAdmin } from '../lib/supabaseClient';
+import { supabase, supabaseAdmin, normalizeSupabaseAssetUrl } from '../lib/supabaseClient';
 import { ClientBoard, ClientBoardSummary, ChatMessage, ChatChannel, Profile, AppNotification } from '../types';
 
 type TimedCache<T> = { value: T; expiresAt: number; inflight?: Promise<T> };
@@ -273,7 +273,10 @@ export const fetchProfiles = async (): Promise<Profile[]> => {
           .select('*')
           .order('full_name', { ascending: true });
 
-      const value = (profiles as Profile[]) || [];
+      const value = ((profiles as Profile[]) || []).map(profile => ({
+        ...profile,
+        avatar_url: normalizeSupabaseAssetUrl(profile.avatar_url) || profile.avatar_url
+      }));
       profilesCache = { value, expiresAt: Date.now() + 60_000 };
       return value;
     })();
@@ -649,8 +652,8 @@ export const fetchChatMessages = async (
     text: row.text,
     timestamp: row.created_at,
     isAi: row.is_ai,
-    avatar: row.avatar,
-    attachmentUrl: row.attachment_url,
+    avatar: normalizeSupabaseAssetUrl(row.avatar) || row.avatar,
+    attachmentUrl: normalizeSupabaseAssetUrl(row.attachment_url) || row.attachment_url,
     attachmentType: row.attachment_type,
     attachmentName: row.attachment_name,
     isEdited: row.is_edited,
@@ -794,8 +797,8 @@ export const fetchThreadReplies = async (parentMessageId: string): Promise<ChatM
     text: row.text,
     timestamp: row.created_at,
     isAi: row.is_ai,
-    avatar: row.avatar,
-    attachmentUrl: row.attachment_url,
+    avatar: normalizeSupabaseAssetUrl(row.avatar) || row.avatar,
+    attachmentUrl: normalizeSupabaseAssetUrl(row.attachment_url) || row.attachment_url,
     attachmentType: row.attachment_type,
     attachmentName: row.attachment_name,
     isEdited: row.is_edited,
@@ -932,8 +935,8 @@ export const fetchPinnedMessages = async (channelId: string): Promise<ChatMessag
     text: row.text,
     timestamp: row.created_at,
     isAi: row.is_ai,
-    avatar: row.avatar,
-    attachmentUrl: row.attachment_url,
+    avatar: normalizeSupabaseAssetUrl(row.avatar) || row.avatar,
+    attachmentUrl: normalizeSupabaseAssetUrl(row.attachment_url) || row.attachment_url,
     attachmentType: row.attachment_type,
     attachmentName: row.attachment_name,
     isEdited: row.is_edited,
@@ -1074,8 +1077,8 @@ export const searchChatMessages = async (
         text: row.text,
         timestamp: row.created_at,
         isAi: row.is_ai,
-        avatar: row.avatar,
-        attachmentUrl: row.attachment_url,
+        avatar: normalizeSupabaseAssetUrl(row.avatar) || row.avatar,
+        attachmentUrl: normalizeSupabaseAssetUrl(row.attachment_url) || row.attachment_url,
         attachmentType: row.attachment_type,
         attachmentName: row.attachment_name,
         isEdited: row.is_edited,
@@ -1106,7 +1109,7 @@ export const uploadFile = async (file: File, bucket: string = 'uploads'): Promis
     }
 
     const { data } = supabase.storage.from(bucket).getPublicUrl(fileName);
-    return data.publicUrl;
+    return normalizeSupabaseAssetUrl(data.publicUrl) || data.publicUrl;
   } catch (e) {
     console.error('[Upload] Unexpected error:', e);
     return null;
