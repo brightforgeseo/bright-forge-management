@@ -289,6 +289,8 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const selectedClientIdRef = useRef<string>('');
+  const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
+  const taskRowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
   const [teamProfiles, setTeamProfiles] = useState<Profile[]>([]);
   const [clientSearchQuery, setClientSearchQuery] = useState('');
   const [isClientSearchFocused, setIsClientSearchFocused] = useState(false);
@@ -364,8 +366,32 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
           }
 
           if (task && group) {
+            const targetGroupId = group.id;
+            setClients(prev => prev.map(client => client.id === board.id
+              ? {
+                  ...client,
+                  groups: client.groups.map(g => ({
+                    ...g,
+                    isCollapsed: g.id === targetGroupId ? false : g.isCollapsed
+                  }))
+                }
+              : client
+            ));
+            clientsRef.current = clientsRef.current.map(client => client.id === board.id
+              ? {
+                  ...client,
+                  groups: client.groups.map(g => ({
+                    ...g,
+                    isCollapsed: g.id === targetGroupId ? false : g.isCollapsed
+                  }))
+                }
+              : client
+            );
+            setHighlightedTaskId(task.id);
+
             requestAnimationFrame(() => {
               requestAnimationFrame(() => {
+                taskRowRefs.current[task!.id]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 setTaskModal({
                   task,
                   groupId: group!.id,
@@ -373,6 +399,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                   groupTitle: group!.title,
                   groupColor: group!.color
                 });
+                window.setTimeout(() => setHighlightedTaskId(current => current === task!.id ? null : current), 8000);
               });
             });
           } else {
@@ -1919,7 +1946,9 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                     return (
                                       <tr
                                         key={task.id}
-                                        className={`group hover:bg-portal-dark/80 transition-colors cursor-grab ${dragOverTaskId === task.id && draggedTask?.task.id !== task.id ? 'border-t-2 border-blue-400' : ''}`}
+                                        ref={(el) => { taskRowRefs.current[task.id] = el; }}
+                                        data-task-id={task.id}
+                                        className={`group hover:bg-portal-dark/80 transition-colors cursor-grab ${highlightedTaskId === task.id ? 'ring-2 ring-brand-500 bg-brand-500/10' : ''} ${dragOverTaskId === task.id && draggedTask?.task.id !== task.id ? 'border-t-2 border-blue-400' : ''}`}
                                         draggable
                                         onDragStart={(e) => { e.stopPropagation(); handleTaskDragStart(e, task, group.id); }}
                                         onDragEnd={() => { setDraggedTask(null); setDragOverGroupId(null); setDragOverTaskId(null); dragOverGroupRef.current = null; dragOverTaskRef.current = null; }}
