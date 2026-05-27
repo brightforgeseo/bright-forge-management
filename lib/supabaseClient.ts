@@ -5,7 +5,14 @@ import { createClient } from '@supabase/supabase-js';
 const LOCAL_SUPABASE_URL = 'https://echo-ai.tailfdbc33.ts.net:10000';
 const LOCAL_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
 
-const SUPABASE_URL = LOCAL_SUPABASE_URL;
+const getSupabaseUrl = () => {
+  if (typeof window !== 'undefined' && window.location.protocol.startsWith('http')) {
+    return `${window.location.origin}/supabase`;
+  }
+  return LOCAL_SUPABASE_URL;
+};
+
+const SUPABASE_URL = getSupabaseUrl();
 const SUPABASE_ANON_KEY = LOCAL_SUPABASE_ANON_KEY;
 
 // Browser code must not bundle a service-role key. Keep the admin export for legacy imports,

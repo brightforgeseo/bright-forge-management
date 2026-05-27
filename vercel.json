@@ -2,6 +2,7 @@
   "buildCommand": "rm -rf .parcel-cache && npm run build",
   "outputDirectory": "dist",
   "rewrites": [
+    { "source": "/supabase/:path*", "destination": "https://echo-ai.tailfdbc33.ts.net:10000/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
