@@ -16,6 +16,7 @@ import {
   Sparkles,
   Target,
   Users,
+  X,
   Zap,
 } from 'lucide-react';
 import { ToolView, User, ClientBoard, Profile } from '../types';
@@ -120,14 +121,40 @@ const ReasonChip: React.FC<{ children: React.ReactNode; tone?: KpiTone }> = ({ c
   return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${cls.bg} ${cls.text} border ${cls.border}`}>{children}</span>;
 };
 
-type DrilldownFilter = 'overdue' | 'blocked' | 'unassigned' | 'due-week' | 'stale' | 'no-due-date' | 'all';
+type DrilldownFilter = 'overdue' | 'blocked' | 'unassigned' | 'due-week' | 'stale' | 'no-due-date' | 'completed-week' | 'all';
 type DrilldownPayload = { boardId?: string; profileId?: string; groupId?: string; taskId?: string; pipelineKey?: string; filter?: DrilldownFilter; label?: string };
+
+const todayIso = (): string => new Date().toISOString().slice(0, 10);
+
+const addDaysIso = (days: number): string => {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+};
 
 const taskPayload = (item: TaskWithContext): DrilldownPayload => ({
   boardId: item.boardId,
-  filter: item.task.dueDate && item.task.dueDate < new Date().toISOString().slice(0, 10) ? 'overdue' : 'due-week',
+  groupId: item.groupId,
+  taskId: item.task.id,
+  filter: item.task.dueDate && item.task.dueDate < todayIso() ? 'overdue' : 'due-week',
   label: item.task.title,
 });
+
+const includesAny = (value: string, needles: string[]) => needles.some(needle => value.includes(needle));
+
+const pipelineKeyForTask = (task: TaskWithContext): string => {
+  const haystack = `${task.task.title} ${task.task.description || ''} ${task.groupTitle} ${task.statusLabel} ${task.priorityLabel}`.toLowerCase();
+  if (includesAny(haystack, ['content', 'article', 'blog', 'copy', 'brief', 'outline', 'writer', 'writing'])) return 'content';
+  if (includesAny(haystack, ['technical', 'dev', 'developer', 'fix', 'schema', 'speed', 'audit', 'crawl', 'index', 'redirect', 'bug'])) return 'technical';
+  if (includesAny(haystack, ['report', 'reporting', 'monthly', 'loom', 'summary'])) return 'reporting';
+  if (includesAny(haystack, ['backlink', 'link building', 'link insert', 'guest post', 'citation', 'outreach'])) return 'backlinks';
+  return 'operations';
+};
+
+const isBlockedTask = (task: TaskWithContext): boolean => {
+  const haystack = `${task.task.title} ${task.task.description || ''} ${task.groupTitle} ${task.statusLabel}`.toLowerCase();
+  return includesAny(haystack, ['blocked', 'stuck', 'waiting', 'hold', 'on hold', 'needs access', 'client to', 'awaiting']);
+};
 
 const CommandList: React.FC<{ items: CommandItem[]; onDrilldown: (payload: DrilldownPayload) => void }> = ({ items, onDrilldown }) => (
   <Panel title="Today's Command List" subtitle="The first clicks, not another spreadsheet" icon={<Target className="w-4 h-4" />} className="lg:col-span-12">
@@ -354,6 +381,117 @@ const AiBriefing: React.FC<{ briefing: string[] }> = ({ briefing }) => (
   </Panel>
 );
 
+const profileLabel = (profile?: Profile): string => profile?.full_name || profile?.email || 'Unassigned';
+
+const assigneeLabels = (task: TaskWithContext, profileMap: Map<string, Profile>): string => {
+  if (!task.assigneeIds.length) return 'Unassigned';
+  return task.assigneeIds.map(id => profileLabel(profileMap.get(id))).join(', ');
+};
+
+const taskMatchesDrilldown = (task: TaskWithContext, payload: DrilldownPayload, staleBoardIds: Set<string>): boolean => {
+  const today = todayIso();
+  const weekEnd = addDaysIso(7);
+  const weekStart = addDaysIso(-7);
+
+  if (payload.taskId && task.task.id !== payload.taskId) return false;
+  if (payload.boardId && task.boardId !== payload.boardId) return false;
+  if (payload.groupId && task.groupId !== payload.groupId) return false;
+  if (payload.profileId && !task.assigneeIds.includes(payload.profileId)) return false;
+  if (payload.pipelineKey && pipelineKeyForTask(task) !== payload.pipelineKey) return false;
+
+  switch (payload.filter || 'all') {
+    case 'overdue':
+      return !task.isCompleted && !!task.task.dueDate && task.task.dueDate < today;
+    case 'blocked':
+      return !task.isCompleted && isBlockedTask(task);
+    case 'unassigned':
+      return !task.isCompleted && task.assigneeIds.length === 0;
+    case 'due-week':
+      return !task.isCompleted && !!task.task.dueDate && task.task.dueDate >= today && task.task.dueDate <= weekEnd;
+    case 'stale':
+      return !task.isCompleted && staleBoardIds.has(task.boardId);
+    case 'no-due-date':
+      return !task.isCompleted && !task.task.dueDate;
+    case 'completed-week':
+      return task.isCompleted && !!task.task.dueDate && task.task.dueDate >= weekStart && task.task.dueDate <= today;
+    case 'all':
+    default:
+      return !task.isCompleted || !!payload.taskId;
+  }
+};
+
+const sortDrilldownTasks = (a: TaskWithContext, b: TaskWithContext): number => {
+  const today = todayIso();
+  const aOverdue = !!a.task.dueDate && a.task.dueDate < today;
+  const bOverdue = !!b.task.dueDate && b.task.dueDate < today;
+  if (aOverdue !== bOverdue) return aOverdue ? -1 : 1;
+  if (a.isHighPriority !== b.isHighPriority) return a.isHighPriority ? -1 : 1;
+  return (a.task.dueDate || '9999-12-31').localeCompare(b.task.dueDate || '9999-12-31') || a.boardName.localeCompare(b.boardName);
+};
+
+const DrilldownPanel: React.FC<{ payload: DrilldownPayload; tasks: TaskWithContext[]; profiles: Profile[]; onClose: () => void }> = ({ payload, tasks, profiles, onClose }) => {
+  const profileMap = useMemo(() => new Map(profiles.map(profile => [profile.id, profile])), [profiles]);
+  const affectedClients = new Set(tasks.map(task => task.boardId)).size;
+  const overdueCount = tasks.filter(task => !!task.task.dueDate && task.task.dueDate < todayIso() && !task.isCompleted).length;
+  const blockedCount = tasks.filter(isBlockedTask).length;
+
+  return (
+    <section className="bg-portal-surface rounded-2xl border border-brand-500/25 shadow-xl shadow-black/20 overflow-hidden">
+      <div className="px-5 py-4 border-b border-white/[0.07] flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="inline-flex items-center rounded-full bg-brand-500/10 text-brand-400 border border-brand-500/20 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide">Cockpit drilldown</span>
+            <span className="text-xs text-portal-soft">Standalone view, not a client board jump</span>
+          </div>
+          <h3 className="text-lg font-bold text-white truncate">{payload.label || 'Filtered tasks'}</h3>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <ReasonChip tone="brand">{tasks.length} task{tasks.length === 1 ? '' : 's'}</ReasonChip>
+          <ReasonChip tone="blue">{affectedClients} client{affectedClients === 1 ? '' : 's'}</ReasonChip>
+          <ReasonChip tone={overdueCount ? 'red' : 'green'}>{overdueCount} overdue</ReasonChip>
+          <ReasonChip tone={blockedCount ? 'amber' : 'green'}>{blockedCount} blocked</ReasonChip>
+          <button type="button" onClick={onClose} className="ml-1 inline-flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-portal-surface2 px-3 py-1.5 text-xs text-portal-soft hover:text-white hover:border-brand-500/30 transition-colors">
+            <X className="w-3.5 h-3.5" />
+            Close
+          </button>
+        </div>
+      </div>
+
+      {tasks.length === 0 ? (
+        <div className="px-5 py-10 text-center text-portal-soft text-sm">No matching tasks for this signal.</div>
+      ) : (
+        <div className="divide-y divide-white/[0.05] max-h-[620px] overflow-y-auto">
+          {tasks.slice(0, 150).map(task => {
+            const dueTone: KpiTone = task.task.dueDate && task.task.dueDate < todayIso() ? 'red' : task.task.dueDate ? 'brand' : 'slate';
+            return (
+              <div key={`${task.boardId}-${task.groupId}-${task.task.id}`} className="px-5 py-4 hover:bg-portal-surface2/70 transition-colors">
+                <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                      <span className="text-xs font-semibold text-brand-400">{task.boardName}</span>
+                      <span className="text-[10px] text-portal-soft">/</span>
+                      <span className="text-xs text-portal-soft">{task.groupTitle}</span>
+                    </div>
+                    <div className="text-sm font-semibold text-white leading-snug">{task.task.title}</div>
+                    {task.task.description ? <p className="text-xs text-portal-soft leading-relaxed mt-1 line-clamp-2">{task.task.description}</p> : null}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 xl:justify-end xl:min-w-[360px]">
+                    <ReasonChip tone="blue">{assigneeLabels(task, profileMap)}</ReasonChip>
+                    <ReasonChip tone={dueTone}>{task.task.dueDate || 'No due date'}</ReasonChip>
+                    <ReasonChip tone={task.isHighPriority ? 'red' : 'slate'}>{task.priorityLabel}</ReasonChip>
+                    <ReasonChip tone={isBlockedTask(task) ? 'amber' : 'slate'}>{task.statusLabel}</ReasonChip>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {tasks.length > 150 ? <div className="px-5 py-3 text-xs text-portal-soft bg-portal-surface2/50">Showing first 150 of {tasks.length}. Tighten the signal if this is too noisy.</div> : null}
+        </div>
+      )}
+    </section>
+  );
+};
+
 const DueSoonPanel: React.FC<{ metrics: DashboardMetrics; onDrilldown: (payload: DrilldownPayload) => void }> = ({ metrics, onDrilldown }) => (
   <Panel title="Due This Week" subtitle={`${metrics.dueThisWeekTasks.length} open tasks due in the next 7 days`} icon={<Clock3 className="w-4 h-4" />} className="lg:col-span-6">
     {metrics.dueThisWeekTasks.length === 0 ? (
@@ -381,6 +519,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, setCurrentView }) =>
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | undefined>();
+  const [activeDrilldown, setActiveDrilldown] = useState<DrilldownPayload | null>(null);
   const lastDashboardRefreshRef = useRef(0);
 
   const loadDashboard = useCallback(async (isBackground = false) => {
@@ -440,10 +579,17 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, setCurrentView }) =>
   }, [loadDashboard]);
 
   const metrics = useMemo(() => buildDashboardMetrics(boards, profiles), [boards, profiles]);
+  const staleBoardIds = useMemo(() => new Set(metrics.staleClients.map(client => client.board.id)), [metrics.staleClients]);
+  const drilldownTasks = useMemo(() => {
+    if (!activeDrilldown) return [];
+    return metrics.allTasks
+      .filter(task => taskMatchesDrilldown(task, activeDrilldown, staleBoardIds))
+      .sort(sortDrilldownTasks);
+  }, [activeDrilldown, metrics.allTasks, staleBoardIds]);
+
   const openTasksView = (payload: DrilldownPayload = { filter: 'all' }) => {
-    localStorage.setItem('dashboardTaskDrilldown', JSON.stringify(payload));
-    window.dispatchEvent(new CustomEvent('dashboardTaskDrilldown'));
-    setCurrentView(ToolView.TASKS);
+    setActiveDrilldown(payload);
+    window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
   };
 
   if (loading) {
@@ -496,13 +642,17 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, setCurrentView }) =>
         </div>
       ) : null}
 
+      {activeDrilldown ? (
+        <DrilldownPanel payload={activeDrilldown} tasks={drilldownTasks} profiles={profiles} onClose={() => setActiveDrilldown(null)} />
+      ) : null}
+
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-        <KpiCard label="Active Clients" value={metrics.boards.length} detail="Live client boards" tone="brand" icon={<Users className="w-5 h-5" />} onClick={() => openTasksView({ boardId: metrics.clientRisks[0]?.board.id, filter: 'all', label: 'Active clients' })} />
-        <KpiCard label="Open Tasks" value={metrics.openTasks.length} detail="Excludes Done groups and done statuses" tone="blue" icon={<ListChecks className="w-5 h-5" />} onClick={() => openTasksView({ boardId: metrics.clientRisks.find(r => r.openCount > 0)?.board.id, filter: 'all', label: 'Open tasks' })} />
-        <KpiCard label="Overdue" value={metrics.overdueTasks.length} detail={`${metrics.clientRisks.filter(r => r.overdueCount > 0).length} affected clients`} tone={metricTone(metrics.overdueTasks.length, 25, 100)} icon={<Flame className="w-5 h-5" />} onClick={() => openTasksView({ boardId: metrics.clientRisks.find(r => r.overdueCount > 0)?.board.id, filter: 'overdue', label: 'Overdue tasks' })} />
-        <KpiCard label="Due This Week" value={metrics.dueThisWeekTasks.length} detail={`${metrics.dueTodayTasks.length} due today`} tone="brand" icon={<Clock3 className="w-5 h-5" />} onClick={() => openTasksView({ boardId: metrics.dueThisWeekTasks[0]?.boardId, filter: 'due-week', label: 'Due this week' })} />
-        <KpiCard label="Blocked" value={metrics.blockedTasks.length} detail="Waiting, stuck or blocked language" tone={metricTone(metrics.blockedTasks.length, 10, 30)} icon={<AlertTriangle className="w-5 h-5" />} onClick={() => openTasksView({ boardId: metrics.blockedTasks[0]?.boardId, filter: 'blocked', label: 'Blocked tasks' })} />
-        <KpiCard label="Completed" value={metrics.completedThisWeekTasks.length} detail="Completed this week" tone="green" icon={<CheckCircle2 className="w-5 h-5" />} onClick={() => openTasksView({ boardId: metrics.completedThisWeekTasks[0]?.boardId, groupId: metrics.completedThisWeekTasks[0]?.groupId, taskId: metrics.completedThisWeekTasks[0]?.task.id, filter: 'all', label: 'Completed this week' })} />
+        <KpiCard label="Active Clients" value={metrics.boards.length} detail="Live client boards" tone="brand" icon={<Users className="w-5 h-5" />} onClick={() => openTasksView({ filter: 'all', label: 'Active clients' })} />
+        <KpiCard label="Open Tasks" value={metrics.openTasks.length} detail="Excludes Done groups and done statuses" tone="blue" icon={<ListChecks className="w-5 h-5" />} onClick={() => openTasksView({ filter: 'all', label: 'Open tasks' })} />
+        <KpiCard label="Overdue" value={metrics.overdueTasks.length} detail={`${metrics.clientRisks.filter(r => r.overdueCount > 0).length} affected clients`} tone={metricTone(metrics.overdueTasks.length, 25, 100)} icon={<Flame className="w-5 h-5" />} onClick={() => openTasksView({ filter: 'overdue', label: 'Overdue tasks' })} />
+        <KpiCard label="Due This Week" value={metrics.dueThisWeekTasks.length} detail={`${metrics.dueTodayTasks.length} due today`} tone="brand" icon={<Clock3 className="w-5 h-5" />} onClick={() => openTasksView({ filter: 'due-week', label: 'Due this week' })} />
+        <KpiCard label="Blocked" value={metrics.blockedTasks.length} detail="Waiting, stuck or blocked language" tone={metricTone(metrics.blockedTasks.length, 10, 30)} icon={<AlertTriangle className="w-5 h-5" />} onClick={() => openTasksView({ filter: 'blocked', label: 'Blocked tasks' })} />
+        <KpiCard label="Completed" value={metrics.completedThisWeekTasks.length} detail="Completed this week" tone="green" icon={<CheckCircle2 className="w-5 h-5" />} onClick={() => openTasksView({ filter: 'completed-week', label: 'Completed this week' })} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
