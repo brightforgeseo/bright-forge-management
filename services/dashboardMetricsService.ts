@@ -60,6 +60,7 @@ export type PipelineMetric = {
   blocked: number;
   dueThisWeek: number;
   completedThisWeek: number;
+  sampleBoardId?: string;
 };
 
 export type FeedItem = {
@@ -68,6 +69,10 @@ export type FeedItem = {
   title: string;
   detail: string;
   tone: 'red' | 'amber' | 'green' | 'blue' | 'slate';
+  boardId?: string;
+  groupId?: string;
+  taskId?: string;
+  filter?: 'overdue' | 'blocked' | 'unassigned' | 'due-week' | 'stale' | 'all';
 };
 
 export type HygieneIssue = {
@@ -276,6 +281,7 @@ export const buildDashboardMetrics = (boards: ClientBoard[], profiles: Profile[]
       blocked: open.filter(isBlockedTask).length,
       dueThisWeek: open.filter(t => !!t.task.dueDate && t.task.dueDate >= today && t.task.dueDate <= weekEnd).length,
       completedThisWeek: completedThisWeekTasks.filter(t => pipelineForTask(t) === key).length,
+      sampleBoardId: open[0]?.boardId,
     };
   }).sort((a, b) => b.overdue - a.overdue || b.open - a.open);
 
@@ -317,6 +323,8 @@ export const buildDashboardMetrics = (boards: ClientBoard[], profiles: Profile[]
       title: `${risk.board.name} is ${risk.level.toLowerCase()} risk`,
       detail: risk.reasons.slice(0, 3).join(' · '),
       tone: risk.level === 'Critical' ? 'red' as const : 'amber' as const,
+      boardId: risk.board.id,
+      filter: risk.overdueCount ? 'overdue' as const : risk.blockedCount ? 'blocked' as const : 'all' as const,
     })),
     ...blockedTasks.slice(0, 4).map(task => ({
       id: `blocked-${task.task.id}`,
@@ -324,6 +332,10 @@ export const buildDashboardMetrics = (boards: ClientBoard[], profiles: Profile[]
       title: `Blocked: ${task.task.title}`,
       detail: task.boardName,
       tone: 'amber' as const,
+      boardId: task.boardId,
+      groupId: task.groupId,
+      taskId: task.task.id,
+      filter: 'blocked' as const,
     })),
     ...dueTodayTasks.slice(0, 4).map(task => ({
       id: `due-${task.task.id}`,
@@ -331,6 +343,10 @@ export const buildDashboardMetrics = (boards: ClientBoard[], profiles: Profile[]
       title: `Due today: ${task.task.title}`,
       detail: task.boardName,
       tone: 'blue' as const,
+      boardId: task.boardId,
+      groupId: task.groupId,
+      taskId: task.task.id,
+      filter: 'due-week' as const,
     })),
     ...completedThisWeekTasks.slice(0, 3).map(task => ({
       id: `done-${task.task.id}`,
@@ -338,6 +354,10 @@ export const buildDashboardMetrics = (boards: ClientBoard[], profiles: Profile[]
       title: `Completed: ${task.task.title}`,
       detail: task.boardName,
       tone: 'green' as const,
+      boardId: task.boardId,
+      groupId: task.groupId,
+      taskId: task.task.id,
+      filter: 'all' as const,
     })),
   ].slice(0, 12);
 

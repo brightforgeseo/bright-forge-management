@@ -120,8 +120,8 @@ const ReasonChip: React.FC<{ children: React.ReactNode; tone?: KpiTone }> = ({ c
   return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${cls.bg} ${cls.text} border ${cls.border}`}>{children}</span>;
 };
 
-type DrilldownFilter = 'overdue' | 'blocked' | 'unassigned' | 'due-week' | 'stale' | 'all';
-type DrilldownPayload = { boardId?: string; profileId?: string; filter?: DrilldownFilter; label?: string };
+type DrilldownFilter = 'overdue' | 'blocked' | 'unassigned' | 'due-week' | 'stale' | 'no-due-date' | 'all';
+type DrilldownPayload = { boardId?: string; profileId?: string; groupId?: string; taskId?: string; pipelineKey?: string; filter?: DrilldownFilter; label?: string };
 
 const taskPayload = (item: TaskWithContext): DrilldownPayload => ({
   boardId: item.boardId,
@@ -191,7 +191,7 @@ const RiskQueue: React.FC<{ risks: ClientRisk[]; onDrilldown: (payload: Drilldow
   </Panel>
 );
 
-const PipelineHealth: React.FC<{ pipelines: PipelineMetric[] }> = ({ pipelines }) => (
+const PipelineHealth: React.FC<{ pipelines: PipelineMetric[]; onDrilldown: (payload: DrilldownPayload) => void }> = ({ pipelines, onDrilldown }) => (
   <Panel title="Pipeline Health" subtitle="Content, technical, reporting and links" icon={<Activity className="w-4 h-4" />} className="lg:col-span-4">
     <div className="p-5 space-y-3">
       {pipelines.map(pipeline => {
@@ -199,7 +199,12 @@ const PipelineHealth: React.FC<{ pipelines: PipelineMetric[] }> = ({ pipelines }
         const overduePct = Math.min(100, Math.round((pipeline.overdue / total) * 100));
         const tone = pipeline.overdue > 20 ? 'red' : pipeline.overdue > 5 ? 'amber' : 'green';
         return (
-          <div key={pipeline.key} className="bg-portal-surface2/60 rounded-xl p-3 border border-white/[0.05]">
+          <button
+            key={pipeline.key}
+            type="button"
+            onClick={() => onDrilldown({ boardId: pipeline.sampleBoardId, pipelineKey: pipeline.key, filter: pipeline.overdue ? 'overdue' : 'all', label: pipeline.label })}
+            className="w-full text-left bg-portal-surface2/60 rounded-xl p-3 border border-white/[0.05] hover:border-brand-500/30 hover:bg-portal-surface2 transition-all"
+          >
             <div className="flex items-center justify-between gap-3 mb-2">
               <span className="text-sm font-semibold text-white">{pipeline.label}</span>
               <span className={`text-xs font-bold ${toneClasses[tone].text}`}>{pipeline.overdue} overdue</span>
@@ -213,27 +218,32 @@ const PipelineHealth: React.FC<{ pipelines: PipelineMetric[] }> = ({ pipelines }
               <span><strong className="text-white">{pipeline.dueThisWeek}</strong> due</span>
               <span><strong className="text-white">{pipeline.completedThisWeek}</strong> done</span>
             </div>
-          </div>
+          </button>
         );
       })}
     </div>
   </Panel>
 );
 
-const AgencyFeed: React.FC<{ items: FeedItem[] }> = ({ items }) => (
+const AgencyFeed: React.FC<{ items: FeedItem[]; onDrilldown: (payload: DrilldownPayload) => void }> = ({ items, onDrilldown }) => (
   <Panel title="Agency Feed" subtitle="Latest operational signals" icon={<Zap className="w-4 h-4" />} className="lg:col-span-3">
     {items.length === 0 ? (
       <div className="px-5 py-10 text-center text-portal-soft text-sm">Quiet. Too quiet.</div>
     ) : (
       <div className="divide-y divide-white/[0.05] max-h-[520px] overflow-y-auto">
         {items.map(item => (
-          <div key={item.id} className="px-5 py-3 flex gap-3">
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => onDrilldown({ boardId: item.boardId, groupId: item.groupId, taskId: item.taskId, filter: item.filter || 'all', label: item.title })}
+            className="w-full text-left px-5 py-3 flex gap-3 hover:bg-portal-surface2 transition-colors"
+          >
             <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${toneClasses[item.tone].dot}`} />
             <div className="min-w-0">
               <div className="text-sm text-white font-medium leading-snug">{item.title}</div>
               <div className="text-xs text-portal-soft mt-1 leading-snug">{item.detail}</div>
             </div>
-          </div>
+          </button>
         ))}
       </div>
     )}
@@ -303,7 +313,7 @@ const StaleClientsPanel: React.FC<{ clients: ClientRisk[]; onDrilldown: (payload
   </Panel>
 );
 
-const HygienePanel: React.FC<{ issues: HygieneIssue[] }> = ({ issues }) => (
+const HygienePanel: React.FC<{ issues: HygieneIssue[]; onDrilldown: (payload: DrilldownPayload) => void }> = ({ issues, onDrilldown }) => (
   <Panel title="Data Hygiene" subtitle="Messy data that makes planning harder" icon={<Database className="w-4 h-4" />} className="lg:col-span-3">
     {issues.length === 0 ? (
       <div className="px-5 py-10 text-center text-portal-soft text-sm">No obvious hygiene issues found.</div>
@@ -312,13 +322,18 @@ const HygienePanel: React.FC<{ issues: HygieneIssue[] }> = ({ issues }) => (
         {issues.map(issue => {
           const tone = issue.severity === 'red' ? 'red' : issue.severity === 'amber' ? 'amber' : 'blue';
           return (
-            <div key={issue.id} className={`rounded-xl p-3 border ${toneClasses[tone].border} ${toneClasses[tone].bg}`}>
+            <button
+              key={issue.id}
+              type="button"
+              onClick={() => onDrilldown({ filter: issue.id === 'unassigned' ? 'unassigned' : issue.id === 'blocked' ? 'blocked' : issue.id === 'no-due-date' ? 'no-due-date' : 'all', label: issue.label })}
+              className={`w-full text-left rounded-xl p-3 border ${toneClasses[tone].border} ${toneClasses[tone].bg} hover:bg-portal-surface2 transition-colors`}
+            >
               <div className="flex items-center justify-between gap-3">
                 <span className="text-sm font-semibold text-white">{issue.label}</span>
                 <span className={`text-lg font-bold tabular-nums ${toneClasses[tone].text}`}>{issue.count}</span>
               </div>
               <p className="text-xs text-portal-soft mt-1">{issue.detail}</p>
-            </div>
+            </button>
           );
         })}
       </div>
@@ -407,8 +422,8 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, setCurrentView }) =>
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, queueDashboardRefresh)
       .subscribe();
 
-    // Realtime is primary. Polling is only a safety refresh, not a 60-second board-data hoover.
-    const interval = window.setInterval(() => loadDashboard(true), 300000);
+    // Realtime is primary. A one-minute safety refresh keeps the cockpit breathing if the socket drops.
+    const interval = window.setInterval(() => loadDashboard(true), 60000);
     const onVisible = () => {
       if (document.visibilityState === 'visible' && Date.now() - lastDashboardRefreshRef.current > 120000) {
         loadDashboard(true);
@@ -482,12 +497,12 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, setCurrentView }) =>
       ) : null}
 
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-        <KpiCard label="Active Clients" value={metrics.boards.length} detail="Live client boards" tone="brand" icon={<Users className="w-5 h-5" />} onClick={() => openTasksView({ filter: 'all' })} />
-        <KpiCard label="Open Tasks" value={metrics.openTasks.length} detail="Excludes Done groups and done statuses" tone="blue" icon={<ListChecks className="w-5 h-5" />} onClick={() => openTasksView({ filter: 'all' })} />
-        <KpiCard label="Overdue" value={metrics.overdueTasks.length} detail={`${metrics.clientRisks.filter(r => r.overdueCount > 0).length} affected clients`} tone={metricTone(metrics.overdueTasks.length, 25, 100)} icon={<Flame className="w-5 h-5" />} onClick={() => openTasksView({ filter: 'overdue' })} />
-        <KpiCard label="Due This Week" value={metrics.dueThisWeekTasks.length} detail={`${metrics.dueTodayTasks.length} due today`} tone="brand" icon={<Clock3 className="w-5 h-5" />} onClick={() => openTasksView({ filter: 'due-week' })} />
-        <KpiCard label="Blocked" value={metrics.blockedTasks.length} detail="Waiting, stuck or blocked language" tone={metricTone(metrics.blockedTasks.length, 10, 30)} icon={<AlertTriangle className="w-5 h-5" />} onClick={() => openTasksView({ filter: 'blocked' })} />
-        <KpiCard label="Completed" value={metrics.completedThisWeekTasks.length} detail="Completed this week" tone="green" icon={<CheckCircle2 className="w-5 h-5" />} onClick={() => openTasksView({ filter: 'all' })} />
+        <KpiCard label="Active Clients" value={metrics.boards.length} detail="Live client boards" tone="brand" icon={<Users className="w-5 h-5" />} onClick={() => openTasksView({ boardId: metrics.clientRisks[0]?.board.id, filter: 'all', label: 'Active clients' })} />
+        <KpiCard label="Open Tasks" value={metrics.openTasks.length} detail="Excludes Done groups and done statuses" tone="blue" icon={<ListChecks className="w-5 h-5" />} onClick={() => openTasksView({ boardId: metrics.clientRisks.find(r => r.openCount > 0)?.board.id, filter: 'all', label: 'Open tasks' })} />
+        <KpiCard label="Overdue" value={metrics.overdueTasks.length} detail={`${metrics.clientRisks.filter(r => r.overdueCount > 0).length} affected clients`} tone={metricTone(metrics.overdueTasks.length, 25, 100)} icon={<Flame className="w-5 h-5" />} onClick={() => openTasksView({ boardId: metrics.clientRisks.find(r => r.overdueCount > 0)?.board.id, filter: 'overdue', label: 'Overdue tasks' })} />
+        <KpiCard label="Due This Week" value={metrics.dueThisWeekTasks.length} detail={`${metrics.dueTodayTasks.length} due today`} tone="brand" icon={<Clock3 className="w-5 h-5" />} onClick={() => openTasksView({ boardId: metrics.dueThisWeekTasks[0]?.boardId, filter: 'due-week', label: 'Due this week' })} />
+        <KpiCard label="Blocked" value={metrics.blockedTasks.length} detail="Waiting, stuck or blocked language" tone={metricTone(metrics.blockedTasks.length, 10, 30)} icon={<AlertTriangle className="w-5 h-5" />} onClick={() => openTasksView({ boardId: metrics.blockedTasks[0]?.boardId, filter: 'blocked', label: 'Blocked tasks' })} />
+        <KpiCard label="Completed" value={metrics.completedThisWeekTasks.length} detail="Completed this week" tone="green" icon={<CheckCircle2 className="w-5 h-5" />} onClick={() => openTasksView({ boardId: metrics.completedThisWeekTasks[0]?.boardId, groupId: metrics.completedThisWeekTasks[0]?.groupId, taskId: metrics.completedThisWeekTasks[0]?.task.id, filter: 'all', label: 'Completed this week' })} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -496,8 +511,8 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, setCurrentView }) =>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <RiskQueue risks={metrics.clientRisks.filter(r => r.overdueCount > 0 || r.level !== 'Watch').slice(0, 20)} onDrilldown={openTasksView} />
-        <PipelineHealth pipelines={metrics.pipelineMetrics} />
-        <AgencyFeed items={metrics.feedItems} />
+        <PipelineHealth pipelines={metrics.pipelineMetrics} onDrilldown={openTasksView} />
+        <AgencyFeed items={metrics.feedItems} onDrilldown={openTasksView} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -508,7 +523,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, setCurrentView }) =>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <DueSoonPanel metrics={metrics} onDrilldown={openTasksView} />
-        <HygienePanel issues={metrics.hygieneIssues} />
+        <HygienePanel issues={metrics.hygieneIssues} onDrilldown={openTasksView} />
         <Panel title="Control Notes" subtitle="How to use this cockpit" icon={<Target className="w-4 h-4" />} className="lg:col-span-6">
           <div className="p-5 grid sm:grid-cols-2 gap-3">
             <div className="rounded-xl bg-portal-surface2/60 border border-white/[0.05] p-4">

@@ -6,11 +6,81 @@ import { Task, TaskGroup, User, ClientBoard, ToastType, LabelDefinition, Profile
 import { generateProjectTasks } from '../services/geminiService';
 import { fetchClientBoards, fetchArchivedBoards, archiveBoardById, restoreBoardById, deleteBoardByDbId, saveClientBoard, deleteClientBoard, uploadFile, fetchProfiles, createNotification, fetchChannels, sendChatMessage, logActivity, parseClientBoardRow } from '../services/databaseService';
 import { supabase } from '../lib/supabaseClient';
+import { getPriorityLabel, getStatusLabel, isHighPriority, isTaskCompleted, taskAssignees } from '../utils/taskCompletion';
 
 interface TaskBoardProps {
   currentUser: User;
   addToast: (type: ToastType, message: string) => void;
 }
+
+type DashboardDrilldownFilter = 'overdue' | 'blocked' | 'unassigned' | 'due-week' | 'stale' | 'no-due-date' | 'all';
+type DashboardDrilldown = {
+  boardId?: string;
+  profileId?: string;
+  groupId?: string;
+  taskId?: string;
+  pipelineKey?: string;
+  filter?: DashboardDrilldownFilter;
+  label?: string;
+};
+
+const dashboardFilterLabels: Record<DashboardDrilldownFilter, string> = {
+  overdue: 'Overdue',
+  blocked: 'Blocked',
+  unassigned: 'Unassigned',
+  'due-week': 'Due this week',
+  stale: 'Stale',
+  'no-due-date': 'No due date',
+  all: 'All open tasks',
+};
+
+const todayIso = () => new Date().toISOString().slice(0, 10);
+const addDaysIso = (days: number): string => {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+};
+
+const includesAny = (value: string, needles: string[]) => needles.some(needle => value.includes(needle));
+const pipelineKeyForTask = (board: ClientBoard, group: TaskGroup, task: Task): string => {
+  const statusLabel = getStatusLabel(task.status, board.statusDefs || []);
+  const priorityLabel = getPriorityLabel(task.priority, board.priorityDefs || []);
+  const haystack = `${task.title} ${task.description || ''} ${group.title} ${statusLabel} ${priorityLabel}`.toLowerCase();
+  if (includesAny(haystack, ['content', 'article', 'blog', 'copy', 'brief', 'outline', 'writer', 'writing'])) return 'content';
+  if (includesAny(haystack, ['technical', 'dev', 'developer', 'fix', 'schema', 'speed', 'audit', 'crawl', 'index', 'redirect', 'bug'])) return 'technical';
+  if (includesAny(haystack, ['report', 'reporting', 'monthly', 'loom', 'summary'])) return 'reporting';
+  if (includesAny(haystack, ['backlink', 'link building', 'link insert', 'guest post', 'citation', 'outreach'])) return 'backlinks';
+  return 'operations';
+};
+
+const taskMatchesDashboardDrilldown = (board: ClientBoard, group: TaskGroup, task: Task, drilldown: DashboardDrilldown | null): boolean => {
+  if (!drilldown) return true;
+  if (drilldown.pipelineKey && pipelineKeyForTask(board, group, task) !== drilldown.pipelineKey) return false;
+  if (drilldown.taskId && task.id !== drilldown.taskId) return false;
+
+  const filter = drilldown.filter || 'all';
+  const statusDefs = board.statusDefs || [];
+  const priorityDefs = board.priorityDefs || [];
+  const completed = isTaskCompleted(task, statusDefs, group.title);
+  const today = todayIso();
+  const weekEnd = addDaysIso(7);
+  const assignees = taskAssignees(task);
+  const statusLabel = getStatusLabel(task.status, statusDefs).toLowerCase();
+  const haystack = `${task.title} ${task.description || ''} ${group.title} ${statusLabel}`.toLowerCase();
+
+  if (filter === 'all') return !completed || !!drilldown.taskId;
+  if (completed) return false;
+  if (filter === 'overdue') return !!task.dueDate && task.dueDate < today;
+  if (filter === 'due-week') return !!task.dueDate && task.dueDate >= today && task.dueDate <= weekEnd;
+  if (filter === 'unassigned') return assignees.length === 0;
+  if (filter === 'no-due-date') return !task.dueDate;
+  if (filter === 'blocked') return includesAny(haystack, ['blocked', 'stuck', 'waiting', 'hold', 'on hold', 'needs access', 'client to', 'awaiting']);
+  if (filter === 'stale') return !task.dueDate || isHighPriority(task.priority, priorityDefs);
+  return true;
+};
+
+const boardHasDashboardMatches = (board: ClientBoard, drilldown: DashboardDrilldown): boolean =>
+  (board.groups || []).some(group => (group.tasks || []).some(task => taskMatchesDashboardDrilldown(board, group, task, drilldown)));
 
 const GROUP_COLORS = [
   '#f97316', '#3b82f6', '#ef4444', '#10b981', '#a855f7', '#ec4899'
@@ -354,11 +424,30 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
       if (!raw || clients.length === 0) return;
 
       try {
-        const payload = JSON.parse(raw) as { boardId?: string; profileId?: string; filter?: string; label?: string };
-        if (payload.boardId && clients.some(board => board.id === payload.boardId)) {
+        const payload = JSON.parse(raw) as DashboardDrilldown;
+        const personScoped = payload.profileId ? { ...payload, profileId: undefined } : payload;
+        const explicitBoard = payload.boardId ? clients.find(board => board.id === payload.boardId) : undefined;
+        const matchingBoard = explicitBoard && boardHasDashboardMatches(explicitBoard, personScoped)
+          ? explicitBoard
+          : clients.find(board => boardHasDashboardMatches(board, personScoped));
+
+        if (matchingBoard) {
+          selectClient(matchingBoard.id);
+        } else if (payload.boardId && clients.some(board => board.id === payload.boardId)) {
           selectClient(payload.boardId);
         }
+
         setSelectedPersonFilter(payload.profileId || '');
+        setDashboardDrilldown(payload.filter && payload.filter !== 'all' || payload.pipelineKey || payload.taskId ? payload : null);
+
+        if (payload.taskId && matchingBoard) {
+          const group = matchingBoard.groups.find(g => g.id === payload.groupId) || matchingBoard.groups.find(g => g.tasks.some(t => t.id === payload.taskId));
+          const task = group?.tasks.find(t => t.id === payload.taskId);
+          if (group && task) {
+            setTaskModal({ task, groupId: group.id, clientId: matchingBoard.id, groupTitle: group.title, groupColor: group.color });
+          }
+        }
+
         const filterLabel = payload.filter && payload.filter !== 'all' ? ` (${payload.filter.replace('-', ' ')})` : '';
         addToast('info', `Opened dashboard drilldown${filterLabel}${payload.label ? `: ${payload.label}` : ''}`);
       } catch (e) {
@@ -409,6 +498,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [newItemText, setNewItemText] = useState<{ [key: string]: string }>({});
   const [selectedPersonFilter, setSelectedPersonFilter] = useState<string>(''); // '' = all, or profile ID
+  const [dashboardDrilldown, setDashboardDrilldown] = useState<DashboardDrilldown | null>(null);
   const [isPersonFilterOpen, setIsPersonFilterOpen] = useState(false);
   
   const [isEditingClient, setIsEditingClient] = useState(false);
@@ -1717,21 +1807,42 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
          )}
       </div>
 
+      {dashboardDrilldown && activeClient && (
+        <div className="flex-none px-3 lg:px-8 py-3 border-b border-white/[0.07] bg-brand-500/10 text-sm text-brand-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-bold text-brand-300">Dashboard drilldown</span>
+            <span className="text-white">{dashboardFilterLabels[dashboardDrilldown.filter || 'all']}</span>
+            {dashboardDrilldown.pipelineKey ? <span className="text-portal-soft">Pipeline: {dashboardDrilldown.pipelineKey}</span> : null}
+            {dashboardDrilldown.label ? <span className="text-portal-soft truncate max-w-[52rem]">{dashboardDrilldown.label}</span> : null}
+          </div>
+          <button
+            type="button"
+            onClick={() => setDashboardDrilldown(null)}
+            className="self-start sm:self-auto inline-flex items-center gap-1.5 rounded-lg border border-brand-500/30 px-2.5 py-1 text-xs font-semibold text-brand-200 hover:bg-brand-500/15"
+          >
+            <X className="w-3.5 h-3.5" /> Clear filter
+          </button>
+        </div>
+      )}
+
       {/* Board Area - Scrollable */}
       <div className="flex-1 overflow-y-auto custom-scrollbar p-4 lg:p-8 pt-2 bg-portal-surface">
         {activeClient ? (
             <div className="space-y-8 pb-20">
                {activeClient.groups.map((group) => {
-                 // Filter tasks by selected person
-                 const filteredTasks = selectedPersonFilter
+                 // Filter tasks by selected person and dashboard drilldown
+                 const personFilteredTasks = selectedPersonFilter
                    ? group.tasks.filter(task => {
                        const assignedIds = Array.isArray(task.assignedTo) ? task.assignedTo : (task.assignedTo ? [task.assignedTo] : []);
                        return assignedIds.includes(selectedPersonFilter);
                      })
                    : group.tasks;
+                 const filteredTasks = dashboardDrilldown
+                   ? personFilteredTasks.filter(task => taskMatchesDashboardDrilldown(activeClient, group, task, dashboardDrilldown))
+                   : personFilteredTasks;
 
-                 // Don't show group if no tasks match filter
-                 if (selectedPersonFilter && filteredTasks.length === 0) return null;
+                 // Don't show group if no tasks match filters
+                 if ((selectedPersonFilter || dashboardDrilldown) && filteredTasks.length === 0) return null;
 
                  return (
                  <div
