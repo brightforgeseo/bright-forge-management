@@ -7,9 +7,10 @@ import {
 } from 'lucide-react';
 import { ChatMessage, ClientBoardSummary, ToastType, User } from '../types';
 import { fetchClientBoardSummaries, sendChatMessage } from '../services/databaseService';
+import { getBridgeUrl } from '../lib/bridgeClient';
 
-const BRIDGE_URL = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_BRIDGE_URL) || 'http://localhost:18790';
-const BRIDGE_SECRET = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_ECHO_BRIDGE_SECRET) || 'brightforge-echo-bridge-2026';
+const BRIDGE_URL = getBridgeUrl();
+const BRIDGE_SECRET = 'brightforge-echo-bridge-2026';
 const GENERAL_CHANNEL_ID = '12d8fb3a-4ddf-4557-97ea-b9dbac2520bc';
 const MAX_WORKSPACES = 10;
 const MAX_CONTEXT_FILES = 20;

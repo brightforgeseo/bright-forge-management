@@ -3,6 +3,7 @@
   "outputDirectory": "dist",
   "rewrites": [
     { "source": "/supabase/:path*", "destination": "https://echo-ai.tailfdbc33.ts.net:10000/:path*" },
+    { "source": "/bridge/:path*", "destination": "https://echo-ai.tailfdbc33.ts.net:8443/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

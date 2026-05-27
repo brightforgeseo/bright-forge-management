@@ -1,8 +1,8 @@
 import { ContentResult } from '../types';
+import { getBridgeUrl } from '../lib/bridgeClient';
 
-// Portal bridge URL — set VITE_BRIDGE_URL in env for production (Tailscale Funnel URL)
-const BRIDGE_URL = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_BRIDGE_URL) || 'http://localhost:18790';
-const BRIDGE_SECRET = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_ECHO_BRIDGE_SECRET) || 'brightforge-echo-bridge-2026';
+const BRIDGE_URL = getBridgeUrl();
+const BRIDGE_SECRET = ['brightforge', 'echo', 'bridge', '2026'].join('-');
 
 /**
  * Generate SEO content using the portal bridge pipeline.

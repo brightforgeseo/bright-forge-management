@@ -1,5 +1,7 @@
-const BRIDGE_URL = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_BRIDGE_URL) || 'http://localhost:18790';
-const BRIDGE_SECRET = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_ECHO_BRIDGE_SECRET) || 'brightforge-echo-bridge-2026';
+import { getBridgeUrl } from '../lib/bridgeClient';
+
+const BRIDGE_URL = getBridgeUrl();
+const BRIDGE_SECRET = 'brightforge-echo-bridge-2026';
 
 export interface BusinessInboxAttachment {
   filename: string;

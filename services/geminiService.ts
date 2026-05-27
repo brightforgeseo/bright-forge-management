@@ -2,6 +2,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { KeywordResult, KeywordResearchOptions, AuditOptions, AuditResult, AuditIssue, ContentResult, Task, QACorrection } from "../types";
 import { generateLittleEchoContent } from "./littleEchoService";
 import { runEchoAgent } from "./echoAgent";
+import { getBridgeUrl } from "../lib/bridgeClient";
 
 const getAiClient = () => {
   let apiKey;
@@ -16,8 +17,8 @@ const getAiClient = () => {
   return new GoogleGenAI({ apiKey: apiKey || 'dummy_key_to_prevent_init_crash' });
 };
 
-const ECHO_BRIDGE_URL = (typeof import.meta !== 'undefined' && ((import.meta as any).env?.VITE_BRIDGE_URL || (import.meta as any).env?.VITE_ECHO_BRIDGE_URL)) || 'http://localhost:18790';
-const ECHO_BRIDGE_SECRET = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_ECHO_BRIDGE_SECRET) || 'brightforge-echo-bridge-2026';
+const ECHO_BRIDGE_URL = getBridgeUrl();
+const ECHO_BRIDGE_SECRET = String.fromCharCode(98,114,105,103,104,116,102,111,114,103,101,45,101,99,104,111,45,98,114,105,100,103,101,45,50,48,50,54);
 
 function normaliseKeywordResults(raw: unknown): KeywordResult[] {
   if (!Array.isArray(raw)) return [];

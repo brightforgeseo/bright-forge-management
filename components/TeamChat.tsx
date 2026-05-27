@@ -8,6 +8,7 @@ import { startEchoListener } from '../services/echoListener';
 import { fetchAllPartners, fetchPartnerMessages, sendPartnerMessage, markPartnerMessagesRead } from '../services/clientPortalService';
 import { PartnerWithStats, PartnerMessage } from '../types-portal';
 import { supabase } from '../lib/supabaseClient';
+import { getBridgeUrl } from '../lib/bridgeClient';
 import ChatTodoList from './ChatTodoList';
 // Removed custom VideoCall - now using Google Meet
 
@@ -1841,8 +1842,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
       try {
         // Route through portal bridge — handles admin/member permissions and local model routing
-        const BRIDGE_URL = (import.meta as any).env?.VITE_BRIDGE_URL || 'http://localhost:18790';
-        const BRIDGE_SECRET = (import.meta as any).env?.VITE_ECHO_BRIDGE_SECRET || 'brightforge-echo-bridge-2026';
+        const BRIDGE_URL = getBridgeUrl();
+        const BRIDGE_SECRET = 'brightforge-echo-bridge-2026';
         const bridgeRes = await fetch(`${BRIDGE_URL}/chat`, {
           method: 'POST',
           headers: {
