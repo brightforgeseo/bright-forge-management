@@ -56,6 +56,7 @@ const pipelineKeyForTask = (board: ClientBoard, group: TaskGroup, task: Task): s
 const taskMatchesDashboardDrilldown = (board: ClientBoard, group: TaskGroup, task: Task, drilldown: DashboardDrilldown | null): boolean => {
   if (!drilldown) return true;
   if (drilldown.pipelineKey && pipelineKeyForTask(board, group, task) !== drilldown.pipelineKey) return false;
+  if (drilldown.profileId && !taskAssignees(task).includes(drilldown.profileId)) return false;
   if (drilldown.taskId && task.id !== drilldown.taskId) return false;
 
   const filter = drilldown.filter || 'all';
@@ -425,11 +426,10 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
 
       try {
         const payload = JSON.parse(raw) as DashboardDrilldown;
-        const personScoped = payload.profileId ? { ...payload, profileId: undefined } : payload;
         const explicitBoard = payload.boardId ? clients.find(board => board.id === payload.boardId) : undefined;
-        const matchingBoard = explicitBoard && boardHasDashboardMatches(explicitBoard, personScoped)
+        const matchingBoard = explicitBoard && boardHasDashboardMatches(explicitBoard, payload)
           ? explicitBoard
-          : clients.find(board => boardHasDashboardMatches(board, personScoped));
+          : clients.find(board => boardHasDashboardMatches(board, payload));
 
         if (matchingBoard) {
           selectClient(matchingBoard.id);
@@ -438,7 +438,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
         }
 
         setSelectedPersonFilter(payload.profileId || '');
-        setDashboardDrilldown(payload.filter && payload.filter !== 'all' || payload.pipelineKey || payload.taskId ? payload : null);
+        setDashboardDrilldown((payload.filter && payload.filter !== 'all') || payload.pipelineKey || payload.taskId || payload.profileId ? payload : null);
 
         if (payload.taskId && matchingBoard) {
           const group = matchingBoard.groups.find(g => g.id === payload.groupId) || matchingBoard.groups.find(g => g.tasks.some(t => t.id === payload.taskId));

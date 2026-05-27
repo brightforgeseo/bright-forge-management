@@ -40,6 +40,7 @@ export type WorkloadRow = {
   completedThisWeek: number;
   accountabilityScore: number;
   risk: 'Overloaded' | 'Busy' | 'Healthy';
+  sampleBoardId?: string;
 };
 
 export type CommandItem = {
@@ -81,6 +82,7 @@ export type HygieneIssue = {
   count: number;
   severity: 'red' | 'amber' | 'blue';
   detail: string;
+  sampleBoardId?: string;
 };
 
 export type DashboardMetrics = {
@@ -248,6 +250,11 @@ export const buildDashboardMetrics = (boards: ClientBoard[], profiles: Profile[]
     const dueThisWeekCount = assignedOpen.filter(t => !!t.task.dueDate && t.task.dueDate >= today && t.task.dueDate <= weekEnd).length;
     const accountabilityScore = overdueCount * 5 + blockedCount * 4 + highPriorityCount * 2 + dueThisWeekCount;
     const risk: WorkloadRow['risk'] = overdueCount > 20 || assignedOpen.length > 55 ? 'Overloaded' : overdueCount > 5 || assignedOpen.length > 30 ? 'Busy' : 'Healthy';
+    const sampleTask = assignedOpen.find(t => !!t.task.dueDate && t.task.dueDate < today)
+      || assignedOpen.find(isBlockedTask)
+      || assignedOpen.find(t => !!t.task.dueDate && t.task.dueDate >= today && t.task.dueDate <= weekEnd)
+      || assignedOpen[0]
+      || assignedCompleted[0];
     return {
       profile,
       openCount: assignedOpen.length,
@@ -258,6 +265,7 @@ export const buildDashboardMetrics = (boards: ClientBoard[], profiles: Profile[]
       completedThisWeek: assignedCompleted.length,
       accountabilityScore,
       risk,
+      sampleBoardId: sampleTask?.boardId,
     };
   })
     .filter(row => row.openCount > 0 || row.completedThisWeek > 0)
@@ -273,15 +281,18 @@ export const buildDashboardMetrics = (boards: ClientBoard[], profiles: Profile[]
 
   const pipelineMetrics = Object.keys(pipelineLabels).map(key => {
     const open = openTasks.filter(t => pipelineForTask(t) === key);
+    const overdue = open.filter(t => !!t.task.dueDate && t.task.dueDate < today);
+    const blocked = open.filter(isBlockedTask);
+    const dueThisWeek = open.filter(t => !!t.task.dueDate && t.task.dueDate >= today && t.task.dueDate <= weekEnd);
     return {
       key,
       label: pipelineLabels[key],
       open: open.length,
-      overdue: open.filter(t => !!t.task.dueDate && t.task.dueDate < today).length,
-      blocked: open.filter(isBlockedTask).length,
-      dueThisWeek: open.filter(t => !!t.task.dueDate && t.task.dueDate >= today && t.task.dueDate <= weekEnd).length,
+      overdue: overdue.length,
+      blocked: blocked.length,
+      dueThisWeek: dueThisWeek.length,
       completedThisWeek: completedThisWeekTasks.filter(t => pipelineForTask(t) === key).length,
-      sampleBoardId: open[0]?.boardId,
+      sampleBoardId: (overdue[0] || blocked[0] || dueThisWeek[0] || open[0])?.boardId,
     };
   }).sort((a, b) => b.overdue - a.overdue || b.open - a.open);
 
@@ -292,6 +303,7 @@ export const buildDashboardMetrics = (boards: ClientBoard[], profiles: Profile[]
       count: noDueDateTasks.length,
       severity: noDueDateTasks.length > 100 ? 'red' : 'amber',
       detail: 'These tasks cannot be planned properly.',
+      sampleBoardId: noDueDateTasks[0]?.boardId,
     },
     {
       id: 'unassigned',
@@ -299,6 +311,7 @@ export const buildDashboardMetrics = (boards: ClientBoard[], profiles: Profile[]
       count: unassignedTasks.length,
       severity: unassignedTasks.length > 50 ? 'red' : 'amber',
       detail: 'No owner means nobody is accountable.',
+      sampleBoardId: unassignedTasks[0]?.boardId,
     },
     {
       id: 'blocked',
@@ -306,6 +319,7 @@ export const buildDashboardMetrics = (boards: ClientBoard[], profiles: Profile[]
       count: blockedTasks.length,
       severity: blockedTasks.length > 20 ? 'red' : 'blue',
       detail: 'These need access, decisions, or chasing.',
+      sampleBoardId: blockedTasks[0]?.boardId,
     },
     {
       id: 'empty-boards',

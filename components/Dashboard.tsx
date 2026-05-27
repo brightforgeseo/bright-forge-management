@@ -262,7 +262,7 @@ const TeamCapacity: React.FC<{ rows: WorkloadRow[]; onDrilldown: (payload: Drill
             const barPct = Math.round((row.openCount / maxLoad) * 100);
             const tone: KpiTone = row.risk === 'Overloaded' ? 'red' : row.risk === 'Busy' ? 'amber' : 'green';
             return (
-              <button key={row.profile.id} onClick={() => onDrilldown({ profileId: row.profile.id, filter: 'overdue', label: row.profile.full_name || row.profile.email || 'Team Member' })} className="w-full px-5 py-3.5 text-left hover:bg-portal-surface2 transition-colors">
+              <button key={row.profile.id} onClick={() => onDrilldown({ boardId: row.sampleBoardId, profileId: row.profile.id, filter: row.overdueCount ? 'overdue' : row.blockedCount ? 'blocked' : row.dueThisWeekCount ? 'due-week' : 'all', label: row.profile.full_name || row.profile.email || 'Team Member' })} className="w-full px-5 py-3.5 text-left hover:bg-portal-surface2 transition-colors">
                 <div className="flex items-center justify-between gap-3 mb-2">
                   <div className="min-w-0">
                     <div className="text-sm font-semibold text-white truncate">{row.profile.full_name || row.profile.email || 'Team Member'}</div>
@@ -325,7 +325,7 @@ const HygienePanel: React.FC<{ issues: HygieneIssue[]; onDrilldown: (payload: Dr
             <button
               key={issue.id}
               type="button"
-              onClick={() => onDrilldown({ filter: issue.id === 'unassigned' ? 'unassigned' : issue.id === 'blocked' ? 'blocked' : issue.id === 'no-due-date' ? 'no-due-date' : 'all', label: issue.label })}
+              onClick={() => onDrilldown({ boardId: issue.sampleBoardId, filter: issue.id === 'unassigned' ? 'unassigned' : issue.id === 'blocked' ? 'blocked' : issue.id === 'no-due-date' ? 'no-due-date' : 'all', label: issue.label })}
               className={`w-full text-left rounded-xl p-3 border ${toneClasses[tone].border} ${toneClasses[tone].bg} hover:bg-portal-surface2 transition-colors`}
             >
               <div className="flex items-center justify-between gap-3">
