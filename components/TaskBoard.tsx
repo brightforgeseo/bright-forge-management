@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Plus, Sparkles, ChevronDown, ChevronUp, ChevronRight, Trash2, Briefcase, CheckCircle2, Settings, Mail, Phone, Globe, X, Image as ImageIcon, Edit3, Palette, Loader2, Upload, UserCircle, Link as LinkIcon, MessageCircle, Send, Search, Share2, Hash, Users, Archive, RotateCcw, UserPlus, GripVertical, CheckSquare } from 'lucide-react';
+import { Plus, Sparkles, ChevronDown, ChevronUp, ChevronRight, Trash2, Briefcase, CheckCircle2, Settings, Mail, Phone, Globe, X, Image as ImageIcon, Edit3, Palette, Loader2, Upload, UserCircle, Link as LinkIcon, MessageCircle, Send, Search, Share2, Hash, Users, Archive, RotateCcw, UserPlus, GripVertical, CheckSquare, Paperclip, File as FileIcon } from 'lucide-react';
 import AssignToPartnerModal from './client-portal/AssignToPartnerModal';
-import { Task, TaskGroup, User, ClientBoard, ToastType, LabelDefinition, Profile, TaskComment, ChatChannel, ChatMessage, ArchivedTask } from '../types';
+import { Task, TaskGroup, User, ClientBoard, ToastType, LabelDefinition, Profile, TaskComment, TaskAttachment, ChatChannel, ChatMessage, ArchivedTask } from '../types';
 import { generateProjectTasks } from '../services/geminiService';
 import { fetchClientBoards, fetchArchivedBoards, archiveBoardById, restoreBoardById, deleteBoardByDbId, saveClientBoard, deleteClientBoard, uploadFile, fetchProfiles, createNotification, fetchChannels, sendChatMessage, logActivity, parseClientBoardRow } from '../services/databaseService';
 import { supabase } from '../lib/supabaseClient';
@@ -533,6 +533,8 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
     name: '', email: '', phone: '', website: '', logoUrl: '', notes: ''
   });
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const taskAttachmentInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingTaskAttachment, setIsUploadingTaskAttachment] = useState(false);
 
   const [activePicker, setActivePicker] = useState<{ type: 'status' | 'priority', taskId: string, groupId: string, clientId: string, anchor: HTMLElement | null } | null>(null);
   const [activePersonPicker, setActivePersonPicker] = useState<{ taskId: string, groupId: string, clientId: string, anchor: HTMLElement | null } | null>(null);
@@ -1052,7 +1054,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
       updateClient(cid, c => ({ ...c, groups: c.groups.map(g => g.id === gid ? { ...g, tasks: [...g.tasks, newTask] } : g) }));
       setNewItemText(prev => ({ ...prev, [gid]: '' }));
   };
-  const updateTaskField = (cid: string, gid: string, tid: string, f: keyof Task, v: string) => {
+  const updateTaskField = (cid: string, gid: string, tid: string, f: keyof Task, v: any) => {
     // pendingSaveRef is set by triggerSave (called via updateClient below) and
     // cleared when the actual save promise resolves — no manual handling needed.
 
@@ -1207,6 +1209,47 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
       return { ...c, groups: c.groups.map(g => g.id === currentGroupId ? { ...g, tasks: g.tasks.map(t => t.id === tid ? { ...t, [f]: v } : t) } : g) };
     });
   };
+  const handleTaskAttachmentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !taskModal) return;
+
+    setIsUploadingTaskAttachment(true);
+    try {
+      const url = await uploadFile(file, 'uploads');
+      if (!url) {
+        addToast('error', 'Failed to upload attachment');
+        return;
+      }
+
+      const attachment: TaskAttachment = {
+        id: `attachment-${Date.now()}`,
+        name: file.name,
+        url,
+        type: file.type.startsWith('image/') ? 'image' : 'file',
+        size: file.size,
+        uploadedAt: new Date().toISOString(),
+      };
+      const attachments = [...(taskModal.task.attachments || []), attachment];
+      updateTaskField(taskModal.clientId, taskModal.groupId, taskModal.task.id, 'attachments', attachments);
+      setTaskModal({ ...taskModal, task: { ...taskModal.task, attachments } });
+      addToast('success', 'Attachment added to task');
+    } catch (err) {
+      console.error('Error uploading task attachment:', err);
+      addToast('error', 'Failed to upload attachment');
+    } finally {
+      setIsUploadingTaskAttachment(false);
+      if (taskAttachmentInputRef.current) taskAttachmentInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveTaskAttachment = (attachmentId: string) => {
+    if (!taskModal) return;
+    const attachments = (taskModal.task.attachments || []).filter(att => att.id !== attachmentId);
+    updateTaskField(taskModal.clientId, taskModal.groupId, taskModal.task.id, 'attachments', attachments);
+    setTaskModal({ ...taskModal, task: { ...taskModal.task, attachments } });
+    addToast('info', 'Attachment removed from task');
+  };
+
   const deleteTask = (cid: string, gid: string, tid: string) => updateClient(cid, c => ({ ...c, groups: c.groups.map(g => g.id === gid ? { ...g, tasks: g.tasks.filter(t => t.id !== tid) } : g) }));
 
   // Archive a task (soft delete) - moves to archive instead of deleting
@@ -2398,6 +2441,51 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                   )}
                 </div>
               )}
+
+              {/* Attachments Section */}
+              <div className="border-t border-white/[0.07] pt-6">
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <div className="flex items-center gap-2">
+                    <Paperclip className="w-5 h-5 text-portal-soft" />
+                    <h4 className="font-bold text-white">Attachments</h4>
+                    <span className="text-xs text-portal-soft">({taskModal.task.attachments?.length || 0})</span>
+                  </div>
+                  <button
+                    onClick={() => taskAttachmentInputRef.current?.click()}
+                    disabled={isUploadingTaskAttachment}
+                    className="flex items-center gap-2 px-3 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors disabled:opacity-50 text-sm font-semibold"
+                  >
+                    {isUploadingTaskAttachment ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    {isUploadingTaskAttachment ? 'Uploading...' : 'Attach File'}
+                  </button>
+                  <input
+                    ref={taskAttachmentInputRef}
+                    type="file"
+                    className="hidden"
+                    onChange={handleTaskAttachmentUpload}
+                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.md"
+                  />
+                </div>
+                {taskModal.task.attachments && taskModal.task.attachments.length > 0 ? (
+                  <div className="space-y-2">
+                    {taskModal.task.attachments.map(att => (
+                      <div key={att.id} className="flex items-center gap-3 p-3 bg-portal-dark border border-white/[0.07] rounded-lg">
+                        {att.type === 'image' ? <ImageIcon className="w-4 h-4 text-brand-500" /> : <FileIcon className="w-4 h-4 text-brand-500" />}
+                        <a href={att.url} target="_blank" rel="noopener noreferrer" className="flex-1 min-w-0 text-sm text-portal-text hover:text-brand-500 truncate">
+                          {att.name}
+                        </a>
+                        <button onClick={() => handleRemoveTaskAttachment(att.id)} className="p-1 text-portal-soft hover:text-red-500 rounded" title="Remove attachment">
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-portal-soft text-sm bg-portal-dark rounded-lg border border-white/[0.07]">
+                    No task attachments yet.
+                  </div>
+                )}
+              </div>
 
               {/* Comments Section */}
               <div className="border-t border-white/[0.07] pt-6">

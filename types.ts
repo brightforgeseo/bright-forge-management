@@ -172,6 +172,15 @@ export interface TaskComment {
   mentions?: string[]; // Array of profile IDs mentioned in comment
 }
 
+export interface TaskAttachment {
+  id: string;
+  name: string;
+  url: string;
+  type: 'image' | 'file';
+  size?: number;
+  uploadedAt: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -182,6 +191,7 @@ export interface Task {
   assignedTo?: string | string[]; // User ID(s) - single UUID or array of UUIDs
   worksheet?: string; // URL to worksheet
   clientSheet?: string; // URL to client sheet
+  attachments?: TaskAttachment[]; // Files attached to the task and visible in partner/client portal
   comments?: TaskComment[];
 }
 

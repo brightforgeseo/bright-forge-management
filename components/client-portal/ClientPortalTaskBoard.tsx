@@ -14,6 +14,7 @@ import {
   ExternalLink,
   MessageCircle,
   Inbox,
+  Paperclip,
 } from 'lucide-react';
 import { PartnerAccount, PartnerTask, PartnerTaskStatus, PartnerTaskColumn } from '../../types-portal';
 import { ClientBoard, ToastType } from '../../types';
@@ -420,6 +421,13 @@ const ClientPortalTaskBoard: React.FC<ClientPortalTaskBoardProps> = ({
                             <span className="text-xs text-portal-soft">
                               Due: {new Date(task.task.dueDate).toLocaleDateString()}
                             </span>
+                          </div>
+                        )}
+
+                        {task.task?.attachments && task.task.attachments.length > 0 && (
+                          <div className="flex items-center gap-1 mt-3 ml-6 text-xs text-portal-soft">
+                            <Paperclip className="w-3 h-3" />
+                            <span>{task.task.attachments.length} attachment{task.task.attachments.length === 1 ? '' : 's'}</span>
                           </div>
                         )}
 

@@ -8,6 +8,9 @@ import {
   Calendar,
   Tag,
   CheckCircle2,
+  Paperclip,
+  File as FileIcon,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { PartnerAccount, PartnerTask, PartnerTaskStatus } from '../../types-portal';
 import { TaskComment, ToastType } from '../../types';
@@ -209,6 +212,32 @@ const PartnerTaskDetailModal: React.FC<PartnerTaskDetailModalProps> = ({
                   Open Client Sheet
                 </a>
               )}
+            </div>
+          )}
+
+          {/* Task Attachments */}
+          {task.task?.attachments && task.task.attachments.length > 0 && (
+            <div className="bg-portal-surface2/50 border border-white/[0.07] rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Paperclip className="w-4 h-4 text-portal-soft" />
+                <h3 className="text-sm font-semibold text-white">Attachments</h3>
+                <span className="text-xs text-portal-soft">({task.task.attachments.length})</span>
+              </div>
+              <div className="space-y-2">
+                {task.task.attachments.map(att => (
+                  <a
+                    key={att.id}
+                    href={att.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 p-3 bg-portal-surface rounded-lg border border-white/[0.07] hover:border-portal-accent/50 transition-colors text-sm text-portal-text"
+                  >
+                    {att.type === 'image' ? <ImageIcon className="w-4 h-4 text-portal-accent" /> : <FileIcon className="w-4 h-4 text-portal-accent" />}
+                    <span className="flex-1 truncate">{att.name}</span>
+                    <ExternalLink className="w-3 h-3 text-portal-soft" />
+                  </a>
+                ))}
+              </div>
             </div>
           )}
 
