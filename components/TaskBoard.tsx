@@ -517,6 +517,31 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
     }, 1500);
   }, []);
 
+  const saveClientBoardNow = useCallback(async (changedClientId: string, options: Parameters<typeof saveClientBoard>[1] = {}) => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+
+    const myCounter = ++saveCounterRef.current;
+    pendingSaveRef.current = { taskId: '', boardId: changedClientId };
+
+    const clientToSave = clientsRef.current.find(c => c.id === changedClientId);
+    if (!clientToSave) {
+      console.error('[TaskBoard] Board not found for immediate save:', changedClientId);
+      if (myCounter === saveCounterRef.current) pendingSaveRef.current = null;
+      return false;
+    }
+
+    console.log('[TaskBoard] Immediate save board:', clientToSave.id, clientToSave.name);
+    const saved = await saveClientBoard(clientToSave, options);
+
+    if (myCounter === saveCounterRef.current) {
+      pendingSaveRef.current = null;
+    }
+    return saved;
+  }, []);
+
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
   const [newClientName, setNewClientName] = useState('');
   const [isAddingClient, setIsAddingClient] = useState(false);
@@ -1230,9 +1255,8 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
         uploadedAt: new Date().toISOString(),
       };
       const attachments = [...(taskModal.task.attachments || []), attachment];
-      updateTaskField(taskModal.clientId, taskModal.groupId, taskModal.task.id, 'attachments', attachments);
-      setTaskModal({ ...taskModal, task: { ...taskModal.task, attachments } });
-      addToast('success', 'Attachment added to task');
+      const saved = await persistTaskAttachments(taskModal, attachments);
+      addToast(saved ? 'success' : 'error', saved ? 'Attachment added and saved to task' : 'Attachment uploaded but task save failed');
     } catch (err) {
       console.error('Error uploading task attachment:', err);
       addToast('error', 'Failed to upload attachment');
@@ -1242,12 +1266,67 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
     }
   };
 
-  const handleRemoveTaskAttachment = (attachmentId: string) => {
+  const persistTaskAttachments = async (
+    modal: { task: Task; groupId: string; clientId: string; groupTitle: string; groupColor: string },
+    attachments: TaskAttachment[]
+  ): Promise<boolean> => {
+    const updatedTask = { ...modal.task, attachments };
+    const updatedClients = clientsRef.current.map(client => {
+      if (client.id !== modal.clientId) return client;
+
+      let found = false;
+      const groups = client.groups.map(group => {
+        const hasTask = group.tasks.some(task => task.id === modal.task.id);
+        if (!hasTask) return group;
+        found = true;
+        return {
+          ...group,
+          tasks: group.tasks.map(task => task.id === modal.task.id ? updatedTask : task),
+        };
+      });
+
+      if (!found) {
+        console.error('[TaskBoard] Task not found while saving attachments:', modal.task.id);
+        return client;
+      }
+
+      return { ...client, groups };
+    });
+
+    setClients(updatedClients);
+    clientsRef.current = updatedClients;
+    setTaskModal({ ...modal, task: updatedTask });
+
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+
+    const myCounter = ++saveCounterRef.current;
+    pendingSaveRef.current = { taskId: modal.task.id, boardId: modal.clientId };
+
+    const clientToSave = updatedClients.find(client => client.id === modal.clientId);
+    if (!clientToSave) {
+      console.error('[TaskBoard] Board not found while saving attachments:', modal.clientId);
+      if (myCounter === saveCounterRef.current) pendingSaveRef.current = null;
+      return false;
+    }
+
+    try {
+      return await saveClientBoard(clientToSave, { attachmentMode: 'replace' });
+    } catch (error) {
+      console.error('[TaskBoard] Failed to save task attachments:', error);
+      return false;
+    } finally {
+      if (myCounter === saveCounterRef.current) pendingSaveRef.current = null;
+    }
+  };
+
+  const handleRemoveTaskAttachment = async (attachmentId: string) => {
     if (!taskModal) return;
     const attachments = (taskModal.task.attachments || []).filter(att => att.id !== attachmentId);
-    updateTaskField(taskModal.clientId, taskModal.groupId, taskModal.task.id, 'attachments', attachments);
-    setTaskModal({ ...taskModal, task: { ...taskModal.task, attachments } });
-    addToast('info', 'Attachment removed from task');
+    const saved = await persistTaskAttachments(taskModal, attachments);
+    addToast(saved ? 'info' : 'error', saved ? 'Attachment removed and saved' : 'Attachment removed locally but task save failed');
   };
 
   const deleteTask = (cid: string, gid: string, tid: string) => updateClient(cid, c => ({ ...c, groups: c.groups.map(g => g.id === gid ? { ...g, tasks: g.tasks.filter(t => t.id !== tid) } : g) }));
@@ -2005,10 +2084,38 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                                     <GripVertical className="w-4 h-4 text-portal-soft" />
                                                 </div>
                                                 <div className="w-1 lg:w-1.5 h-6 lg:h-8 rounded-full flex-shrink-0" style={{ backgroundColor: group.color }}></div>
-                                                <span
-                                                  onClick={() => setTaskModal({ task, groupId: group.id, clientId: activeClient.id, groupTitle: group.title, groupColor: group.color })}
-                                                  className="flex-1 min-w-0 text-xs lg:text-sm font-medium text-portal-text cursor-pointer hover:text-brand-600 truncate"
-                                                >{task.title}</span>
+                                                <div className="flex-1 min-w-0">
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => setTaskModal({ task, groupId: group.id, clientId: activeClient.id, groupTitle: group.title, groupColor: group.color })}
+                                                    className="block w-full text-left text-xs lg:text-sm font-medium text-portal-text cursor-pointer hover:text-brand-600 truncate"
+                                                  >{task.title}</button>
+                                                  {(task.worksheet || task.clientSheet || (task.attachments && task.attachments.length > 0)) && (
+                                                    <div className="mt-1 flex lg:hidden flex-wrap items-center gap-2 text-[11px]">
+                                                      {task.worksheet && (
+                                                        <a href={task.worksheet} target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()} className="inline-flex items-center gap-1 text-brand-500 hover:text-brand-600">
+                                                          <LinkIcon className="w-3 h-3" /> Worksheet
+                                                        </a>
+                                                      )}
+                                                      {task.clientSheet && (
+                                                        <a href={task.clientSheet} target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()} className="inline-flex items-center gap-1 text-sky-500 hover:text-sky-600">
+                                                          <LinkIcon className="w-3 h-3" /> Client sheet
+                                                        </a>
+                                                      )}
+                                                      {task.attachments && task.attachments.length > 0 && (
+                                                        <span className="inline-flex items-center gap-1 text-portal-soft">
+                                                          <Paperclip className="w-3 h-3" /> {task.attachments.length} file{task.attachments.length === 1 ? '' : 's'}
+                                                        </span>
+                                                      )}
+                                                    </div>
+                                                  )}
+                                                  {task.attachments && task.attachments.length > 0 && (
+                                                    <div className="mt-1 hidden lg:flex items-center gap-1 text-[11px] text-portal-soft">
+                                                      <Paperclip className="w-3 h-3" />
+                                                      <span>{task.attachments.length} file{task.attachments.length === 1 ? '' : 's'} attached</span>
+                                                    </div>
+                                                  )}
+                                                </div>
                                                 {(task.comments && task.comments.length > 0) && (
                                                   <MessageCircle className="w-4 h-4 text-portal-soft flex-shrink-0" />
                                                 )}
@@ -2087,6 +2194,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                                placeholder="Add URL"
                                                value={task.worksheet || ''}
                                                onChange={(e) => updateTaskField(activeClient.id, group.id, task.id, 'worksheet', e.target.value)}
+                                               onBlur={() => saveClientBoardNow(activeClient.id, { linkMode: 'replace' })}
                                                className="flex-1 text-xs text-portal-soft bg-transparent outline-none text-center placeholder:text-portal-text hover:bg-portal-dark px-2 py-1 rounded"
                                                onClick={(e) => e.stopPropagation()}
                                              />
@@ -2111,6 +2219,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                                                placeholder="Add URL"
                                                value={task.clientSheet || ''}
                                                onChange={(e) => updateTaskField(activeClient.id, group.id, task.id, 'clientSheet', e.target.value)}
+                                               onBlur={() => saveClientBoardNow(activeClient.id, { linkMode: 'replace' })}
                                                className="flex-1 text-xs text-portal-soft bg-transparent outline-none text-center placeholder:text-portal-text hover:bg-portal-dark px-2 py-1 rounded"
                                                onClick={(e) => e.stopPropagation()}
                                              />
@@ -2406,41 +2515,51 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
               </div>
 
               {/* Links Section */}
-              {(taskModal.task.worksheet || taskModal.task.clientSheet) && (
-                <div className="grid grid-cols-1 gap-4">
-                  {taskModal.task.worksheet && (
-                    <div>
-                      <label className="block text-xs font-bold text-portal-soft uppercase tracking-wide mb-2">Worksheet</label>
-                      <a
-                        href={taskModal.task.worksheet}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 p-3 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors group"
-                      >
-                        <LinkIcon className="w-4 h-4 text-brand-600" />
-                        <span className="text-sm font-medium text-brand-700 truncate flex-1">{taskModal.task.worksheet}</span>
-                        <span className="text-xs text-brand-500 opacity-0 group-hover:opacity-100 transition-opacity">Open →</span>
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-portal-soft uppercase tracking-wide mb-2">Worksheet</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="url"
+                      placeholder="Add or edit worksheet URL"
+                      value={taskModal.task.worksheet || ''}
+                      onChange={(e) => {
+                        updateTaskField(taskModal.clientId, taskModal.groupId, taskModal.task.id, 'worksheet', e.target.value);
+                        setTaskModal({ ...taskModal, task: { ...taskModal.task, worksheet: e.target.value } });
+                      }}
+                      onBlur={() => saveClientBoardNow(taskModal.clientId, { linkMode: 'replace' })}
+                      className="flex-1 text-sm text-portal-text bg-portal-dark border border-white/[0.07] rounded-lg px-3 py-2 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 placeholder:text-portal-soft"
+                    />
+                    {taskModal.task.worksheet ? (
+                      <a href={taskModal.task.worksheet} target="_blank" rel="noopener noreferrer" className="p-2 text-brand-500 hover:text-brand-400 rounded-lg border border-white/[0.07]" title="Open worksheet">
+                        <LinkIcon className="w-4 h-4" />
                       </a>
-                    </div>
-                  )}
-
-                  {taskModal.task.clientSheet && (
-                    <div>
-                      <label className="block text-xs font-bold text-portal-soft uppercase tracking-wide mb-2">Client Sheet</label>
-                      <a
-                        href={taskModal.task.clientSheet}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 p-3 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors group"
-                      >
-                        <LinkIcon className="w-4 h-4 text-brand-600" />
-                        <span className="text-sm font-medium text-brand-700 truncate flex-1">{taskModal.task.clientSheet}</span>
-                        <span className="text-xs text-brand-500 opacity-0 group-hover:opacity-100 transition-opacity">Open →</span>
-                      </a>
-                    </div>
-                  )}
+                    ) : null}
+                  </div>
                 </div>
-              )}
+
+                <div>
+                  <label className="block text-xs font-bold text-portal-soft uppercase tracking-wide mb-2">Client Sheet</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="url"
+                      placeholder="Add or edit client sheet URL"
+                      value={taskModal.task.clientSheet || ''}
+                      onChange={(e) => {
+                        updateTaskField(taskModal.clientId, taskModal.groupId, taskModal.task.id, 'clientSheet', e.target.value);
+                        setTaskModal({ ...taskModal, task: { ...taskModal.task, clientSheet: e.target.value } });
+                      }}
+                      onBlur={() => saveClientBoardNow(taskModal.clientId, { linkMode: 'replace' })}
+                      className="flex-1 text-sm text-portal-text bg-portal-dark border border-white/[0.07] rounded-lg px-3 py-2 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 placeholder:text-portal-soft"
+                    />
+                    {taskModal.task.clientSheet ? (
+                      <a href={taskModal.task.clientSheet} target="_blank" rel="noopener noreferrer" className="p-2 text-brand-500 hover:text-brand-400 rounded-lg border border-white/[0.07]" title="Open client sheet">
+                        <LinkIcon className="w-4 h-4" />
+                      </a>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
 
               {/* Attachments Section */}
               <div className="border-t border-white/[0.07] pt-6">

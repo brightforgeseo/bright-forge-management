@@ -1,7 +1,7 @@
 // Bright Forge Portal — service worker for web push notifications.
 // Minimal & focused: receive push events, show notifications, route clicks back into the app.
 
-const SW_VERSION = 'bf-sw-v1';
+const SW_VERSION = 'bf-sw-v1.0.293';
 
 self.addEventListener('install', (event) => {
   // Activate immediately on first install

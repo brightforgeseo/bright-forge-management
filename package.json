@@ -1,6 +1,6 @@
 {
   "name": "bright-forge-portal",
-  "version": "1.0.287",
+  "version": "1.0.293",
   "description": "Bright Forge Team Portal",
   "main": "electron.js",
   "targets": {
@@ -8,9 +8,13 @@
   },
   "scripts": {
     "start": "parcel index.html",
-    "build": "rm -rf .parcel-cache dist && parcel build index.html --public-url ./ && cp -R public/. dist/ 2>/dev/null || true",
+    "build": "rm -rf .parcel-cache dist && parcel build index.html --public-url ./ && node scripts/copy-public.cjs",
     "electron:dev": "concurrently \"cross-env BROWSER=none npm start\" \"wait-on http://localhost:1234 && electron .\"",
     "electron:build": "npm run build && electron-builder",
+    "release:update": "node scripts/release-portal-update.cjs",
+    "release:update:dry-run": "node scripts/release-portal-update.cjs --dry-run",
+    "release:update:local": "node scripts/release-portal-update.cjs --allow-unpublished",
+    "release:verify": "node scripts/verify-release-surfaces.cjs",
     "cap:sync": "npx cap sync",
     "mobile:build": "npm run build && npx cap sync",
     "ios:open": "npx cap open ios",
@@ -45,6 +49,7 @@
     "parcel": "^2.0.0",
     "postcss": "^8.4.35",
     "process": "^0.11.10",
+    "rcedit": "^5.0.2",
     "tailwindcss": "^3.4.1",
     "wait-on": "^7.0.0"
   },
@@ -55,7 +60,9 @@
     "files": [
       "dist/**/*",
       "electron.js",
-      "package.json"
+      "package.json",
+      "assets/**/*",
+      "preload.js"
     ],
     "directories": {
       "buildResources": "assets"
@@ -91,7 +98,8 @@
         "arch": [
           "x64"
         ]
-      }
+      },
+      "icon": "assets/icon.ico"
     }
   }
 }

@@ -55,6 +55,9 @@ export interface TaskSummary {
   dueDate: string;
   assignedTo: string[];
   commentCount: number;
+  worksheet?: string;
+  clientSheet?: string;
+  attachments: { name: string; url: string; type?: string; size?: number }[];
   isOverdue: boolean;
 }
 
@@ -230,6 +233,14 @@ export const loadBusinessContext = async (forceRefresh = false): Promise<Busines
               dueDate: task.dueDate || 'No date',
               assignedTo: assignedIds.map(id => profileMap.get(id) || 'Unknown'),
               commentCount: task.comments?.length || 0,
+              worksheet: task.worksheet,
+              clientSheet: task.clientSheet,
+              attachments: (task.attachments || []).map(att => ({
+                name: att.name,
+                url: att.url,
+                type: att.type,
+                size: att.size,
+              })),
               isOverdue
             });
           }
@@ -431,8 +442,16 @@ export const formatBusinessContextForPrompt = (context: BusinessContext): string
   }
 
   // Auto-detected risks block — Echo can flag these without being asked
+  const fmtTaskResources = (t: TaskSummary) => {
+    const resources: string[] = [];
+    if (t.worksheet) resources.push(`Worksheet: ${t.worksheet}`);
+    if (t.clientSheet) resources.push(`Client sheet: ${t.clientSheet}`);
+    if (t.attachments.length) resources.push(`Attachments: ${t.attachments.map(a => `${a.name} (${a.url})`).join(', ')}`);
+    return resources.length ? ` | ${resources.join(' | ')}` : '';
+  };
+
   const fmtRiskTask = (t: TaskSummary) =>
-    `  - "${t.title}" (${t.clientName}) | ${t.status} | Due: ${t.dueDate}${t.assignedTo.length ? ` | ${t.assignedTo.join(', ')}` : ' | unassigned'}`;
+    `  - "${t.title}" (${t.clientName}) | ${t.status} | Due: ${t.dueDate}${t.assignedTo.length ? ` | ${t.assignedTo.join(', ')}` : ' | unassigned'}${fmtTaskResources(t)}`;
   const risksBlock = `
 ### Auto-Detected Risks
 **Imminent (due ≤3 days, not started):** ${risks.imminentNotStarted.length || 0}
@@ -472,7 +491,7 @@ ${projectedTasks.length === 0 ? '(nothing projected — quiet week)' :
   Array.from(projectedByAssignee.entries())
     .sort((a, b) => b[1].length - a[1].length)
     .map(([owner, tasks]) =>
-      `**${owner}** — ${tasks.length} due:\n${tasks.map(t => `  - "${t.title}" (${t.clientName}) | due ${t.dueDate} | ${t.status}`).join('\n')}`
+      `**${owner}** — ${tasks.length} due:\n${tasks.map(t => `  - "${t.title}" (${t.clientName}) | due ${t.dueDate} | ${t.status}${fmtTaskResources(t)}`).join('\n')}`
     ).join('\n\n')}
 ${risksBlock}
 
@@ -517,7 +536,7 @@ export const getClientContext = async (clientName: string): Promise<string> => {
 - Completed: ${client.completedCount}
 
 ### Current Tasks
-${clientTasks.map(t => `- ${t.isOverdue ? '[OVERDUE] ' : ''}"${t.title}" | ${t.status} | ${t.priority} | Due: ${t.dueDate}`).join('\n') || 'No active tasks'}
+${clientTasks.map(t => `- ${t.isOverdue ? '[OVERDUE] ' : ''}"${t.title}" | ${t.status} | ${t.priority} | Due: ${t.dueDate}${fmtTaskResources(t)}`).join('\n') || 'No active tasks'}
 
 ### Recent Updates
 ${clientComments.map(c => `- ${c.author}: "${c.text.substring(0, 150)}"`).join('\n') || 'No recent updates'}

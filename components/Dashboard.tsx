@@ -11,6 +11,7 @@ import {
   ListChecks,
   Loader2,
   MessageSquare,
+  Paperclip,
   RefreshCcw,
   ShieldAlert,
   Sparkles,
@@ -18,6 +19,7 @@ import {
   Users,
   X,
   Zap,
+  ExternalLink,
 } from 'lucide-react';
 import { ToolView, User, ClientBoard, Profile } from '../types';
 import { fetchClientBoards, fetchProfiles } from '../services/databaseService';
@@ -470,11 +472,15 @@ const DrilldownPanel: React.FC<{
           {tasks.slice(0, 150).map(task => {
             const dueTone: KpiTone = task.task.dueDate && task.task.dueDate < todayIso() ? 'red' : task.task.dueDate ? 'brand' : 'slate';
             return (
-              <button
+              <div
                 key={`${task.boardId}-${task.groupId}-${task.task.id}`}
-                type="button"
+                role="button"
+                tabIndex={0}
                 onClick={() => onOpenTask(task)}
-                className="w-full px-5 py-4 text-left hover:bg-portal-surface2/70 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-inset"
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') onOpenTask(task);
+                }}
+                className="w-full px-5 py-4 text-left hover:bg-portal-surface2/70 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-inset cursor-pointer"
                 title={`Open ${task.task.title}`}
               >
                 <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-3">
@@ -486,6 +492,25 @@ const DrilldownPanel: React.FC<{
                     </div>
                     <div className="text-sm font-semibold text-white leading-snug">{task.task.title}</div>
                     {task.task.description ? <p className="text-xs text-portal-soft leading-relaxed mt-1 line-clamp-2">{task.task.description}</p> : null}
+                    {(task.task.worksheet || task.task.clientSheet || (task.task.attachments && task.task.attachments.length > 0)) ? (
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                        {task.task.worksheet ? (
+                          <a href={task.task.worksheet} target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()} className="inline-flex items-center gap-1 text-brand-400 hover:text-brand-300">
+                            <ExternalLink className="w-3 h-3" /> Worksheet
+                          </a>
+                        ) : null}
+                        {task.task.clientSheet ? (
+                          <a href={task.task.clientSheet} target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()} className="inline-flex items-center gap-1 text-sky-400 hover:text-sky-300">
+                            <ExternalLink className="w-3 h-3" /> Client sheet
+                          </a>
+                        ) : null}
+                        {task.task.attachments && task.task.attachments.length > 0 ? (
+                          <span className="inline-flex items-center gap-1 text-portal-soft">
+                            <Paperclip className="w-3 h-3" /> {task.task.attachments.length} attachment{task.task.attachments.length === 1 ? '' : 's'}
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
                   <div className="flex flex-wrap gap-1.5 xl:justify-end xl:min-w-[360px]">
                     <ReasonChip tone="blue">{assigneeLabels(task, profileMap)}</ReasonChip>
@@ -494,7 +519,7 @@ const DrilldownPanel: React.FC<{
                     <ReasonChip tone={isBlockedTask(task) ? 'amber' : 'slate'}>{task.statusLabel}</ReasonChip>
                   </div>
                 </div>
-              </button>
+              </div>
             );
           })}
           {tasks.length > 150 ? <div className="px-5 py-3 text-xs text-portal-soft bg-portal-surface2/50">Showing first 150 of {tasks.length}. Tighten the signal if this is too noisy.</div> : null}

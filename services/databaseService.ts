@@ -23,6 +23,20 @@ const invalidateBoardCaches = () => {
 };
 
 type TaskLike = Record<string, any>;
+type SaveClientBoardOptions = {
+  /**
+   * Full-board saves are normally merged with the current server copy so a stale
+   * browser cannot erase evidence uploaded by someone else. Task attachment add/remove
+   * is different: the edited task's attachment array is the source of truth and must
+   * be allowed to replace the server array, including replacing it with [].
+   */
+   attachmentMode?: 'merge' | 'replace';
+   /** Link edits need explicit replace behaviour too. Otherwise the safe-save
+    * guard restores an old server worksheet/clientSheet when a user clears or
+    * replaces a link from a stale browser/app state.
+    */
+   linkMode?: 'merge' | 'replace';
+   };
 
 const mergeById = <T extends { id?: string }>(serverItems: T[] = [], localItems: T[] = []): T[] => {
   const merged = new Map<string, T>();
@@ -40,7 +54,7 @@ const hasValue = (value: unknown): boolean => {
   return typeof value === 'string' ? value.trim().length > 0 : value !== undefined && value !== null;
 };
 
-const protectTaskEvidenceFields = (serverTask: TaskLike | undefined, localTask: TaskLike): TaskLike => {
+const protectTaskEvidenceFields = (serverTask: TaskLike | undefined, localTask: TaskLike, options: SaveClientBoardOptions = {}): TaskLike => {
   if (!serverTask) return localTask;
 
   const nextTask: TaskLike = { ...localTask };
@@ -48,7 +62,7 @@ const protectTaskEvidenceFields = (serverTask: TaskLike | undefined, localTask: 
   // Full-board saves can race across team members. Never let a stale local copy
   // erase proof links, comments, or attachments that already exist on the server.
   for (const field of ['worksheet', 'clientSheet']) {
-    if (!hasValue(nextTask[field]) && hasValue(serverTask[field])) {
+    if (options.linkMode !== 'replace' && !hasValue(nextTask[field]) && hasValue(serverTask[field])) {
       nextTask[field] = serverTask[field];
     }
   }
@@ -58,13 +72,15 @@ const protectTaskEvidenceFields = (serverTask: TaskLike | undefined, localTask: 
   }
 
   if (Array.isArray(serverTask.attachments) || Array.isArray(nextTask.attachments)) {
-    nextTask.attachments = mergeById(serverTask.attachments || [], nextTask.attachments || []);
+    nextTask.attachments = options.attachmentMode === 'replace'
+      ? (nextTask.attachments || [])
+      : mergeById(serverTask.attachments || [], nextTask.attachments || []);
   }
 
   return nextTask;
 };
 
-export const mergeClientBoardForSafeSave = (serverBoard: ClientBoard | null | undefined, localBoard: ClientBoard): ClientBoard => {
+export const mergeClientBoardForSafeSave = (serverBoard: ClientBoard | null | undefined, localBoard: ClientBoard, options: SaveClientBoardOptions = {}): ClientBoard => {
   if (!serverBoard?.groups?.length || !localBoard?.groups?.length) return localBoard;
 
   const serverTasksById = new Map<string, TaskLike>();
@@ -78,7 +94,7 @@ export const mergeClientBoardForSafeSave = (serverBoard: ClientBoard | null | un
     ...localBoard,
     groups: (localBoard.groups || []).map(group => ({
       ...group,
-      tasks: (group.tasks || []).map(task => protectTaskEvidenceFields(serverTasksById.get(task.id), task as TaskLike) as any),
+      tasks: (group.tasks || []).map(task => protectTaskEvidenceFields(serverTasksById.get(task.id), task as TaskLike, options) as any),
     })),
   };
 };
@@ -632,7 +648,7 @@ export const restoreBoardById = async (dbId: string) => {
   else invalidateBoardCaches();
 };
 
-export const saveClientBoard = async (board: ClientBoard) => {
+export const saveClientBoard = async (board: ClientBoard, options: SaveClientBoardOptions = {}): Promise<boolean> => {
   const dbId = (board as any).db_id;
 
   if (dbId) {
@@ -647,7 +663,7 @@ export const saveClientBoard = async (board: ClientBoard) => {
       console.error('Error fetching current board before save:', fetchCurrentError);
     } else if (currentRow) {
       const currentBoard = parseClientBoardRow(currentRow);
-      boardToSave = mergeClientBoardForSafeSave(currentBoard, board);
+      boardToSave = mergeClientBoardForSafeSave(currentBoard, board, options);
     }
 
     const { error: updateError } = await supabase
@@ -657,9 +673,11 @@ export const saveClientBoard = async (board: ClientBoard) => {
 
     if (updateError) {
       console.error('Error updating board:', updateError);
+      return false;
     } else {
       invalidateBoardCaches();
       console.log('Board updated successfully:', boardToSave.id, boardToSave.name);
+      return true;
     }
   } else {
     const { error: insertError } = await supabase
@@ -668,9 +686,11 @@ export const saveClientBoard = async (board: ClientBoard) => {
 
     if (insertError) {
       console.error('Error inserting board:', insertError);
+      return false;
     } else {
       invalidateBoardCaches();
       console.log('Board inserted successfully:', board.id, board.name);
+      return true;
     }
   }
 };
@@ -1174,7 +1194,31 @@ export const searchChatMessages = async (
 export const uploadFile = async (file: File, bucket: string = 'uploads'): Promise<string | null> => {
   try {
     const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+    const safeExt = fileExt ? `.${fileExt.replace(/[^a-zA-Z0-9]/g, '')}` : '';
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}${safeExt}`;
+
+    // Uploads go through the portal web server. Supabase Storage currently blocks anon inserts
+    // via RLS, and the packaged Electron app runs from file://, so a same-origin-only check
+    // breaks desktop chat/task attachments and pasted screenshots. For file:// use the live
+    // portal origin explicitly; for web keep same-origin so URLs remain portable.
+    if (typeof window !== 'undefined') {
+      const isHttpApp = window.location.protocol.startsWith('http');
+      const portalOrigin = isHttpApp ? '' : 'https://echo-ai.tailfdbc33.ts.net';
+      const params = new URLSearchParams({ bucket, filename: fileName, originalName: file.name });
+      const response = await fetch(`${portalOrigin}/api/uploads?${params.toString()}`, {
+        method: 'POST',
+        headers: { 'content-type': file.type || 'application/octet-stream' },
+        body: file,
+      });
+
+      if (response.ok) {
+        const data = await response.json().catch(() => null);
+        if (data?.url) return isHttpApp ? data.url : `${portalOrigin}${data.url}`;
+      } else {
+        const text = await response.text().catch(() => '');
+        console.error('[Upload] Portal upload error:', response.status, text);
+      }
+    }
 
     const { error } = await supabase.storage.from(bucket).upload(fileName, file);
 

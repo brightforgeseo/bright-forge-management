@@ -3,6 +3,10 @@ const { app, BrowserWindow, shell, ipcMain, dialog, Notification } = require('el
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 
+const appIconPath = process.platform === 'win32'
+  ? path.join(__dirname, 'assets', 'icon.ico')
+  : path.join(__dirname, 'assets', 'icon.png');
+
 // Set App User Model ID for Windows notifications
 // Must match the appId in electron-builder config for proper Windows integration
 if (process.platform === 'win32') {
@@ -24,9 +28,8 @@ function showNativeNotification(title, body) {
 
       // Add icon if it exists (for Windows/Linux - macOS uses app icon automatically)
       const fs = require('fs');
-      const iconPath = path.join(__dirname, 'assets', 'icon.png');
-      if (fs.existsSync(iconPath)) {
-        notificationOptions.icon = iconPath;
+      if (fs.existsSync(appIconPath)) {
+        notificationOptions.icon = appIconPath;
       }
 
       const notification = new Notification(notificationOptions);
@@ -83,6 +86,7 @@ function createWindow() {
     width: 1280,
     height: 800,
     title: "Bright Forge Portal",
+    icon: appIconPath,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
