@@ -22,6 +22,67 @@ const invalidateBoardCaches = () => {
   clientBoardsCache = null;
 };
 
+type TaskLike = Record<string, any>;
+
+const mergeById = <T extends { id?: string }>(serverItems: T[] = [], localItems: T[] = []): T[] => {
+  const merged = new Map<string, T>();
+  for (const item of serverItems) {
+    if (item?.id) merged.set(item.id, item);
+  }
+  for (const item of localItems) {
+    if (item?.id) merged.set(item.id, item);
+  }
+  return Array.from(merged.values());
+};
+
+const hasValue = (value: unknown): boolean => {
+  if (Array.isArray(value)) return value.length > 0;
+  return typeof value === 'string' ? value.trim().length > 0 : value !== undefined && value !== null;
+};
+
+const protectTaskEvidenceFields = (serverTask: TaskLike | undefined, localTask: TaskLike): TaskLike => {
+  if (!serverTask) return localTask;
+
+  const nextTask: TaskLike = { ...localTask };
+
+  // Full-board saves can race across team members. Never let a stale local copy
+  // erase proof links, comments, or attachments that already exist on the server.
+  for (const field of ['worksheet', 'clientSheet']) {
+    if (!hasValue(nextTask[field]) && hasValue(serverTask[field])) {
+      nextTask[field] = serverTask[field];
+    }
+  }
+
+  if (Array.isArray(serverTask.comments) || Array.isArray(nextTask.comments)) {
+    nextTask.comments = mergeById(serverTask.comments || [], nextTask.comments || []);
+  }
+
+  if (Array.isArray(serverTask.attachments) || Array.isArray(nextTask.attachments)) {
+    nextTask.attachments = mergeById(serverTask.attachments || [], nextTask.attachments || []);
+  }
+
+  return nextTask;
+};
+
+export const mergeClientBoardForSafeSave = (serverBoard: ClientBoard | null | undefined, localBoard: ClientBoard): ClientBoard => {
+  if (!serverBoard?.groups?.length || !localBoard?.groups?.length) return localBoard;
+
+  const serverTasksById = new Map<string, TaskLike>();
+  for (const group of serverBoard.groups || []) {
+    for (const task of group.tasks || []) {
+      if (task?.id) serverTasksById.set(task.id, task as TaskLike);
+    }
+  }
+
+  return {
+    ...localBoard,
+    groups: (localBoard.groups || []).map(group => ({
+      ...group,
+      tasks: (group.tasks || []).map(task => protectTaskEvidenceFields(serverTasksById.get(task.id), task as TaskLike) as any),
+    })),
+  };
+};
+
 // --- Profile Management ---
 
 export const ensureProfileExists = async (userId: string, email?: string, fullName?: string) => {
@@ -575,16 +636,30 @@ export const saveClientBoard = async (board: ClientBoard) => {
   const dbId = (board as any).db_id;
 
   if (dbId) {
+    let boardToSave = board;
+    const { data: currentRow, error: fetchCurrentError } = await supabase
+      .from('client_boards')
+      .select('id, updated_at, board_data')
+      .eq('id', dbId)
+      .maybeSingle();
+
+    if (fetchCurrentError) {
+      console.error('Error fetching current board before save:', fetchCurrentError);
+    } else if (currentRow) {
+      const currentBoard = parseClientBoardRow(currentRow);
+      boardToSave = mergeClientBoardForSafeSave(currentBoard, board);
+    }
+
     const { error: updateError } = await supabase
       .from('client_boards')
-      .update({ board_data: board, updated_at: new Date().toISOString() })
+      .update({ board_data: boardToSave, updated_at: new Date().toISOString() })
       .eq('id', dbId);
 
     if (updateError) {
       console.error('Error updating board:', updateError);
     } else {
       invalidateBoardCaches();
-      console.log('Board updated successfully:', board.id, board.name);
+      console.log('Board updated successfully:', boardToSave.id, boardToSave.name);
     }
   } else {
     const { error: insertError } = await supabase
