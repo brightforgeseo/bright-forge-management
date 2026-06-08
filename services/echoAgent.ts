@@ -9,7 +9,6 @@
  *  - Current client list and partner notes baked in
  */
 
-import Anthropic from '@anthropic-ai/sdk';
 import { supabase } from '../lib/supabaseClient';
 import { ClientBoard, Task } from '../types';
 import {
@@ -27,19 +26,23 @@ import {
 } from './businessContextLoader';
 import { getChatSystemPrompt } from './skillsLoader';
 
-const K1 = 'sk-ant-api03-FM3mh6FtduBlSZR63Sdx8zM2xsKNtuE';
-const K2 = '_IxCsXAgHA-QFdT-0P2Ip3Tpypg7SVQAPr8TA7p0S2dvHyFi9D0mpjQ-z388AAAA';
-const GEMINI_PRO = 'gemini-3.1-pro-preview';
+const GEMINI_PRO = 'disabled-browser-side-paid-ai';
 
 const MAX_HOPS = 12;
 const MAX_TOKENS = 16000;
 
-const getClient = () => new Anthropic({ apiKey: K1 + K2, dangerouslyAllowBrowser: true });
+const getClient = (): any => ({
+  messages: {
+    create: async () => {
+      throw new Error('Browser-side paid AI usage is disabled. Use the Echo bridge/Hermes route instead.');
+    },
+  },
+});
 
 // =============================================================================
 // TOOL DEFINITIONS
 // =============================================================================
-const TOOLS: Anthropic.Tool[] = [
+const TOOLS: any[] = [
   {
     name: 'find_tasks',
     description:
@@ -1109,7 +1112,7 @@ If numbers look wrong vs the known baselines (40+ clients, 6-8 team, ₱1.1M+ re
 
 The acting user is **${executingUser.name}** — attribute actions and notifications to them.`;
 
-  const messages: Anthropic.MessageParam[] = [
+  const messages: any[] = [
     {
       role: 'user',
       content: `Chat History:\n${truncatedHistory}\n\nUser Message: ${userMessage}`
@@ -1125,14 +1128,14 @@ The acting user is **${executingUser.name}** — attribute actions and notificat
       messages
     });
 
-    const toolUses = response.content.filter(b => b.type === 'tool_use') as Anthropic.ToolUseBlock[];
+    const toolUses = response.content.filter(b => b.type === 'tool_use') as any[];
 
     if (toolUses.length === 0 || response.stop_reason === 'end_turn') {
-      const textBlock = response.content.find(b => b.type === 'text') as Anthropic.TextBlock | undefined;
+      const textBlock = response.content.find(b => b.type === 'text') as any | undefined;
       return textBlock?.text || 'Done.';
     }
 
-    const toolResults: Anthropic.ToolResultBlockParam[] = [];
+    const toolResults: any[] = [];
     for (const tu of toolUses) {
       console.log('[Echo v2] tool_use:', tu.name, tu.input);
       const result = await executeTool(tu.name, tu.input, executingUser.name, executingUser.id);

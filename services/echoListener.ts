@@ -10,47 +10,31 @@
  * the user with role === 'Owner'. Other roles get a no-op.
  */
 
-import Anthropic from '@anthropic-ai/sdk';
 import { supabase } from '../lib/supabaseClient';
 import { sendChatMessage, fetchChannels, editChatMessage, sendReplyMessage } from './databaseService';
 import { getChatResponse } from './geminiService';
 import { ChatChannel, User } from '../types';
 
-// Tiny, cheap classifier — Haiku. Only used when Echo just spoke and the next
-// message MIGHT be a follow-up. Avoids running on every chat message.
-const K1 = 'sk-ant-api03-FM3mh6FtduBlSZR63Sdx8zM2xsKNtuE';
-const K2 = '_IxCsXAgHA-QFdT-0P2Ip3Tpypg7SVQAPr8TA7p0S2dvHyFi9D0mpjQ-z388AAAA';
-const CLASSIFIER_MODEL = 'gemini-haiku-4-5-20251001';
 const FOLLOWUP_WINDOW_MS = 5 * 60 * 1000;       // 5 min after Echo speaks, treat next msgs as possibly addressed to him
-
-const classifierClient = new Anthropic({ apiKey: K1 + K2, dangerouslyAllowBrowser: true });
 
 const lastEchoMessageAt = new Map<string, number>();   // channel.id -> ts
 
 /**
- * Cheap classifier: "Is this human talking to Echo, or to other humans?"
- * Only invoked when the prior Echo activity makes it plausible.
+ * Local follow-up classifier: "Is this human talking to Echo, or to other humans?"
+ * Keep this deterministic. The portal must not spend paid LLM/API credits just
+ * to decide whether to reply to a team-chat message.
  */
 async function isAddressedToEcho(opts: {
   currentMessage: string;
   recentHistory: string;
 }): Promise<boolean> {
-  try {
-    const resp = await classifierClient.messages.create({
-      model: CLASSIFIER_MODEL,
-      max_tokens: 6,                              // single token answer
-      system: 'You decide if a chat message is addressed to "Echo" (the AI assistant) or to other humans in the channel. Reply with EXACTLY "YES" or "NO" — nothing else. Default to NO if ambiguous; only say YES if the message is clearly directed at Echo (a follow-up question/instruction, a reply to something Echo said, asking the AI to do something).',
-      messages: [{
-        role: 'user',
-        content: `Recent channel messages (oldest -> newest):\n${opts.recentHistory}\n\nCURRENT MESSAGE:\n${opts.currentMessage}\n\nIs the CURRENT MESSAGE addressed to Echo? YES or NO.`
-      }]
-    });
-    const text = resp.content[0]?.type === 'text' ? resp.content[0].text.trim().toUpperCase() : '';
-    return text.startsWith('YES');
-  } catch (e) {
-    console.error('[EchoListener] classifier failed:', e);
-    return false; // err on the side of silence
-  }
+  const t = (opts.currentMessage || '').trim();
+  if (!t) return false;
+  if (isWakeMention(t)) return true;
+
+  // Conservative follow-up patterns after Echo just spoke. Ambiguous chatter
+  // stays silent rather than burning model credits or interrupting humans.
+  return /^(yes|yeah|yep|no|nah|ok|okay|do it|go ahead|please do|can you|could you|what about|why|how|when|where|which|show me|check|fix|update|create|add|remove|delete|move|mark|assign)\b/i.test(t);
 }
 
 // "Echo off" commands: explicit mute. Matched BEFORE the wake trigger so saying

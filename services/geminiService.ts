@@ -1,7 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { KeywordResult, KeywordResearchOptions, AuditOptions, AuditResult, AuditIssue, ContentResult, Task, QACorrection } from "../types";
 import { generateLittleEchoContent } from "./littleEchoService";
-import { runEchoAgent } from "./echoAgent";
 import { getBridgeUrl } from "../lib/bridgeClient";
 
 const getAiClient = () => {
@@ -390,34 +389,8 @@ export const getChatResponse = async (
   try {
     return await callEchoBridge(history, message, bridgeUser);
   } catch (bridgeError) {
-    console.warn("Portal bridge unavailable, falling back to Gemini directly:", bridgeError);
-  }
-
-  try {
-    if (executingUser?.id) {
-      return await runEchoAgent(history, message, executingUser);
-    }
-    const ai = getAiClient();
-    const truncatedHistory = history.length > 8000 ? "..." + history.slice(-8000) : history;
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: `You are "Echo", a helpful, professional, and slightly witty SEO AI Assistant in a team chat for a digital agency called "Bright Forge".
-
-      Chat History Context:
-      ${truncatedHistory}
-
-      User Message: ${message}
-
-      Reply to the user as a helpful colleague.
-      - Be concise (under 3 sentences unless asked for detail).
-      - You can use simple markdown (*bold*, _italic_) but avoid complex blocks unless it's code.
-      - If asked to do a task you can't do (like "delete this"), explain you are a chat assistant but can guide them.`,
-    });
-
-    return response.text || "I'm having trouble connecting to the server right now.";
-  } catch (error) {
-    console.error("Chat response failed:", error);
-    throw new Error("AI Service Unavailable");
+    console.error("Chat response failed: Echo bridge unavailable", bridgeError);
+    throw new Error("Echo bridge unavailable. Start the local Hermes bridge rather than using paid/browser-side AI fallback.");
   }
 };
 

@@ -8,7 +8,7 @@ const BRIDGE_SECRET = ['brightforge', 'echo', 'bridge', '2026'].join('-');
  * Generate SEO content using the portal bridge pipeline.
  * mode='edit'  (default) — Echo draft → Gemma 4B edit. Fast (~30s).
  * mode='full'            — Echo outline → Sassin full article. Quality (~90s).
- * Zero API cost. Falls back to Gemini if bridge unavailable.
+ * Zero API cost. If the bridge is unavailable, fail loudly instead of using paid browser-side fallback.
  */
 export const generateLittleEchoContent = async (
   topic: string,

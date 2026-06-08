@@ -155,6 +155,8 @@ export interface ContentResult {
   title: string;
   content: string;
   metaDescription: string;
+  rawDraft?: string;
+  mode?: string;
 }
 
 export interface QACorrection {
