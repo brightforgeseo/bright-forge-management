@@ -1,15 +1,9 @@
 const DEFAULT_REMOTE_BRIDGE_URL = 'https://echo-ai.tailfdbc33.ts.net:8443';
 
 export const getBridgeUrl = (): string => {
-  if (
-    typeof window !== 'undefined' &&
-    window.location?.origin &&
-    window.location.protocol.startsWith('http') &&
-    window.location.hostname.endsWith('vercel.app')
-  ) {
-    return `${window.location.origin}/bridge`;
-  }
-
+  // Vercel rewrites to Ben's Tailscale Funnel bridge can fail with
+  // ROUTER_EXTERNAL_TARGET_HANDSHAKE_ERROR on the custom HTTPS port. Use the
+  // public Funnel bridge directly instead of the Vercel proxy.
   return DEFAULT_REMOTE_BRIDGE_URL;
 };
 
