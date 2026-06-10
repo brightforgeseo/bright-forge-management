@@ -1,14 +1,9 @@
 {
-  "version": 2,
-  "builds": [
-    { "src": "api/**/*.js", "use": "@vercel/node" },
-    { "src": "package.json", "use": "@vercel/static-build", "config": { "distDir": "dist" } }
-  ],
-  "routes": [
-    { "src": "/api/(.*)", "dest": "/api/proxy.js?proxyPath=$1" },
-    { "src": "/(.*\\.(?:js|css|png|ico|webmanifest|json|svg|jpg|jpeg|gif|webp|woff|woff2|ttf|map))", "dest": "/$1" },
-    { "src": "/supabase/(.*)", "dest": "https://echo-ai.tailfdbc33.ts.net/supabase/$1" },
-    { "src": "/bridge/(.*)", "dest": "https://echo-ai.tailfdbc33.ts.net/bridge/$1" },
-    { "src": "/(.*)", "dest": "/index.html" }
+  "redirects": [
+    {
+      "source": "/:path*",
+      "destination": "https://echo-ai.tailfdbc33.ts.net/:path*",
+      "permanent": false
+    }
   ]
 }
