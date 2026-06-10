@@ -1,6 +1,7 @@
 // Client Portal Types
 // Separate from main app types for partner-facing portal
 
+import type React from 'react';
 import { ClientBoard, Task, TaskGroup, ToastType } from './types';
 
 // ============================================

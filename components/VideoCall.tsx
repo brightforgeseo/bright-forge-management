@@ -15,8 +15,8 @@ interface VideoCallProps {
 }
 
 interface RemoteParticipant {
-  odisconnectionuserId: string;
-  odisconnectionuserName: string;
+  userId: string;
+  userName: string;
   stream: MediaStream;
 }
 
@@ -59,20 +59,20 @@ const VideoCall: React.FC<VideoCallProps> = ({
         }
       };
 
-      webrtcService.onParticipantJoined = (odisconnectionuserId: string, odisconnectionuserName: string, stream: MediaStream) => {
-        console.log('[VideoCall] Participant joined:', odisconnectionuserName);
+      webrtcService.onParticipantJoined = (userId: string, userName: string, stream: MediaStream) => {
+        console.log('[VideoCall] Participant joined:', userName);
         setRemoteParticipants(prev => {
           const updated = new Map(prev);
-          updated.set(odisconnectionuserId, { odisconnectionuserId, odisconnectionuserName, stream });
+          updated.set(userId, { userId, userName, stream });
           return updated;
         });
       };
 
-      webrtcService.onParticipantLeft = (odisconnectionuserId: string) => {
-        console.log('[VideoCall] Participant left:', odisconnectionuserId);
+      webrtcService.onParticipantLeft = (userId: string) => {
+        console.log('[VideoCall] Participant left:', userId);
         setRemoteParticipants(prev => {
           const updated = new Map(prev);
-          updated.delete(odisconnectionuserId);
+          updated.delete(userId);
           return updated;
         });
       };
@@ -223,7 +223,7 @@ const VideoCall: React.FC<VideoCallProps> = ({
         {/* Remote Participants */}
         {Array.from(remoteParticipants.values()).map((participant) => (
           <RemoteVideo
-            key={participant.odisconnectionuserId}
+            key={participant.userId}
             participant={participant}
           />
         ))}
@@ -372,13 +372,13 @@ const RemoteVideo: React.FC<{ participant: RemoteParticipant }> = ({ participant
         <div className="absolute inset-0 flex items-center justify-center bg-slate-700">
           <div className="w-20 h-20 rounded-full bg-slate-600 flex items-center justify-center">
             <span className="text-2xl font-bold text-white">
-              {participant.odisconnectionuserName.charAt(0).toUpperCase()}
+              {participant.userName.charAt(0).toUpperCase()}
             </span>
           </div>
         </div>
       )}
       <div className="absolute bottom-3 left-3 px-3 py-1 bg-black/50 rounded-lg">
-        <span className="text-white text-sm font-medium">{participant.odisconnectionuserName}</span>
+        <span className="text-white text-sm font-medium">{participant.userName}</span>
       </div>
     </div>
   );

@@ -336,7 +336,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
       }
 
       if (clients.length === 0) {
-        addToast('Unable to open task - boards not loaded. Please try again.', 'error');
+        addToast('error', 'Unable to open task - boards not loaded. Please try again.');
         localStorage.removeItem('openTaskModal');
         return;
       }
@@ -403,15 +403,15 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
               });
             });
           } else {
-            addToast('Task not found. It may have been deleted.', 'error');
+            addToast('error', 'Task not found. It may have been deleted.');
           }
         } else {
-          addToast('Board not found. The board may have been deleted.', 'error');
+          addToast('error', 'Board not found. The board may have been deleted.');
         }
         localStorage.removeItem('openTaskModal');
       } catch (e) {
         console.error('Error processing deep link:', e);
-        addToast('Failed to open notification link. Please try again.', 'error');
+        addToast('error', 'Failed to open notification link. Please try again.');
         localStorage.removeItem('openTaskModal');
       }
     };
