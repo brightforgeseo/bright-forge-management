@@ -122,6 +122,15 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
   const channelsRef = useRef<ChatChannel[]>([]);
   const messageCacheRef = useRef<Map<string, ChatMessage[]>>(new Map());
   const pendingOptimisticRef = useRef<Record<string, string>>({});
+  // Dedupe between the realtime INSERT handler and the unread-badge poll so a
+  // message never bumps a badge twice regardless of which path sees it first.
+  const seenMessageIdsRef = useRef<Set<string>>(new Set());
+  const unreadPollSinceRef = useRef<string>(new Date().toISOString());
+  // Online status comes from realtime presence when the socket is up, and from
+  // profiles.last_seen_at heartbeats when it is not. A user is online if either
+  // source says so.
+  const realtimePresenceIdsRef = useRef<Set<string>>(new Set());
+  const heartbeatOnlineIdsRef = useRef<Set<string>>(new Set());
   const [mentionDropdown, setMentionDropdown] = useState<{ show: boolean; search: string; position: number } | null>(null);
 
   // Echo AI Bot User ID (fixed UUID for the bot)
@@ -601,7 +610,21 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
   }, [messages, activeChannelId]);
 
   // Presence Tracking
+  // Realtime presence is the primary source, but the websocket can drop or be
+  // blocked by the hosting proxy (REST keeps working while presence dies). The
+  // profiles.last_seen_at heartbeat below keeps online badges accurate over
+  // plain REST whenever the database is reachable at all. Requires the
+  // last_seen_at column from ADD_PRESENCE_HEARTBEAT.sql; degrades silently to
+  // realtime-only presence until that migration is run.
   useEffect(() => {
+    const applyOnlineStatus = () => {
+      setProfiles(prev => prev.map(profile => {
+        const isOnline = realtimePresenceIdsRef.current.has(profile.id)
+          || heartbeatOnlineIdsRef.current.has(profile.id);
+        return profile.isOnline === isOnline ? profile : { ...profile, isOnline };
+      }));
+    };
+
     const presenceChannel = supabase.channel('online-users', {
       config: {
         presence: {
@@ -612,11 +635,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
     presenceChannel
       .on('presence', { event: 'sync' }, () => {
-        const state = presenceChannel.presenceState();
-        setProfiles(prev => prev.map(profile => {
-          const isOnline = Object.keys(state).includes(profile.id);
-          return { ...profile, isOnline };
-        }));
+        realtimePresenceIdsRef.current = new Set(Object.keys(presenceChannel.presenceState()));
+        applyOnlineStatus();
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
@@ -627,17 +647,44 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
         }
       });
 
+    const sendHeartbeat = async () => {
+      await supabase
+        .from('profiles')
+        .update({ last_seen_at: new Date().toISOString() })
+        .eq('id', currentUser.id);
+    };
+
+    const pollHeartbeats = async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, last_seen_at');
+      if (error || !data) return;
+      const cutoff = Date.now() - 90_000;
+      heartbeatOnlineIdsRef.current = new Set(
+        data
+          .filter((p: any) => p.last_seen_at && new Date(p.last_seen_at).getTime() >= cutoff)
+          .map((p: any) => p.id as string)
+      );
+      applyOnlineStatus();
+    };
+
+    sendHeartbeat().catch(() => {});
+    pollHeartbeats().catch(() => {});
+
     const heartbeat = setInterval(() => {
       presenceChannel.track({
         user: currentUser.id,
         online_at: new Date().toISOString(),
       });
+      sendHeartbeat().catch(() => {});
+      pollHeartbeats().catch(() => {});
     }, 30000);
 
     return () => {
       clearInterval(heartbeat);
       presenceChannel.untrack();
       supabase.removeChannel(presenceChannel);
+      realtimePresenceIdsRef.current = new Set();
     };
   }, [currentUser.id]);
 
@@ -896,6 +943,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, async (payload) => {
         const newMsg = payload.new as any;
         console.log('[TeamChat] ✅ REALTIME: New message received:', newMsg.id, newMsg);
+        seenMessageIdsRef.current.add(newMsg.id);
 
         const formattedMsg = formatChatRow(newMsg);
 
@@ -1129,6 +1177,47 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       window.clearInterval(catchUpTimer);
     };
   }, []);
+
+  // Unread badge fallback: the realtime INSERT handler is the primary source
+  // for badges, but when the websocket is down those events never arrive while
+  // the active channel keeps working via the catch-up poll above. This poll
+  // sweeps for new messages across all channels and bumps badges for anything
+  // the realtime handler hasn't already counted (seenMessageIdsRef dedupes).
+  useEffect(() => {
+    const pollUnread = async () => {
+      const since = unreadPollSinceRef.current;
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .select('id, channel_id, sender_id, is_ai, created_at')
+        .gt('created_at', since)
+        .order('created_at', { ascending: true })
+        .limit(200);
+      if (error || !data || data.length === 0) return;
+
+      unreadPollSinceRef.current = data[data.length - 1].created_at;
+
+      const unseenCounts = new Map<string, number>();
+      for (const row of data) {
+        if (seenMessageIdsRef.current.has(row.id)) continue;
+        seenMessageIdsRef.current.add(row.id);
+        if (row.sender_id === currentUser.id || row.is_ai) continue;
+        if (row.channel_id === activeChannelRef.current) continue;
+        unseenCounts.set(row.channel_id, (unseenCounts.get(row.channel_id) || 0) + 1);
+      }
+      if (unseenCounts.size === 0) return;
+
+      setChannels(prev => prev.map(c =>
+        unseenCounts.has(c.id)
+          ? { ...c, unread: (c.unread || 0) + (unseenCounts.get(c.id) || 0) }
+          : c
+      ));
+    };
+
+    const unreadTimer = window.setInterval(() => {
+      pollUnread().catch(e => console.error('[TeamChat] unread poll failed:', e));
+    }, 10000);
+    return () => window.clearInterval(unreadTimer);
+  }, [currentUser.id]);
 
   // SIMPLIFIED CHANNEL SWITCH - Always fetch fresh from database
   useEffect(() => {

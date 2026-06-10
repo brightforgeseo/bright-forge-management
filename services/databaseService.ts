@@ -1220,7 +1220,12 @@ export const uploadFile = async (file: File, bucket: string = 'uploads'): Promis
       }
     }
 
-    const { error } = await supabase.storage.from(bucket).upload(fileName, file);
+    // Fallback when the portal /api/uploads endpoint is unreachable. Direct
+    // storage uploads need the authenticated-insert policy from
+    // CHECK_UPLOADS_BUCKET.sql; without it this fails with an RLS error.
+    const { error } = await supabase.storage
+      .from(bucket)
+      .upload(fileName, file, { contentType: file.type || 'application/octet-stream' });
 
     if (error) {
       console.error('[Upload] Error:', error.message);
