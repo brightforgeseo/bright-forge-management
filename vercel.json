@@ -1,10 +1,10 @@
 {
   "buildCommand": "rm -rf .parcel-cache && npm run build",
   "outputDirectory": "dist",
-  "rewrites": [
-    { "source": "/api/:path*", "destination": "/api/:path*" },
-    { "source": "/supabase/:path*", "destination": "https://echo-ai.tailfdbc33.ts.net:10000/:path*" },
-    { "source": "/bridge/:path*", "destination": "https://echo-ai.tailfdbc33.ts.net:8443/:path*" },
-    { "source": "/(.*)", "destination": "/index.html" }
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/supabase/(.*)", "dest": "https://echo-ai.tailfdbc33.ts.net:10000/$1" },
+    { "src": "/bridge/(.*)", "dest": "https://echo-ai.tailfdbc33.ts.net:8443/$1" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
