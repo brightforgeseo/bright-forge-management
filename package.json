@@ -11,6 +11,7 @@
     "build": "rm -rf .parcel-cache dist && parcel build index.html --public-url ./ && node scripts/copy-public.cjs",
     "electron:dev": "concurrently \"cross-env BROWSER=none npm start\" \"wait-on http://localhost:1234 && electron .\"",
     "electron:build": "npm run build && electron-builder",
+    "deploy:watch": "node scripts/auto-deploy-watch.cjs",
     "release:update": "node scripts/release-portal-update.cjs",
     "release:update:dry-run": "node scripts/release-portal-update.cjs --dry-run",
     "release:update:local": "node scripts/release-portal-update.cjs --allow-unpublished",
