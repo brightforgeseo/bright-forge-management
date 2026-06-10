@@ -1,8 +1,11 @@
 {
-  "buildCommand": "rm -rf .parcel-cache && npm run build",
-  "outputDirectory": "dist",
+  "version": 2,
+  "builds": [
+    { "src": "api/**/*.js", "use": "@vercel/node" },
+    { "src": "package.json", "use": "@vercel/static-build", "config": { "distDir": "dist" } }
+  ],
   "routes": [
-    { "handle": "filesystem" },
+    { "src": "/api/(.*)", "dest": "/api/$1" },
     { "src": "/supabase/(.*)", "dest": "https://echo-ai.tailfdbc33.ts.net:10000/$1" },
     { "src": "/bridge/(.*)", "dest": "https://echo-ai.tailfdbc33.ts.net:8443/$1" },
     { "src": "/(.*)", "dest": "/index.html" }
