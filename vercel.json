@@ -5,7 +5,8 @@
     { "src": "package.json", "use": "@vercel/static-build", "config": { "distDir": "dist" } }
   ],
   "routes": [
-    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/api/(.*)", "dest": "/api/proxy.js?proxyPath=$1" },
+    { "src": "/(.*\\.(?:js|css|png|ico|webmanifest|json|svg|jpg|jpeg|gif|webp|woff|woff2|ttf|map))", "dest": "/$1" },
     { "src": "/supabase/(.*)", "dest": "https://echo-ai.tailfdbc33.ts.net:10000/$1" },
     { "src": "/bridge/(.*)", "dest": "https://echo-ai.tailfdbc33.ts.net:8443/$1" },
     { "src": "/(.*)", "dest": "/index.html" }
