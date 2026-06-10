@@ -7,12 +7,12 @@ const LOCAL_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOi
 
 const getSupabaseUrl = () => {
   if (typeof window !== 'undefined' && window.location.protocol.startsWith('http')) {
-    // Vercel cannot reliably proxy Ben's Tailscale Funnel services on custom
-    // HTTPS ports. Use the public Funnel Supabase endpoint directly for the
-    // Vercel-hosted web app, while preserving same-origin routing on the live
-    // local portal host.
+    // Vercel's router-level external rewrites can fail against Ben's Tailscale
+    // Funnel custom HTTPS ports. Use the bundled serverless proxy for the
+    // Vercel-hosted app, while preserving same-origin routing on the live local
+    // portal host.
     if (window.location.hostname.endsWith('vercel.app')) {
-      return LOCAL_SUPABASE_URL;
+      return `${window.location.origin}/api/supabase`;
     }
     return `${window.location.origin}/supabase`;
   }
