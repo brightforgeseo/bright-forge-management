@@ -35,7 +35,17 @@ const SUPABASE_URL = new URL(process.env.SUPABASE_INTERNAL_URL || 'http://127.0.
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
 const DIST = path.resolve(__dirname, '..', 'dist');
+const PROJECT_ROOT = path.resolve(__dirname, '..');
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+
+const getPortalVersion = () => {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(PROJECT_ROOT, 'package.json'), 'utf8'));
+    return pkg.version || 'unknown';
+  } catch {
+    return 'unknown';
+  }
+};
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -166,12 +176,13 @@ const serveStatic = (req, res, requestUrl) => {
     return res.end('Portal build not found - run: npm run build');
   }
   const ext = path.extname(filePath).toLowerCase();
-  const isIndex = filePath.endsWith('index.html');
+  const isAppShell = filePath.endsWith('index.html') || ['.js', '.css', '.webmanifest'].includes(ext);
   res.writeHead(200, {
     'content-type': MIME[ext] || 'application/octet-stream',
-    // Hashed assets can cache forever; index.html must revalidate so new
-    // builds (from the auto-deploy watcher) reach browsers immediately.
-    'cache-control': isIndex ? 'no-cache' : 'public, max-age=31536000, immutable',
+    // During active portal release debugging, app-shell files must not be
+    // served stale. Images/fonts can still cache normally.
+    'cache-control': isAppShell ? 'no-store, no-cache, must-revalidate, max-age=0' : 'public, max-age=3600',
+    ...(isAppShell ? { pragma: 'no-cache' } : {}),
   });
   fs.createReadStream(filePath).pipe(res);
 };
@@ -185,6 +196,14 @@ const server = http.createServer((req, res) => {
   if (requestUrl.pathname === '/healthz') {
     res.writeHead(200, { 'content-type': 'text/plain' });
     return res.end('ok');
+  }
+  if (requestUrl.pathname === '/version') {
+    res.writeHead(200, {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'no-store, no-cache, must-revalidate, max-age=0',
+      pragma: 'no-cache',
+    });
+    return res.end(JSON.stringify({ version: getPortalVersion() }));
   }
   return serveStatic(req, res, requestUrl);
 });
