@@ -13,8 +13,11 @@ const HOP_BY_HOP_HEADERS = new Set([
 ]);
 
 const TARGETS = {
-  bridge: { host: 'echo-ai.tailfdbc33.ts.net', port: 8443 },
-  supabase: { host: 'echo-ai.tailfdbc33.ts.net', port: 10000 }
+  // Use the root Tailscale Funnel on standard HTTPS/443. Vercel serverless
+  // functions cannot reliably open TLS to the custom Funnel ports, but 443 is
+  // stable and routes these paths locally via Tailscale Serve/Funnel.
+  bridge: { host: 'echo-ai.tailfdbc33.ts.net', port: 443, prefix: '/bridge' },
+  supabase: { host: 'echo-ai.tailfdbc33.ts.net', port: 443, prefix: '/supabase' }
 };
 
 function cors(res) {
@@ -100,7 +103,7 @@ module.exports = async (req, res) => {
     protocol: 'https:',
     hostname: target.host,
     port: target.port,
-    path: `${upstreamPath}${upstreamQuery(req)}`,
+    path: `${target.prefix}${upstreamPath}${upstreamQuery(req)}`,
     method: req.method,
     headers,
     servername: target.host,
