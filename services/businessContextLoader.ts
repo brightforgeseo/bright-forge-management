@@ -395,6 +395,14 @@ export const loadBusinessContext = async (forceRefresh = false): Promise<Busines
  * Format business context as a concise prompt section
  * Optimized for token efficiency while maintaining quality
  */
+const fmtTaskResources = (t: TaskSummary) => {
+  const resources: string[] = [];
+  if (t.worksheet) resources.push(`Worksheet: ${t.worksheet}`);
+  if (t.clientSheet) resources.push(`Client sheet: ${t.clientSheet}`);
+  if (t.attachments.length) resources.push(`Attachments: ${t.attachments.map(a => `${a.name} (${a.url})`).join(', ')}`);
+  return resources.length ? ` | ${resources.join(' | ')}` : '';
+};
+
 export const formatBusinessContextForPrompt = (context: BusinessContext): string => {
   const { clients, recentTasks, recentComments, teamMembers, statistics, risks, recentChat } = context;
 
@@ -442,14 +450,6 @@ export const formatBusinessContextForPrompt = (context: BusinessContext): string
   }
 
   // Auto-detected risks block — Echo can flag these without being asked
-  const fmtTaskResources = (t: TaskSummary) => {
-    const resources: string[] = [];
-    if (t.worksheet) resources.push(`Worksheet: ${t.worksheet}`);
-    if (t.clientSheet) resources.push(`Client sheet: ${t.clientSheet}`);
-    if (t.attachments.length) resources.push(`Attachments: ${t.attachments.map(a => `${a.name} (${a.url})`).join(', ')}`);
-    return resources.length ? ` | ${resources.join(' | ')}` : '';
-  };
-
   const fmtRiskTask = (t: TaskSummary) =>
     `  - "${t.title}" (${t.clientName}) | ${t.status} | Due: ${t.dueDate}${t.assignedTo.length ? ` | ${t.assignedTo.join(', ')}` : ' | unassigned'}${fmtTaskResources(t)}`;
   const risksBlock = `

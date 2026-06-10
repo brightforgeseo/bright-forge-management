@@ -798,7 +798,7 @@ async function executeTool(
         const taskIndex = group.tasks?.findIndex(t => t.id === taskId) ?? -1;
         if (taskIndex === -1) return { ok: false, error: `Task ${taskId} not found` };
         const [task] = group.tasks!.splice(taskIndex, 1);
-        board.archivedTasks = [...(board.archivedTasks || []), { ...task, archivedAt: new Date().toISOString() }];
+        board.archivedTasks = [...(board.archivedTasks || []), { ...task, archivedAt: new Date().toISOString(), originalGroupId: group.id, originalGroupTitle: group.title }];
         await saveClientBoard(board);
         clearBusinessContextCache();
         return { ok: true, data: { archived: taskId, taskTitle: task.title, boardName: board.name } };

@@ -185,7 +185,7 @@ export const buildDashboardMetrics = (boards: ClientBoard[], profiles: Profile[]
     tasksByBoard.set(task.boardId, [...(tasksByBoard.get(task.boardId) || []), task]);
   }
 
-  const clientRisks: ClientRisk[] = boards.map(board => {
+  const clientRisks: ClientRisk[] = boards.map((board): ClientRisk => {
     const boardTasks = tasksByBoard.get(board.id) || [];
     const open = boardTasks.filter(t => !t.isCompleted);
     const overdue = open.filter(t => !!t.task.dueDate && t.task.dueDate < today);
@@ -296,7 +296,7 @@ export const buildDashboardMetrics = (boards: ClientBoard[], profiles: Profile[]
     };
   }).sort((a, b) => b.overdue - a.overdue || b.open - a.open);
 
-  const hygieneIssues: HygieneIssue[] = [
+  const hygieneCandidates: HygieneIssue[] = [
     {
       id: 'no-due-date',
       label: 'Open tasks without due dates',
@@ -328,7 +328,8 @@ export const buildDashboardMetrics = (boards: ClientBoard[], profiles: Profile[]
       severity: 'blue',
       detail: 'Could be healthy, archived, or abandoned.',
     },
-  ].filter(issue => issue.count > 0);
+  ];
+  const hygieneIssues = hygieneCandidates.filter(issue => issue.count > 0);
 
   const feedItems: FeedItem[] = [
     ...clientRisks.slice(0, 5).map(risk => ({

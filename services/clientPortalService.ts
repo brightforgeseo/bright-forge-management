@@ -981,6 +981,47 @@ const extractTaskComments = (task: any): PortalTaskComment[] => {
   }));
 };
 
+// Flatten the structured context into the plain-text prompt generateClientEmail expects
+const formatEmailContext = (ctx: EmailGenerationContext): string => {
+  const lines: string[] = [];
+  lines.push(`Client: ${ctx.clientName}${ctx.clientIndustry ? ` (${ctx.clientIndustry})` : ''}`);
+  lines.push(`Sender: ${ctx.partnerFullName} (${ctx.partnerName}) at ${ctx.partnerCompany}`);
+  lines.push(`Task: ${ctx.taskTitle}`);
+  if (ctx.taskDescription) lines.push(`Task description: ${ctx.taskDescription}`);
+  if (ctx.taskStatus) lines.push(`Task status: ${ctx.taskStatus}`);
+  if (ctx.taskDueDate) lines.push(`Due date: ${ctx.taskDueDate}`);
+  if (ctx.notes) lines.push(`Notes visible to the client: ${ctx.notes}`);
+  if (ctx.taskComments?.length) {
+    lines.push('Team comments on the task:');
+    ctx.taskComments.forEach(c => lines.push(`- ${c.author} (${c.createdAt}): ${c.text}`));
+  }
+  if (ctx.partnerComments?.length) {
+    lines.push('Partner comments:');
+    ctx.partnerComments.forEach(c => lines.push(`- ${c.author} (${c.createdAt}): ${c.text}`));
+  }
+  if (ctx.previousTasks?.length) {
+    lines.push('Previous tasks on this SEO project:');
+    ctx.previousTasks.forEach(t => lines.push(`- ${t.title} [${t.status}]${t.completedAt ? ` completed ${t.completedAt}` : ''}`));
+  }
+  if (ctx.isReply) {
+    lines.push('This email is a reply to the client.');
+    if (ctx.previousConversation) lines.push(`Previous conversation:\n${ctx.previousConversation}`);
+    if (ctx.lastClientMessage) lines.push(`Latest client message to respond to: ${ctx.lastClientMessage}`);
+  }
+  lines.push('');
+  lines.push('Format the response as a single line "Subject: <subject line>" followed by a blank line, then the email body. Do not include anything else.');
+  return lines.join('\n');
+};
+
+const parseGeneratedEmail = (raw: string, ctx: EmailGenerationContext): GeneratedEmail => {
+  const text = raw.trim();
+  const match = text.match(/^subject:\s*(.+?)\s*\n+([\s\S]*)$/i);
+  if (match) {
+    return { subject: match[1].trim(), body: match[2].trim() };
+  }
+  return { subject: `Update on ${ctx.taskTitle}`, body: text };
+};
+
 export const generateEmailWithAI = async (
   context: EmailGenerationContext,
   task?: any, // Optional full task object with comments
@@ -1009,9 +1050,12 @@ export const generateEmailWithAI = async (
       );
     }
 
-    // Call Gemini Haiku to generate the email
-    const result = await generateClientEmail(enrichedContext);
-    return result;
+    // Generate the email, then parse the free-text reply into subject/body
+    const raw = await generateClientEmail(formatEmailContext(enrichedContext));
+    if (!raw || raw === 'Email generation failed.' || raw === 'Error generating email.') {
+      return null;
+    }
+    return parseGeneratedEmail(raw, enrichedContext);
   } catch (err) {
     console.error('[generateEmailWithAI] Unexpected error:', err);
     return null;

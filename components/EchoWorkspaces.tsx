@@ -353,7 +353,7 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
 
   const addWorkspace = (templateId: WorkspaceTemplateId = 'blank', client?: ClientBoardSummary) => {
     if (workspaces.filter(w => !w.archived).length >= MAX_WORKSPACES) {
-      addToast('warning', `Maximum ${MAX_WORKSPACES} active workspaces open at once`);
+      addToast('info', `Maximum ${MAX_WORKSPACES} active workspaces open at once`);
       return;
     }
     const base = makeWorkspace(undefined, templateId, client);
@@ -697,7 +697,7 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
             return (
               <div key={ws.id} onClick={() => setActiveId(ws.id)} className={`group flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg cursor-pointer text-xs transition-colors max-w-[210px] ${ws.id === activeId ? 'bg-portal-surface text-white border border-white/[0.07]' : 'text-white/50 hover:text-white/80 hover:bg-white/5'}`}>
                 {ws.isThinking ? <Loader2 size={11} className="animate-spin text-brand-400 flex-shrink-0" /> : <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${cfg.dot}`} />}
-                {hasCtx && <Database size={9} className="text-brand-400/70 flex-shrink-0" title="Has workspace context" />}
+                {hasCtx && <span title="Has workspace context" className="flex-shrink-0"><Database size={9} className="text-brand-400/70" /></span>}
                 {editingTabId === ws.id ? (
                   <input autoFocus value={editingTabName} onChange={e => setEditingTabName(e.target.value)} onBlur={() => commitRename(ws.id)} onKeyDown={e => { if (e.key === 'Enter') commitRename(ws.id); if (e.key === 'Escape') setEditingTabId(null); }} onClick={e => e.stopPropagation()} className="bg-transparent border-b border-brand-400 outline-none w-24 text-white text-xs" />
                 ) : <span className="truncate">{ws.name}</span>}

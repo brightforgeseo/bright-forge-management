@@ -2,8 +2,11 @@ import { createClient } from '@supabase/supabase-js';
 
 // Production is intentionally served from Ben's local PC via Tailscale Funnel.
 // Rollback target, hosted Supabase: https://mvkbmozwplhsduiiakql.supabase.co
-const LOCAL_SUPABASE_URL = 'https://echo-ai.tailfdbc33.ts.net:10000';
-const LOCAL_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+const LOCAL_SUPABASE_URL = process.env.SUPABASE_URL || 'https://echo-ai.tailfdbc33.ts.net:10000';
+// SECURITY: the fallback below is the publicly known supabase-demo key. Set
+// SUPABASE_ANON_KEY at build time after rotating the JWT secret on the
+// self-hosted instance — see SECURITY_ROTATE_SUPABASE_KEYS.md.
+const LOCAL_SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
 
 const getSupabaseUrl = () => {
   if (typeof window !== 'undefined' && window.location.protocol.startsWith('http')) {

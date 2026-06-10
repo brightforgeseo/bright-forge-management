@@ -30,7 +30,7 @@ const ICE_SERVERS = [
 ];
 
 export interface Participant {
-  odisconnection: RTCPeerConnection | null;
+  peerConnection: RTCPeerConnection | null;
   userId: string;
   userName: string;
   stream: MediaStream | null;
