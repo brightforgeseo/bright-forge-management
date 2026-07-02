@@ -3,7 +3,7 @@ import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Lo
 import { ChatChannel, ChatMessage, User, ToastType, Profile, MessageReaction } from '../types';
 import { getChatResponse } from '../services/geminiService';
 import { storeEchoConversation, buildConversationContext } from '../services/echoMemory';
-import { fetchChatMessages, sendChatMessage, clearChatHistory, uploadFile, fetchChannels, createChannel, deleteChannel, fetchProfiles, getOrCreateDMChannel, createNotification, editChatMessage, fetchMessageReactions, addMessageReaction, removeMessageReaction, fetchChannelMembers, addChannelMember, removeChannelMember, deleteChatMessage, isChannelMember, searchChatMessages, SearchResult, pinMessage, unpinMessage, fetchPinnedMessages, sendReplyMessage, fetchThreadReplies } from '../services/databaseService';
+import { fetchChatMessages, sendChatMessage, clearChatHistory, uploadFile, fetchChannels, createChannel, deleteChannel, fetchProfiles, getOrCreateDMChannel, createNotification, editChatMessage, fetchMessageReactions, addMessageReaction, removeMessageReaction, fetchChannelMembers, addChannelMember, removeChannelMember, deleteChatMessage, isChannelMember, searchChatMessages, SearchResult, pinMessage, unpinMessage, fetchPinnedMessages, sendReplyMessage, fetchThreadReplies, markChannelRead, fetchUnreadCounts } from '../services/databaseService';
 import { startEchoListener } from '../services/echoListener';
 import { fetchAllPartners, fetchPartnerMessages, sendPartnerMessage, markPartnerMessagesRead } from '../services/clientPortalService';
 import { PartnerWithStats, PartnerMessage } from '../types-portal';
@@ -131,10 +131,24 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
   // source says so.
   const realtimePresenceIdsRef = useRef<Set<string>>(new Set());
   const heartbeatOnlineIdsRef = useRef<Set<string>>(new Set());
+  // When the message websocket is healthy the active-channel catch-up poll can
+  // back way off; it only needs to be aggressive while realtime is down.
+  const realtimeHealthyRef = useRef(false);
+  const lastCatchUpRef = useRef(0);
+  const lastMarkReadRef = useRef(0);
   const [mentionDropdown, setMentionDropdown] = useState<{ show: boolean; search: string; position: number } | null>(null);
 
   // Echo AI Bot User ID (fixed UUID for the bot)
   const ECHO_BOT_ID = '00000000-0000-0000-0000-000000000001';
+
+  // Server-side read marker for the active channel, debounced so a busy
+  // channel doesn't hammer the DB. Badges reset immediately in local state;
+  // this just makes the reset survive reloads.
+  const touchChannelRead = (channelId: string, force = false) => {
+    if (!force && Date.now() - lastMarkReadRef.current < 10000) return;
+    lastMarkReadRef.current = Date.now();
+    markChannelRead(channelId, currentUser.id).catch(() => {});
+  };
 
   // Channel members state
   const [showMembersModal, setShowMembersModal] = useState(false);
@@ -839,6 +853,16 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     const init = async () => {
       const chans = await refreshData();
 
+      // Restore unread badges from the server so they survive reloads/logins.
+      fetchUnreadCounts(currentUser.id).then(counts => {
+        if (Object.keys(counts).length === 0) return;
+        setChannels(prev => prev.map(c =>
+          counts[c.id] && c.id !== activeChannelRef.current
+            ? { ...c, unread: Math.max(c.unread || 0, counts[c.id]) }
+            : c
+        ));
+      }).catch(() => {});
+
       // Check for notification click (chat navigation)
       const openChatNotification = localStorage.getItem('openChatNotification');
       if (openChatNotification) {
@@ -890,7 +914,15 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       .on('postgres_changes', { event: '*', schema: 'public', table: 'channel_members' }, refreshChannelList)
       .subscribe();
 
-    const channelListTimer = window.setInterval(refreshChannelList, 5000);
+    // Safety net for missed websocket events: frequent while realtime is
+    // down, relaxed once the channel subscriptions above are doing the work.
+    let lastChannelRefresh = 0;
+    const channelListTimer = window.setInterval(() => {
+      const interval = realtimeHealthyRef.current ? 30000 : 5000;
+      if (Date.now() - lastChannelRefresh < interval) return;
+      lastChannelRefresh = Date.now();
+      refreshChannelList();
+    }, 5000);
 
     const profileSub = supabase.channel('public:profiles')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, async () => {
@@ -997,6 +1029,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
             });
           }
           scrollToBottom();
+          // Viewing the channel counts as reading its new messages.
+          touchChannelRead(newMsg.channel_id);
         } else {
           // Keep per-channel cache warm so switching into a busy room is instant.
           const cached = messageCacheRef.current.get(newMsg.channel_id);
@@ -1113,6 +1147,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       })
       .subscribe((status) => {
         console.log('[TeamChat] Message subscription status:', status);
+        realtimeHealthyRef.current = status === 'SUBSCRIBED';
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
           // Reconnect after a short delay to avoid tight loops
           setTimeout(() => setSubscriptionGen(g => g + 1), 1500);
@@ -1170,7 +1205,15 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('online', onOnline);
-    const catchUpTimer = window.setInterval(catchUp, 1500);
+    // Adaptive cadence: 1.5s while the websocket is down (poll is the only
+    // message source), 15s once realtime is delivering (poll is just a safety
+    // net). This cuts steady-state DB load by ~10x per user.
+    const catchUpTimer = window.setInterval(() => {
+      const interval = realtimeHealthyRef.current ? 15000 : 1500;
+      if (Date.now() - lastCatchUpRef.current < interval) return;
+      lastCatchUpRef.current = Date.now();
+      catchUp();
+    }, 1500);
     return () => {
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('online', onOnline);
@@ -1201,7 +1244,12 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
         if (seenMessageIdsRef.current.has(row.id)) continue;
         seenMessageIdsRef.current.add(row.id);
         if (row.sender_id === currentUser.id || row.is_ai) continue;
-        if (row.channel_id === activeChannelRef.current) continue;
+        if (row.channel_id === activeChannelRef.current) {
+          // Messages arriving in the open channel count as read even when the
+          // websocket is down and this poll is the only delivery path.
+          touchChannelRead(row.channel_id);
+          continue;
+        }
         unseenCounts.set(row.channel_id, (unseenCounts.get(row.channel_id) || 0) + 1);
       }
       if (unseenCounts.size === 0) return;
@@ -1267,10 +1315,11 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
         setPinnedMessages(pinned);
       }
 
-      // Reset unread count
+      // Reset unread count (locally, and server-side so it survives reloads)
       setChannels(prev => prev.map(c =>
         c.id === currentChannelId ? { ...c, unread: 0 } : c
       ));
+      touchChannelRead(currentChannelId, true);
 
       // For private channels, load members so we can filter the mention dropdown
       const currentChannel = channelsRef.current.find(c => c.id === currentChannelId);

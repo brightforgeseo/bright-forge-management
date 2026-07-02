@@ -1130,20 +1130,26 @@ export const searchChatMessages = async (
   if (!query.trim()) return [];
 
   const limit = options?.limit || 50;
-  const searchTerm = `%${query.trim()}%`;
 
-  let messagesQuery = supabase
-    .from('chat_messages')
-    .select('*')
-    .ilike('text', searchTerm)
-    .order('created_at', { ascending: false })
-    .limit(limit);
+  const buildQuery = (useFullText: boolean) => {
+    let q = supabase
+      .from('chat_messages')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    q = useFullText
+      ? q.textSearch('text_search', query.trim(), { type: 'websearch', config: 'english' })
+      : q.ilike('text', `%${query.trim()}%`);
+    if (options?.channelId) q = q.eq('channel_id', options.channelId);
+    return q;
+  };
 
-  if (options?.channelId) {
-    messagesQuery = messagesQuery.eq('channel_id', options.channelId);
+  // Prefer the indexed full-text search (SETUP_MESSAGE_SEARCH.sql); fall back
+  // to substring matching when the migration hasn't been run yet.
+  let { data: messages, error: messagesError } = await buildQuery(true);
+  if (messagesError) {
+    ({ data: messages, error: messagesError } = await buildQuery(false));
   }
-
-  const { data: messages, error: messagesError } = await messagesQuery;
 
   if (messagesError) {
     console.error('Error searching messages:', messagesError);
@@ -1191,6 +1197,26 @@ export const searchChatMessages = async (
 
 // --- Storage ---
 
+// --- Persistent unread state (see SETUP_CHANNEL_READ_STATE.sql) ---
+
+export const markChannelRead = async (channelId: string, userId: string): Promise<void> => {
+  const { error } = await supabase
+    .from('channel_read_state')
+    .upsert(
+      { user_id: userId, channel_id: channelId, last_read_at: new Date().toISOString() },
+      { onConflict: 'user_id,channel_id' }
+    );
+  if (error) console.warn('[ReadState] mark failed (run SETUP_CHANNEL_READ_STATE.sql?):', error.message);
+};
+
+export const fetchUnreadCounts = async (userId: string): Promise<Record<string, number>> => {
+  const { data, error } = await supabase.rpc('get_unread_counts', { p_user: userId });
+  if (error || !Array.isArray(data)) return {};
+  const counts: Record<string, number> = {};
+  for (const row of data as any[]) counts[row.channel_id] = Number(row.unread) || 0;
+  return counts;
+};
+
 export const uploadFile = async (file: File, bucket: string = 'uploads'): Promise<string | null> => {
   try {
     const fileExt = file.name.split('.').pop();
@@ -1205,9 +1231,15 @@ export const uploadFile = async (file: File, bucket: string = 'uploads'): Promis
       const isHttpApp = window.location.protocol.startsWith('http');
       const portalOrigin = isHttpApp ? '' : 'https://echo-ai.tailfdbc33.ts.net';
       const params = new URLSearchParams({ bucket, filename: fileName, originalName: file.name });
+      // The uploads endpoint requires a logged-in user's token.
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
       const response = await fetch(`${portalOrigin}/api/uploads?${params.toString()}`, {
         method: 'POST',
-        headers: { 'content-type': file.type || 'application/octet-stream' },
+        headers: {
+          'content-type': file.type || 'application/octet-stream',
+          ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
+        },
         body: file,
       });
 
