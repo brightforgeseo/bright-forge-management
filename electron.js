@@ -182,10 +182,19 @@ app.whenReady().then(() => {
   if (!isDev && process.platform !== 'darwin') {
     autoUpdater.checkForUpdates();
 
-    // Check for updates every hour
+    // Check every 15 minutes so releases reach the team quickly
     setInterval(() => {
       autoUpdater.checkForUpdates();
-    }, 60 * 60 * 1000);
+    }, 15 * 60 * 1000);
+
+    // Also check when the user comes back to the app, so long-running
+    // instances pick up releases as soon as someone looks at the portal.
+    let lastFocusCheck = 0;
+    app.on('browser-window-focus', () => {
+      if (Date.now() - lastFocusCheck < 5 * 60 * 1000) return;
+      lastFocusCheck = Date.now();
+      autoUpdater.checkForUpdates();
+    });
   }
 
   app.on('activate', () => {
