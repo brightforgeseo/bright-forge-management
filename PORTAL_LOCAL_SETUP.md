@@ -22,9 +22,12 @@ unread badges; the uploads route is what fixes image uploads.
 ## One-time setup (on the portal PC)
 
 1. Make sure local Supabase is running (it already is if chat loads), and
-   run these two files in the Supabase SQL editor if you haven't yet:
-   - `ADD_PRESENCE_HEARTBEAT.sql`
-   - `CHECK_UPLOADS_BUCKET.sql`
+   run these files in the Supabase SQL editor if you haven't yet:
+   - `ADD_PRESENCE_HEARTBEAT.sql` (online badges without websockets)
+   - `CHECK_UPLOADS_BUCKET.sql` (upload bucket + policies)
+   - `SETUP_CHANNEL_READ_STATE.sql` (unread badges survive reloads)
+   - `SETUP_MESSAGE_SEARCH.sql` (fast full-text message search)
+   - `SETUP_ERROR_LOGS.sql` (crash reports land in the error_logs table)
 
 2. Build and start the server in the repo folder:
 

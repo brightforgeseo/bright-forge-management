@@ -3,9 +3,11 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import ClientPortalApp from './ClientPortalApp';
 import { supabase } from './lib/supabaseClient';
+import { installErrorReporter, reportError } from './lib/errorReporter';
 import './styles.css';
 
 console.log("Starting Application Mount...");
+installErrorReporter();
 
 interface ErrorBoundaryProps {
   children?: React.ReactNode;
@@ -33,6 +35,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error("Application Crash:", error, errorInfo);
+    reportError(error.message, `${error.stack || ''}\n${errorInfo.componentStack || ''}`, 'error-boundary');
   }
 
   render() {

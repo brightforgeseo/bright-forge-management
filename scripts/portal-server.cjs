@@ -34,6 +34,8 @@ const SUPABASE_URL = new URL(process.env.SUPABASE_INTERNAL_URL || 'http://127.0.
 // SUPABASE_SERVICE_ROLE_KEY in the environment instead.
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
+const ANON_KEY = process.env.SUPABASE_ANON_KEY ||
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
 const DIST = path.resolve(__dirname, '..', 'dist');
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 
@@ -85,7 +87,53 @@ const proxySupabase = (req, res) => {
 
 // ---- /api/uploads -----------------------------------------------------------
 
+// The funnel exposes this server to the whole internet, so uploads require a
+// logged-in portal user. Tokens are verified against Supabase auth and the
+// result is cached briefly to keep uploads snappy.
+const tokenCache = new Map(); // token -> cache expiry (ms epoch)
+
+const verifyUserToken = (token, callback) => {
+  const cached = tokenCache.get(token);
+  if (cached && cached > Date.now()) return callback(true);
+  const check = http.request(
+    {
+      hostname: SUPABASE_URL.hostname,
+      port: SUPABASE_URL.port,
+      path: '/auth/v1/user',
+      method: 'GET',
+      headers: { apikey: ANON_KEY, authorization: `Bearer ${token}` },
+    },
+    (ur) => {
+      ur.resume();
+      const ok = ur.statusCode === 200;
+      if (ok) {
+        if (tokenCache.size > 500) tokenCache.clear();
+        tokenCache.set(token, Date.now() + 5 * 60 * 1000);
+      }
+      callback(ok);
+    }
+  );
+  check.on('error', () => callback(false));
+  check.end();
+};
+
 const handleUpload = (req, res, requestUrl) => {
+  const auth = req.headers.authorization || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+  if (!token) {
+    res.writeHead(401, { 'content-type': 'application/json' });
+    return res.end(JSON.stringify({ error: 'login required to upload' }));
+  }
+  return verifyUserToken(token, (ok) => {
+    if (!ok) {
+      res.writeHead(401, { 'content-type': 'application/json' });
+      return res.end(JSON.stringify({ error: 'invalid or expired session' }));
+    }
+    doUpload(req, res, requestUrl);
+  });
+};
+
+const doUpload = (req, res, requestUrl) => {
   const bucket = (requestUrl.searchParams.get('bucket') || 'uploads').replace(/[^a-zA-Z0-9_-]/g, '');
   const filename = (requestUrl.searchParams.get('filename') || `${Date.now()}`).replace(/[^a-zA-Z0-9._-]/g, '');
   if (!bucket || !filename) {
