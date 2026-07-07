@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@capacitor/android": "^7.4.4",
+    "@capacitor/app": "^7.0.0",
     "@capacitor/cli": "^7.4.4",
     "@capacitor/core": "^7.4.4",
     "@capacitor/ios": "^7.4.4",
@@ -60,6 +61,7 @@
     "appId": "com.brightforge.portal",
     "productName": "Bright Forge Portal",
     "artifactName": "BrightForgePortal-${version}-${arch}-${os}.${ext}",
+    "afterPack": "scripts/afterpack.cjs",
     "files": [
       "dist/**/*",
       "electron.js",
@@ -77,6 +79,7 @@
     },
     "mac": {
       "category": "public.app-category.productivity",
+      "icon": "assets/icon.icns",
       "identity": null,
       "target": [
         {
@@ -103,6 +106,11 @@
         ]
       },
       "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "createDesktopShortcut": "always",
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico"
     }
   }
 }

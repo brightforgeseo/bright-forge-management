@@ -9,6 +9,23 @@ import './styles.css';
 console.log("Starting Application Mount...");
 installErrorReporter();
 
+// Android hardware back button (Capacitor app): navigate back inside the
+// portal instead of closing the app; minimize when there's nowhere to go.
+try {
+  const capApp = (window as any).Capacitor?.Plugins?.App;
+  if (capApp?.addListener) {
+    capApp.addListener('backButton', ({ canGoBack }: { canGoBack?: boolean }) => {
+      if (canGoBack ?? window.history.length > 1) {
+        window.history.back();
+      } else if (capApp.minimizeApp) {
+        capApp.minimizeApp();
+      }
+    });
+  }
+} catch {
+  // Not running inside the mobile app - nothing to do.
+}
+
 interface ErrorBoundaryProps {
   children?: React.ReactNode;
 }

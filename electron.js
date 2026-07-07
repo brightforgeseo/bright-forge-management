@@ -80,13 +80,41 @@ if (process.platform === 'darwin') {
 
 let mainWindow;
 
+// Remember window size/position between sessions
+const windowStateFile = () => path.join(app.getPath('userData'), 'window-state.json');
+
+function loadWindowState() {
+  try {
+    return JSON.parse(require('fs').readFileSync(windowStateFile(), 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+function saveWindowState() {
+  try {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const state = { ...mainWindow.getNormalBounds(), maximized: mainWindow.isMaximized() };
+    require('fs').writeFileSync(windowStateFile(), JSON.stringify(state));
+  } catch {
+    // Losing window state is not worth an error dialog.
+  }
+}
+
 function createWindow() {
+  const state = loadWindowState();
+
   // Create the browser window.
   mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 800,
+    width: state.width || 1280,
+    height: state.height || 800,
+    x: state.x,
+    y: state.y,
     title: "Bright Forge Portal",
     icon: appIconPath,
+    // Match the portal theme and wait for content so launch doesn't flash white
+    backgroundColor: '#0d0f1a',
+    show: false,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -96,6 +124,13 @@ function createWindow() {
     },
     autoHideMenuBar: true, // Hides the file menu on Windows/Linux for a cleaner look
   });
+
+  mainWindow.once('ready-to-show', () => {
+    if (state.maximized) mainWindow.maximize();
+    mainWindow.show();
+  });
+
+  mainWindow.on('close', saveWindowState);
 
   // In development, load the local server
   // In production, load the build file
@@ -170,6 +205,19 @@ ipcMain.on('show-notification', (event, { title, body }) => {
 ipcMain.on('focus-window', () => {
   if (mainWindow) {
     if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  }
+});
+
+// Only one portal instance: launching again focuses the existing window
+// (prevents duplicate notification/presence sessions).
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+}
+app.on('second-instance', () => {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
     mainWindow.focus();
   }
 });
