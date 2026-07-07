@@ -87,12 +87,36 @@ input[type="date"]::-webkit-clear-button {
     user-select: none;
   }
 
-  /* Disable hover effects on mobile (prevents sticky hover) */
-  .group:hover .group-hover\:opacity-100 {
-    opacity: 0;
+  /* Touch devices have no hover: controls that desktop reveals on hover
+     (message actions, task buttons) must simply always be visible, or
+     they are unusable on phones. */
+  .opacity-0.group-hover\:opacity-100,
+  .group-hover\:opacity-100 {
+    opacity: 1 !important;
   }
-  .group:active .group-hover\:opacity-100 {
-    opacity: 1;
+}
+
+/* Prevent pull-to-refresh from reloading the app mid-scroll (Android
+   WebView/Chrome) and rubber-band overscroll from feeling broken. */
+html, body {
+  overscroll-behavior-y: none;
+}
+
+/* Remove the grey tap flash on Android/iOS and the 300ms double-tap zoom
+   delay so taps feel instant and native. */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+button, a, [role="button"] {
+  touch-action: manipulation;
+}
+
+/* Mobile browsers change the viewport height when the URL bar or keyboard
+   shows; 100vh then overflows and traps the chat input off-screen. dvh
+   tracks the real visible height. */
+@supports (height: 100dvh) {
+  .h-screen {
+    height: 100dvh;
   }
 }
 
