@@ -7,8 +7,9 @@ import { fetchChatMessages, sendChatMessage, clearChatHistory, uploadFile, fetch
 import { startEchoListener } from '../services/echoListener';
 import { fetchAllPartners, fetchPartnerMessages, sendPartnerMessage, markPartnerMessagesRead } from '../services/clientPortalService';
 import { PartnerWithStats, PartnerMessage } from '../types-portal';
-import { supabase } from '../lib/supabaseClient';
+import { supabase, normalizeSupabaseAssetUrl } from '../lib/supabaseClient';
 import { getBridgeUrl } from '../lib/bridgeClient';
+import { formatChatRow } from '../lib/chatMessageFormatter';
 import ChatTodoList from './ChatTodoList';
 // Removed custom VideoCall - now using Google Meet
 
@@ -38,29 +39,6 @@ interface TeamChatProps {
   onNavigateToTask?: (taskId: string, boardId: string, groupId: string) => void;
 }
 
-const formatChatRow = (row: any): ChatMessage => ({
-  id: row.id,
-  channelId: row.channel_id,
-  sender: row.sender,
-  senderId: row.sender_id,
-  text: row.text,
-  timestamp: row.created_at,
-  isAi: row.is_ai,
-  avatar: row.avatar,
-  attachmentUrl: row.attachment_url,
-  attachmentType: row.attachment_type,
-  attachmentName: row.attachment_name,
-  isEdited: row.is_edited,
-  editedAt: row.edited_at,
-  isPinned: row.is_pinned,
-  pinnedAt: row.pinned_at,
-  pinnedBy: row.pinned_by,
-  taskLink: row.task_link,
-  callRoomId: row.call_room_id,
-  callType: row.call_type,
-  parentMessageId: row.parent_message_id,
-  replyCount: row.reply_count || 0
-});
 
 const optimisticKey = (channelId?: string, senderId?: string, text?: string) =>
   `${channelId || ''}|${senderId || ''}|${(text || '').trim()}`;
@@ -977,7 +955,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
         console.log('[TeamChat] ✅ REALTIME: New message received:', newMsg.id, newMsg);
         seenMessageIdsRef.current.add(newMsg.id);
 
-        const formattedMsg = formatChatRow(newMsg);
+        const formattedMsg = formatChatRow(newMsg, normalizeSupabaseAssetUrl);
 
         // Play notification sound for messages from other users
         if (!newMsg.is_ai && newMsg.sender_id !== currentUser.id) {
@@ -1811,23 +1789,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
         // Add reply to threadReplies if thread is expanded
         if (expandedThreads.has(savedReplyingTo.id)) {
-          const insertedReply: ChatMessage = {
-            id: result.id,
-            channelId: result.channel_id,
-            sender: result.sender,
-            senderId: result.sender_id,
-            text: result.text,
-            timestamp: result.created_at,
-            isAi: result.is_ai,
-            avatar: result.avatar,
-            attachmentUrl: result.attachment_url,
-            attachmentType: result.attachment_type,
-            attachmentName: result.attachment_name,
-            isEdited: result.is_edited,
-            editedAt: result.edited_at,
-            taskLink: result.task_link,
-            parentMessageId: result.parent_message_id
-          };
+          const insertedReply = formatChatRow(result, normalizeSupabaseAssetUrl);
           setThreadReplies(prev => {
             const existing = prev[savedReplyingTo.id] || [];
             // Check for duplicate
@@ -1845,7 +1807,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
         insertedUserMessageId = result.id;
         console.log('[handleSendMessage] Message sent successfully:', result);
 
-        const insertedMsg = formatChatRow(result);
+        const insertedMsg = formatChatRow(result, normalizeSupabaseAssetUrl);
         delete pendingOptimisticRef.current[pendingKey];
 
         if (activeChannelRef.current === targetChannelId) {
