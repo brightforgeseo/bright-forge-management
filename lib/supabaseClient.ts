@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { resolveSupabaseAssetUrl } from './supabaseAssetUrl';
 
 // Production is intentionally served from Ben's local PC via Tailscale Funnel.
 // Rollback target, hosted Supabase: https://mvkbmozwplhsduiiakql.supabase.co
@@ -25,19 +26,17 @@ const getSupabaseUrl = () => {
 const SUPABASE_URL = getSupabaseUrl();
 const SUPABASE_ANON_KEY = LOCAL_SUPABASE_ANON_KEY;
 
-const SUPABASE_ASSET_BASES = [
-  'http://127.0.0.1:54321',
-  'https://echo-ai.tailfdbc33.ts.net:10000',
-  'https://bright-forge-management.vercel.app/supabase'
-];
+const PORTAL_ORIGIN = 'https://echo-ai.tailfdbc33.ts.net';
 
-export const normalizeSupabaseAssetUrl = (url?: string | null): string | undefined => {
-  if (!url) return undefined;
-  const value = String(url);
-  const base = SUPABASE_ASSET_BASES.find(prefix => value.startsWith(`${prefix}/storage/v1/`));
-  if (!base) return value;
-  return `${SUPABASE_URL}${value.slice(base.length)}`;
-};
+export const normalizeSupabaseAssetUrl = (url?: string | null): string | undefined =>
+  resolveSupabaseAssetUrl(url, {
+    browserOrigin:
+      typeof window !== 'undefined' && window.location.protocol.startsWith('http')
+        ? window.location.origin
+        : null,
+    supabaseUrl: SUPABASE_URL,
+    portalOrigin: PORTAL_ORIGIN,
+  });
 
 // Browser code must not bundle a service-role key. Keep the admin export for legacy imports,
 // but bind it to the publishable/anon key so privileged operations still require server-side routes.

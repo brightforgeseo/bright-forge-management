@@ -11,7 +11,8 @@ const path = require('path');
 module.exports = async function afterPack(context) {
   if (context.electronPlatformName !== 'win32') return;
 
-  const { rcedit } = require('rcedit');
+  const rceditModule = await import('rcedit');
+  const rcedit = rceditModule.rcedit || rceditModule.default;
   const root = path.resolve(__dirname, '..');
   const exe = path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.exe`);
   const icon = path.join(root, 'assets', 'icon.ico');
