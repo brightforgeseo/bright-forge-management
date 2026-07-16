@@ -1,6 +1,17 @@
 import type { ChatMessage } from '../types';
 
 type AssetUrlNormaliser = (value?: string | null) => string | undefined;
+type AvatarProfile = { id: string; avatar_url?: string };
+
+export const resolveChatMessageAvatar = (
+  messageAvatar: string | undefined,
+  senderId: string | undefined,
+  profiles: AvatarProfile[],
+): string | undefined => {
+  if (messageAvatar && messageAvatar !== 'user') return messageAvatar;
+  if (!senderId) return messageAvatar;
+  return profiles.find(profile => profile.id === senderId)?.avatar_url || messageAvatar;
+};
 
 export const formatChatRow = (
   row: any,

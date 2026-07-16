@@ -9,7 +9,7 @@ import { fetchAllPartners, fetchPartnerMessages, sendPartnerMessage, markPartner
 import { PartnerWithStats, PartnerMessage } from '../types-portal';
 import { supabase, normalizeSupabaseAssetUrl } from '../lib/supabaseClient';
 import { getBridgeUrl } from '../lib/bridgeClient';
-import { formatChatRow } from '../lib/chatMessageFormatter';
+import { formatChatRow, resolveChatMessageAvatar } from '../lib/chatMessageFormatter';
 import ChatTodoList from './ChatTodoList';
 // Removed custom VideoCall - now using Google Meet
 
@@ -2948,6 +2948,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
               !msg.isAi && !prevMsg.isAi &&
               (new Date(msg.timestamp).getTime() - new Date(prevMsg.timestamp).getTime()) < 5 * 60 * 1000);
             const isThinking = msg.isAi && msg.text === '⏳ Echo is thinking…';
+            const messageAvatar = resolveChatMessageAvatar(msg.avatar, msg.senderId, profiles);
 
             return (
               <div
@@ -2962,8 +2963,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
                       <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg flex items-center justify-center ${msg.isAi ? 'bg-brand-500' : 'bg-portal-surface2'}`}>
                         {msg.isAi ? (
                           <Bot className="w-4 h-4 md:w-6 md:h-6 text-white" />
-                        ) : msg.avatar && msg.avatar !== 'user' && msg.avatar.startsWith('http') ? (
-                          <img src={msg.avatar} alt="" className="w-full h-full rounded-lg object-cover" />
+                        ) : messageAvatar && messageAvatar.startsWith('http') ? (
+                          <img src={messageAvatar} alt="" className="w-full h-full rounded-lg object-cover" />
                         ) : (
                           <UserIcon className="w-4 h-4 md:w-6 md:h-6 text-portal-soft" />
                         )}
