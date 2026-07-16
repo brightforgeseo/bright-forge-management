@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { formatChatRow } from '../lib/chatMessageFormatter.ts';
+import { formatChatRow, resolveChatMessageAvatar } from '../lib/chatMessageFormatter.ts';
 
 test('chat rows normalise attachment and avatar URLs before rendering', () => {
   const row = {
@@ -21,4 +21,19 @@ test('chat rows normalise attachment and avatar URLs before rendering', () => {
 
   assert.equal(result.avatar, 'https://portal.test/supabase/storage/v1/object/public/uploads/avatar.png');
   assert.equal(result.attachmentUrl, 'https://portal.test/supabase/storage/v1/object/public/uploads/photo.png');
+});
+
+test('group chat falls back to the live profile avatar when a message stores the user sentinel', () => {
+  const profiles = [
+    { id: 'rhoy-id', avatar_url: 'https://portal.test/supabase/storage/v1/object/public/uploads/rhoy.jpeg' },
+  ];
+
+  assert.equal(
+    resolveChatMessageAvatar('user', 'rhoy-id', profiles),
+    profiles[0].avatar_url,
+  );
+  assert.equal(
+    resolveChatMessageAvatar('https://portal.test/message-avatar.jpeg', 'rhoy-id', profiles),
+    'https://portal.test/message-avatar.jpeg',
+  );
 });
