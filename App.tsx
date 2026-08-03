@@ -10,6 +10,7 @@ import MobileTabBar from './components/MobileTabBar';
 // Heavy tools are code-split, then preloaded after login so navigation does not
 // show a spinner every time Ben moves between features.
 const loadKeywordTool = () => import('./components/KeywordTool');
+const loadBusinessOS = () => import('./components/BusinessOS');
 const loadContentTool = () => import('./components/ContentTool');
 const loadAuditTool = () => import('./components/AuditTool');
 const loadQAChecker = () => import('./components/QAChecker');
@@ -45,6 +46,7 @@ const preloadViewChunks = () => {
 };
 
 const KeywordTool = lazy(loadKeywordTool);
+const BusinessOS = lazy(loadBusinessOS);
 const ContentTool = lazy(loadContentTool);
 const AuditTool = lazy(loadAuditTool);
 const QAChecker = lazy(loadQAChecker);
@@ -63,6 +65,7 @@ const ViewFallback: React.FC = () => (
 import { ToolView, BrandingConfig, User, ToastNotification, ToastType, Profile } from './types';
 import { supabase, normalizeSupabaseAssetUrl } from './lib/supabaseClient';
 import { addToAllowlist, updateUserProfile, checkDueDateNotifications, fetchClientBoardSummaries, fetchProfiles } from './services/databaseService';
+import { isBenBusinessOsUser, isBusinessInboxUser } from './services/businessOsModel.mjs';
 import { listenForPushClicks } from './lib/pushNotifications';
 import { Copy, X, UserPlus, Check, Mail, RefreshCw, AlertTriangle, MessageSquare } from 'lucide-react';
 
@@ -87,6 +90,23 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User>({
     id: 'guest', name: 'Guest', role: 'Visitor', initials: 'GU', email: ''
   });
+
+  const canNavigateToView = useCallback((view: ToolView) => {
+    if (!Object.values(ToolView).includes(view)) return false;
+    if (view === ToolView.BUSINESS_OS) return isBenBusinessOsUser(currentUser.id);
+    if (view === ToolView.BUSINESS_INBOX) return isBusinessInboxUser(currentUser.id);
+    return true;
+  }, [currentUser.id]);
+
+  const navigateToView = useCallback((view: ToolView) => {
+    setCurrentView(canNavigateToView(view) ? view : ToolView.DASHBOARD);
+  }, [canNavigateToView]);
+
+  useEffect(() => {
+    if (!Object.values(ToolView).includes(currentView) || !canNavigateToView(currentView)) {
+      setCurrentView(ToolView.DASHBOARD);
+    }
+  }, [canNavigateToView, currentView]);
 
   const refreshProfile = async () => {
      const { data: { user } } = await supabase.auth.getUser();
@@ -206,7 +226,8 @@ const App: React.FC = () => {
   const applyPushDeepLink = React.useCallback((linkView: string, linkData: any) => {
     if (!linkView) return;
     const view = linkView as ToolView;
-    setCurrentView(view);
+    if (!canNavigateToView(view)) return;
+    navigateToView(view);
     if (linkView === 'TASKS' && linkData?.taskId) {
       try { localStorage.setItem('openTaskModal', JSON.stringify(linkData)); } catch {}
       window.dispatchEvent(new CustomEvent('openTaskModal', { detail: linkData }));
@@ -217,7 +238,7 @@ const App: React.FC = () => {
       try { localStorage.setItem('openMyWorkTask', JSON.stringify(linkData)); } catch {}
       window.dispatchEvent(new CustomEvent('openMyWorkTask', { detail: linkData }));
     }
-  }, []);
+  }, [canNavigateToView, navigateToView]);
 
   // 1) Cold-start: SW writes deep-link to URL hash when opening a new tab from a push.
   useEffect(() => {
@@ -269,6 +290,8 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!isAuthenticated) return;
 
+    if (isBenBusinessOsUser(currentUser.id)) loadBusinessOS().catch(() => {});
+
     let idleHandle: number | undefined;
     const timer = window.setTimeout(() => {
       if ('requestIdleCallback' in window) {
@@ -284,7 +307,7 @@ const App: React.FC = () => {
         (window as any).cancelIdleCallback(idleHandle);
       }
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, currentUser.id]);
 
   // Sync sidebar collapsed state from localStorage (Sidebar writes it directly)
   useEffect(() => {
@@ -330,6 +353,7 @@ const App: React.FC = () => {
 
       if (gKeyRef.current) {
         const map: Record<string, ToolView> = {
+          'o': ToolView.BUSINESS_OS,
           'd': ToolView.DASHBOARD,
           't': ToolView.TASKS,
           'm': ToolView.MY_WORK,
@@ -338,29 +362,27 @@ const App: React.FC = () => {
           'i': ToolView.BUSINESS_INBOX,
         };
         const target = map[e.key.toLowerCase()];
-        if (target) {
+        if (target && canNavigateToView(target)) {
           e.preventDefault();
           gKeyRef.current = false;
-          setCurrentView(target);
+          navigateToView(target);
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [canNavigateToView, navigateToView]);
 
   useEffect(() => {
     const handler = (event: Event) => {
       const detail = (event as CustomEvent).detail || {};
       const requested = detail.view as ToolView | undefined;
-      if (requested && Object.values(ToolView).includes(requested)) {
-        setCurrentView(requested);
-      }
+      if (requested) navigateToView(requested);
     };
     window.addEventListener('navigateToView', handler);
     return () => window.removeEventListener('navigateToView', handler);
-  }, []);
+  }, [navigateToView]);
 
   // Generate random password for invites
   const generatePassword = () => {
@@ -414,17 +436,20 @@ ${currentUser.name}`;
   const renderContent = () => {
     const view = (() => {
       switch (currentView) {
-        case ToolView.KEYWORD_RESEARCH: return <KeywordTool onNavigateToContent={() => setCurrentView(ToolView.CONTENT_GENERATOR)} />;
+        case ToolView.BUSINESS_OS: return isBenBusinessOsUser(currentUser.id)
+          ? <BusinessOS currentUser={currentUser} setCurrentView={navigateToView} />
+          : <Dashboard currentUser={currentUser} setCurrentView={navigateToView} />;
+        case ToolView.KEYWORD_RESEARCH: return <KeywordTool onNavigateToContent={() => navigateToView(ToolView.CONTENT_GENERATOR)} />;
         case ToolView.CONTENT_GENERATOR: return <ContentTool />;
         case ToolView.SITE_AUDIT: return <AuditTool />;
         case ToolView.QA_CHECKER: return <QAChecker />;
         case ToolView.TASKS: return <TaskBoard currentUser={currentUser} addToast={addToast} />;
-        case ToolView.MY_WORK: return <MyWork currentUser={currentUser} addToast={addToast} onNavigateToTasks={() => setCurrentView(ToolView.TASKS)} />;
-        case ToolView.TEAM_CHAT: return <TeamChat currentUser={currentUser} addToast={addToast} onNavigateToTask={() => setCurrentView(ToolView.TASKS)} />;
+        case ToolView.MY_WORK: return <MyWork currentUser={currentUser} addToast={addToast} onNavigateToTasks={() => navigateToView(ToolView.TASKS)} />;
+        case ToolView.TEAM_CHAT: return <TeamChat currentUser={currentUser} addToast={addToast} onNavigateToTask={() => navigateToView(ToolView.TASKS)} />;
         case ToolView.BUSINESS_INBOX: return <BusinessInbox currentUser={currentUser} addToast={addToast} />;
         case ToolView.ECHO_WORKSPACES: return <EchoWorkspaces currentUser={currentUser} addToast={addToast} />;
         case ToolView.SETTINGS: return <Settings branding={branding} setBranding={setBranding} addToast={addToast} currentUser={currentUser} />;
-        default: return <Dashboard currentUser={currentUser} setCurrentView={setCurrentView} />;
+        default: return <Dashboard currentUser={currentUser} setCurrentView={navigateToView} />;
       }
     })();
     return <Suspense fallback={<ViewFallback />}>{view}</Suspense>;
@@ -445,7 +470,7 @@ ${currentUser.name}`;
     <div className="flex h-screen bg-portal-dark overflow-hidden font-sans text-white">
       <Sidebar
         currentView={currentView}
-        onChangeView={setCurrentView}
+        onChangeView={navigateToView}
         branding={branding}
         currentUser={currentUser}
         onLogout={handleLogout}
@@ -458,7 +483,7 @@ ${currentUser.name}`;
       <CommandPalette
         isOpen={isPaletteOpen}
         onClose={() => setIsPaletteOpen(false)}
-        onNavigate={(view) => { setCurrentView(view); setIsPaletteOpen(false); }}
+        onNavigate={(view) => { navigateToView(view); setIsPaletteOpen(false); }}
         currentUser={currentUser}
         clients={paletteClients}
         profiles={paletteProfiles}
@@ -466,7 +491,7 @@ ${currentUser.name}`;
 
       <MobileTabBar
         currentView={currentView}
-        onNavigate={(view) => { setCurrentView(view); setIsMobileMenuOpen(false); }}
+        onNavigate={(view) => { navigateToView(view); setIsMobileMenuOpen(false); }}
       />
 
       {/* Mobile Header - Hidden on TeamChat which has its own header */}
