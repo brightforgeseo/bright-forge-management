@@ -1,6 +1,6 @@
 {
   "name": "bright-forge-portal",
-  "version": "1.0.311",
+  "version": "1.0.312",
   "description": "Bright Forge Team Portal",
   "main": "electron.js",
   "targets": {
@@ -21,7 +21,8 @@
     "cap:sync": "npx cap sync",
     "mobile:build": "npm run build && npx cap sync",
     "ios:open": "npx cap open ios",
-    "android:open": "npx cap open android"
+    "android:open": "npx cap open android",
+    "test:business-os": "node --test tests/business-os-model.test.mjs tests/business-os-integration.test.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.4",

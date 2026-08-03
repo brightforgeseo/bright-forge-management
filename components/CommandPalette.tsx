@@ -4,8 +4,9 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, LayoutDashboard, MessageSquare, TableProperties, CheckSquare, PenTool, BarChart, FileCheck, Settings, Zap, Hash, User, ChevronRight, Mail } from 'lucide-react';
+import { Search, LayoutDashboard, MessageSquare, TableProperties, CheckSquare, PenTool, BarChart, FileCheck, Settings, Zap, Hash, User, ChevronRight, Mail, Command } from 'lucide-react';
 import { ToolView, User as UserType, Profile } from '../types';
+import { isBenBusinessOsUser, isBusinessInboxUser } from '../services/businessOsModel.mjs';
 
 interface CommandItem {
   id: string;
@@ -28,6 +29,7 @@ interface Props {
 
 const VIEW_ICONS: Record<ToolView, React.ReactNode> = {
   [ToolView.DASHBOARD]:          <LayoutDashboard size={16} />,
+  [ToolView.BUSINESS_OS]:        <Command size={16} />,
   [ToolView.KEYWORD_RESEARCH]:   <Search size={16} />,
   [ToolView.CONTENT_GENERATOR]:  <PenTool size={16} />,
   [ToolView.SITE_AUDIT]:         <BarChart size={16} />,
@@ -42,6 +44,7 @@ const VIEW_ICONS: Record<ToolView, React.ReactNode> = {
 
 const VIEW_LABELS: Record<ToolView, string> = {
   [ToolView.DASHBOARD]:          'Dashboard',
+  [ToolView.BUSINESS_OS]:        'Business OS',
   [ToolView.KEYWORD_RESEARCH]:   'Keyword Research',
   [ToolView.CONTENT_GENERATOR]:  'Content Generator',
   [ToolView.SITE_AUDIT]:         'SEO Audit',
@@ -55,6 +58,7 @@ const VIEW_LABELS: Record<ToolView, string> = {
 };
 
 const VIEW_SHORTCUTS: Partial<Record<ToolView, string>> = {
+  [ToolView.BUSINESS_OS]:     'G O',
   [ToolView.TASKS]:           'G T',
   [ToolView.TEAM_CHAT]:       'G C',
   [ToolView.ECHO_WORKSPACES]: 'G E',
@@ -63,8 +67,6 @@ const VIEW_SHORTCUTS: Partial<Record<ToolView, string>> = {
   [ToolView.BUSINESS_INBOX]:  'G I',
 };
 
-const BEN_USER_ID = 'f9f11222-d2a9-4ae8-a327-8c4621d90b7c';
-
 const CommandPalette: React.FC<Props> = ({ isOpen, onClose, onNavigate, currentUser, clients = [], profiles = [] }) => {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(0);
@@ -72,7 +74,8 @@ const CommandPalette: React.FC<Props> = ({ isOpen, onClose, onNavigate, currentU
   const listRef = useRef<HTMLDivElement>(null);
 
   const navItems: CommandItem[] = Object.values(ToolView)
-    .filter(view => view !== ToolView.BUSINESS_INBOX || currentUser.id === BEN_USER_ID)
+    .filter(view => view !== ToolView.BUSINESS_OS || isBenBusinessOsUser(currentUser.id))
+    .filter(view => view !== ToolView.BUSINESS_INBOX || isBusinessInboxUser(currentUser.id))
     .map(view => ({
     id: `view-${view}`,
     label: VIEW_LABELS[view],
