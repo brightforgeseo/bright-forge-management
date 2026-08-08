@@ -5,7 +5,7 @@ import { resolveSupabaseAssetUrl } from './supabaseAssetUrl';
 // Rollback target, hosted Supabase: https://mvkbmozwplhsduiiakql.supabase.co
 // Desktop clients launched from file:// do not have a browser origin to infer.
 // Use the Linux-hosted Tailnet portal proxy, not the retired Windows node.
-const LOCAL_SUPABASE_URL = process.env.SUPABASE_URL || 'http://100.97.15.55:8080/supabase';
+const LOCAL_SUPABASE_URL = process.env.SUPABASE_URL || 'https://bazzite.tailfdbc33.ts.net/supabase';
 // SECURITY: the fallback below is the publicly known supabase-demo key. Set
 // SUPABASE_ANON_KEY at build time after rotating the JWT secret on the
 // self-hosted instance — see SECURITY_ROTATE_SUPABASE_KEYS.md.
@@ -28,7 +28,7 @@ const getSupabaseUrl = () => {
 const SUPABASE_URL = getSupabaseUrl();
 const SUPABASE_ANON_KEY = LOCAL_SUPABASE_ANON_KEY;
 
-const PORTAL_ORIGIN = 'http://100.97.15.55:8080';
+const PORTAL_ORIGIN = 'https://bazzite.tailfdbc33.ts.net';
 
 export const normalizeSupabaseAssetUrl = (url?: string | null): string | undefined =>
   resolveSupabaseAssetUrl(url, {
