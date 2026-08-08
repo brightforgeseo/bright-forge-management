@@ -3,6 +3,13 @@ const { app, BrowserWindow, shell, ipcMain, dialog, Notification } = require('el
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 
+// Bazzite's Electron GPU child can crash repeatedly under the current driver
+// stack, which terminates the whole desktop portal. The portal is a business
+// dashboard, so favour a stable software-rendered UI over GPU acceleration.
+if (process.platform === 'linux') {
+  app.disableHardwareAcceleration();
+}
+
 const appIconPath = process.platform === 'win32'
   ? path.join(__dirname, 'assets', 'icon.ico')
   : path.join(__dirname, 'assets', 'icon.png');
@@ -139,8 +146,9 @@ function createWindow() {
     // Open DevTools in development
     // mainWindow.webContents.openDevTools();
   } else {
-    // In production, load the index.html from the build folder
-    mainWindow.loadFile(path.join(__dirname, 'dist', 'index.html'));
+    // All desktop installations use the Tailnet portal server. This keeps each
+    // team member on the shared live database rather than trying localhost.
+    mainWindow.loadURL(process.env.BRIGHTFORGE_PORTAL_URL || 'http://bazzite:8080');
   }
 
   // Handle external links (don't open them inside the app, open in default browser)
@@ -226,8 +234,10 @@ app.on('second-instance', () => {
 app.whenReady().then(() => {
   createWindow();
 
-  // Check for updates only in production (disabled on Mac until app is code signed)
-  if (!isDev && process.platform !== 'darwin') {
+  // Linux builds are local AppImages until a signed Linux release channel is published.
+  // Do not run the GitHub updater there, it produces rejected update promises without
+  // affecting the portal itself. Windows remains on the established release channel.
+  if (!isDev && process.platform === 'win32') {
     autoUpdater.checkForUpdates();
 
     // Check every 15 minutes so releases reach the team quickly

@@ -10,6 +10,13 @@ const path = require('path');
 
 module.exports = async function afterPack(context) {
   if (context.electronPlatformName !== 'win32') return;
+  // Linux release builders may not have Wine. The Windows host release path
+  // still stamps icon/version metadata normally; this escape hatch allows a
+  // functionally identical emergency installer to be built without Wine.
+  if (process.env.SKIP_RCEDIT === '1') {
+    console.log('[afterPack] skipped Windows resource stamping (SKIP_RCEDIT=1)');
+    return;
+  }
 
   const rceditModule = await import('rcedit');
   const rcedit = rceditModule.rcedit || rceditModule.default;
