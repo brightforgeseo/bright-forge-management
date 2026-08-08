@@ -146,9 +146,31 @@ function createWindow() {
     // Open DevTools in development
     // mainWindow.webContents.openDevTools();
   } else {
-    // All desktop installations use the Tailnet portal server. This keeps each
-    // team member on the shared live database rather than trying localhost.
-    mainWindow.loadURL(process.env.BRIGHTFORGE_PORTAL_URL || 'http://bazzite:8080');
+    // Use the stable Tailnet IP first. MagicDNS is a useful fallback, but some
+    // Windows clients do not receive that DNS configuration and otherwise show
+    // a blank Electron window before the portal can mount.
+    const portalUrls = [
+      process.env.BRIGHTFORGE_PORTAL_URL || 'http://100.97.15.55:8080',
+      'http://bazzite:8080',
+    ];
+    let portalUrlIndex = 0;
+    const loadPortal = () => mainWindow.loadURL(portalUrls[portalUrlIndex]);
+    mainWindow.webContents.on('did-fail-load', (_event, _code, description, url, isMainFrame) => {
+      if (!isMainFrame) return;
+      if (portalUrlIndex < portalUrls.length - 1) {
+        portalUrlIndex += 1;
+        loadPortal();
+        return;
+      }
+      const errorHtml = `
+        <main style="font-family:system-ui;background:#0d0f1a;color:#fff;min-height:100vh;padding:48px">
+          <h1>Bright Forge Portal could not connect</h1>
+          <p>Connect this PC to the Bright Forge Tailscale network, then reopen the app.</p>
+          <p style="opacity:.65">${description} (${url})</p>
+        </main>`;
+      mainWindow.loadURL(`data:text/html,${encodeURIComponent(errorHtml)}`);
+    });
+    loadPortal();
   }
 
   // Handle external links (don't open them inside the app, open in default browser)
