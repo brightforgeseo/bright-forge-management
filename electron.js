@@ -150,8 +150,8 @@ function createWindow() {
     // Windows clients do not receive that DNS configuration and otherwise show
     // a blank Electron window before the portal can mount.
     const portalUrls = [
-      process.env.BRIGHTFORGE_PORTAL_URL || 'https://bazzite.tailfdbc33.ts.net',
-      'http://100.97.15.55:8080',
+      process.env.BRIGHTFORGE_PORTAL_URL || 'https://echo-ben.tailfdbc33.ts.net',
+      'http://100.112.162.122:8080',
     ];
     let portalUrlIndex = 0;
     const loadPortal = () => mainWindow.loadURL(portalUrls[portalUrlIndex]);
