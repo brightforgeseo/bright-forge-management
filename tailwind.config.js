@@ -22,14 +22,14 @@ module.exports = {
         },
         // BrightForge website palette
         portal: {
-          dark: '#0d0f1a',
-          surface: '#131627',
-          surface2: '#1a1e32',
-          border: 'rgba(255,255,255,0.07)',
-          text: '#e8eaf2',
-          soft: '#7a7f99',
-          accent: '#f0622a',
-          'accent-light': '#ff9a62',
+          dark: 'rgb(var(--portal-dark-rgb, 13 15 26) / <alpha-value>)',
+          surface: 'rgb(var(--portal-surface-rgb, 19 22 39) / <alpha-value>)',
+          surface2: 'rgb(var(--portal-surface2-rgb, 26 30 50) / <alpha-value>)',
+          border: 'var(--portal-border, rgba(255,255,255,0.07))',
+          text: 'rgb(var(--portal-text-rgb, 232 234 242) / <alpha-value>)',
+          soft: 'rgb(var(--portal-soft-rgb, 122 127 153) / <alpha-value>)',
+          accent: 'rgb(var(--portal-accent-rgb, 240 98 42) / <alpha-value>)',
+          'accent-light': 'rgb(var(--portal-accent-light-rgb, 255 154 98) / <alpha-value>)',
         }
       }
     },

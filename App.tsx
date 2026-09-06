@@ -467,7 +467,7 @@ ${currentUser.name}`;
   const isFullHeight = currentView === ToolView.TASKS || currentView === ToolView.TEAM_CHAT || currentView === ToolView.BUSINESS_INBOX || currentView === ToolView.ECHO_WORKSPACES;
 
   return (
-    <div className="flex h-screen bg-portal-dark overflow-hidden font-sans text-white">
+    <div className="portal-calm flex h-screen bg-portal-dark overflow-hidden font-sans text-white">
       <Sidebar
         currentView={currentView}
         onChangeView={navigateToView}
