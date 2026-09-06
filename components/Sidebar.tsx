@@ -502,7 +502,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Sidebar */}
       <div className={`
-        ${isCollapsed ? 'w-[60px]' : 'w-72 lg:w-64'} bg-portal-surface text-white flex flex-col h-full fixed left-0 top-0 shadow-xl transition-all duration-200 ease-out
+        portal-sidebar ${isCollapsed ? 'w-[60px]' : 'w-72 lg:w-64'} bg-portal-surface text-white flex flex-col h-full fixed left-0 top-0 shadow-xl transition-all duration-200 ease-out
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `} style={{ zIndex: 100 }}>
 

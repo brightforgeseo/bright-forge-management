@@ -1,0 +1,138 @@
+/* Authenticated team workspace only. Client portals and login retain their theme.
+   Presentation only: no control visibility, position, sizing or status changes. */
+@font-face {
+  font-family: 'Portal Inter';
+  src: url('./assets/fonts/Inter.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+.portal-calm, .portal-calm.font-sans {
+  --portal-dark: #f6f7f9;
+  --portal-dark-rgb: 246 247 249;
+  --portal-surface: #ffffff;
+  --portal-surface-rgb: 255 255 255;
+  --portal-surface2: #f1f3f6;
+  --portal-surface2-rgb: 241 243 246;
+  --portal-border: #e7e9ee;
+  --portal-border-rgb: 231 233 238;
+  --portal-text: #20252e;
+  --portal-text-rgb: 32 37 46;
+  --portal-soft: #69717e;
+  --portal-soft-rgb: 105 113 126;
+  --portal-accent: #c94a18;
+  --portal-accent-rgb: 201 74 24;
+  --portal-accent-light: #b54115;
+  --portal-accent-light-rgb: 181 65 21;
+  --calm-ink: 32 37 46;
+  --calm-line: 32 37 46;
+  font-family: 'Portal Inter', sans-serif;
+  font-optical-sizing: auto;
+  color: #20252e;
+  background: #f6f7f9;
+  color-scheme: light;
+}
+.portal-calm .font-sans,
+.portal-calm button, .portal-calm input, .portal-calm select, .portal-calm textarea {
+  font-family: inherit;
+}
+.portal-calm :is(h1,h2,h3) { letter-spacing: -.025em; }
+.portal-calm :is(h1,h2) { font-weight: 650; }
+.portal-calm :is(button,a,input,select,textarea,[tabindex]):focus-visible {
+  outline: 2px solid #c94a18;
+  outline-offset: 3px;
+}
+.portal-calm .portal-sidebar {
+  --portal-dark: #171b24;
+  --portal-dark-rgb: 23 27 36;
+  --portal-surface: #171b24;
+  --portal-surface-rgb: 23 27 36;
+  --portal-surface2: #252a35;
+  --portal-surface2-rgb: 37 42 53;
+  --portal-border: #303641;
+  --portal-border-rgb: 48 54 65;
+  --portal-text: #f3f4f7;
+  --portal-text-rgb: 243 244 247;
+  --portal-soft: #a6afbf;
+  --portal-soft-rgb: 166 175 191;
+  --portal-accent: #f47d43;
+  --portal-accent-rgb: 244 125 67;
+  --portal-accent-light: #ffae81;
+  --portal-accent-light-rgb: 255 174 129;
+  --calm-ink: 255 255 255;
+  --calm-line: 255 255 255;
+  color: #c7ccd5;
+  box-shadow: none;
+  border-right: 1px solid #303641;
+  color-scheme: dark;
+}
+.portal-calm .portal-sidebar nav button.bg-portal-accent {
+  background: #2b303c;
+  box-shadow: inset 2px 0 #f47d43;
+}
+/* Explicit light popovers inside the dark navigation remain light. */
+.portal-calm .portal-sidebar .bg-white {
+  --portal-soft: #69717e;
+  --portal-soft-rgb: 105 113 126;
+  --portal-text: #20252e;
+  --portal-text-rgb: 32 37 46;
+  --calm-ink: 32 37 46;
+  --calm-line: 32 37 46;
+  color-scheme: light;
+}
+/* Preserve existing saturated actions, status labels and dark media/code panels.
+   Only their foreground inheritance changes; background status colours do not. */
+.portal-calm :is(.bg-slate-800,.bg-slate-900,.bg-gray-800,.bg-gray-900,.bg-black,
+  .bg-brand-500,.bg-brand-600,.bg-brand-700,.bg-portal-accent,
+  .bg-red-500,.bg-red-600,.bg-red-700,.bg-green-500,.bg-green-600,.bg-green-700,
+  .bg-emerald-500,.bg-emerald-600,.bg-blue-500,.bg-blue-600,.bg-blue-700,
+  .bg-indigo-500,.bg-indigo-600,.bg-purple-500,.bg-purple-600,
+  .bg-amber-500,.bg-orange-500,.bg-orange-600,.bg-rose-500,.bg-rose-600,
+  .from-brand-500,.from-brand-600) {
+  --calm-ink: 255 255 255;
+  --calm-line: 255 255 255;
+}
+.portal-calm.text-white, .portal-calm .text-white { color: rgb(var(--calm-ink)); }
+.portal-calm .hover\:text-white:hover { color: rgb(var(--calm-ink)); }
+.portal-calm .border-white\/\[0\.07\] { border-color: rgb(var(--calm-line) / .1); }
+.portal-calm .border-white\/10 { border-color: rgb(var(--calm-line) / .12); }
+.portal-calm .divide-white\/\[0\.07\] > :not([hidden]) ~ :not([hidden]) { border-color: rgb(var(--calm-line) / .1); }
+.portal-calm .bg-white\/\[0\.04\] { background-color: rgb(var(--calm-line) / .04); }
+.portal-calm .hover\:bg-white\/\[0\.04\]:hover { background-color: rgb(var(--calm-line) / .04); }
+.portal-calm .hover\:bg-white\/\[0\.08\]:hover { background-color: rgb(var(--calm-line) / .08); }
+/* Preserve intentional dark member panels and the reminder gradient. */
+.portal-calm :is([class~="bg-[#1a1d29]"], [class~="bg-[#2d3142]"]) {
+  --calm-ink: 255 255 255;
+  --calm-line: 255 255 255;
+  --portal-text-rgb: 232 234 242;
+  --portal-soft-rgb: 166 175 191;
+  color: #e8eaf2;
+  color-scheme: dark;
+}
+.portal-calm .from-violet-500 {
+  --calm-ink: 255 255 255;
+  --calm-line: 255 255 255;
+}
+.portal-calm .placeholder-white\/30::placeholder { color: rgb(var(--calm-ink) / .55); }
+.portal-calm .bg-black\/40.text-white { color: #fff; }
+/* Inline board-label colours remain authoritative, including white ink. */
+.portal-calm .text-white[style*="background-color"] { color: #fff; }
+.portal-calm .shadow-lg { box-shadow: 0 3px 12px rgb(20 30 45 / .07); }
+/* Existing board density and responsive controls are deliberately retained. */
+.portal-calm .shadow-xl:not(.portal-sidebar) { --tw-shadow: 0 8px 28px rgb(20 30 45 / .09); }
+.portal-calm .shadow-2xl { --tw-shadow: 0 16px 48px rgb(20 30 45 / .14); }
+
+.portal-calm .text-white\/20 { color: rgb(var(--calm-ink) / 0.62); }
+.portal-calm .text-white\/25 { color: rgb(var(--calm-ink) / 0.62); }
+.portal-calm .text-white\/30 { color: rgb(var(--calm-ink) / 0.62); }
+.portal-calm .text-white\/35 { color: rgb(var(--calm-ink) / 0.62); }
+.portal-calm .text-white\/40 { color: rgb(var(--calm-ink) / 0.62); }
+.portal-calm .text-white\/45 { color: rgb(var(--calm-ink) / 0.62); }
+.portal-calm .text-white\/50 { color: rgb(var(--calm-ink) / 0.62); }
+.portal-calm .text-white\/55 { color: rgb(var(--calm-ink) / 0.62); }
+.portal-calm .text-white\/60 { color: rgb(var(--calm-ink) / 0.62); }
+.portal-calm .text-white\/70 { color: rgb(var(--calm-ink) / 0.7); }
+.portal-calm .text-white\/75 { color: rgb(var(--calm-ink) / 0.75); }
+.portal-calm .text-white\/80 { color: rgb(var(--calm-ink) / 0.8); }
+.portal-calm .hover\:text-white\/70:hover { color: rgb(var(--calm-ink) / 0.7); }
+.portal-calm .hover\:text-white\/80:hover { color: rgb(var(--calm-ink) / 0.8); }

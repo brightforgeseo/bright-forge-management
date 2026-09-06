@@ -1,3 +1,5 @@
+@import './team-calm.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

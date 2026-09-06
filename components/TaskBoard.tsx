@@ -2623,7 +2623,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                           <img src={comment.avatar} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
                         ) : (
                           <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-xs font-bold text-brand-700 flex-shrink-0">
-                            {comment.author.charAt(0).toUpperCase()}
+                            {comment.author?.charAt(0).toUpperCase() || '?'}
                           </div>
                         )}
                         <div className="flex-1">
