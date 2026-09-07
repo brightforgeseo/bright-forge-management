@@ -30,6 +30,14 @@ if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+  if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 })
+  // Only the server-side notification trigger may select another user's devices.
+  // A valid anon/user JWT is not authorisation to send arbitrary notifications.
+  if (!SUPABASE_SERVICE_ROLE_KEY || req.headers.get('authorization') !== `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`) {
+    return new Response(JSON.stringify({ ok: false, error: 'Unauthorised' }), {
+      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
 
   try {
     if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
