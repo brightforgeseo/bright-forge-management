@@ -491,12 +491,13 @@ ${currentUser.name}`;
 
       <MobileTabBar
         currentView={currentView}
+        onOpenMenu={() => setIsMobileMenuOpen(true)}
         onNavigate={(view) => { navigateToView(view); setIsMobileMenuOpen(false); }}
       />
 
       {/* Mobile Header - Hidden on TeamChat which has its own header */}
       {currentView !== ToolView.TEAM_CHAT && (
-      <div className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-portal-surface border-b border-white/[0.07] z-30 flex items-center justify-between px-3 safe-area-inset-top">
+      <div className="portal-mobile-header lg:hidden fixed top-0 left-0 right-0 h-14 bg-portal-surface border-b border-white/[0.07] z-30 flex items-center justify-between px-3 safe-area-inset-top">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <button
             onClick={() => setIsMobileMenuOpen(true)}
@@ -519,7 +520,7 @@ ${currentUser.name}`;
       </div>
       )}
 
-      <main className={`flex-1 ${isSidebarCollapsed ? 'lg:ml-[60px]' : 'lg:ml-64'} h-full overflow-hidden relative transition-all duration-200 ${isFullHeight ? '' : 'bg-portal-dark'} ${currentView === ToolView.TEAM_CHAT || currentView === ToolView.BUSINESS_INBOX ? '' : 'pt-14'} lg:pt-0 pb-16 lg:pb-0`}>
+      <main className={`portal-mobile-main min-w-0 flex-1 ${isSidebarCollapsed ? 'lg:ml-[60px]' : 'lg:ml-64'} h-full overflow-hidden relative transition-all duration-200 ${isFullHeight ? '' : 'bg-portal-dark'} ${currentView === ToolView.TEAM_CHAT ? '' : 'portal-with-header'} lg:pt-0 pb-16 lg:pb-0`}>
         {isFullHeight ? renderContent() : <ScrollablePageWrapper>{renderContent()}</ScrollablePageWrapper>}
       </main>
       <ToastContainer toasts={toasts} removeToast={removeToast} />

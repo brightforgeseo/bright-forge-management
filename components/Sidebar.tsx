@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useDialogFocus } from '../lib/useDialogFocus';
 import { LayoutDashboard, Search, PenTool, BarChart, Settings, TableProperties, MessageSquare, Hexagon, LogOut, UserPlus, MoreVertical, Bell, X, Check, CheckSquare, Menu, FileCheck, Zap, ChevronLeft, ChevronRight, Clock, Mail, Command } from 'lucide-react';
 import { ToolView, BrandingConfig, User, AppNotification } from '../types';
 import { supabase } from '../lib/supabaseClient';
@@ -172,9 +173,18 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [isCollapsed, setIsCollapsed] = useState(() => {
+  const [desktopCollapsed, setIsCollapsed] = useState(() => {
     try { return localStorage.getItem('sidebar-collapsed') === 'true'; } catch { return false; }
   });
+  const [isDesktop, setIsDesktop] = useState(() => window.matchMedia('(min-width: 1024px)').matches);
+  const isCollapsed = isDesktop && desktopCollapsed;
+  useDialogFocus(isMobileMenuOpen && !isDesktop, '#portal-tool-menu', () => setIsMobileMenuOpen(false));
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 1024px)');
+    const update = () => setIsDesktop(media.matches);
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
   const [recentViews, setRecentViews] = useState<ToolView[]>(() => {
     try { return JSON.parse(localStorage.getItem('sidebar-recent') || '[]'); } catch { return []; }
   });
@@ -501,7 +511,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       )}
 
       {/* Sidebar */}
-      <div className={`
+      <div id="portal-tool-menu" role={!isDesktop && isMobileMenuOpen ? 'dialog' : undefined} aria-modal={!isDesktop && isMobileMenuOpen ? true : undefined} aria-label="All tools" tabIndex={-1} inert={!isDesktop && !isMobileMenuOpen} className={`
         portal-sidebar ${isCollapsed ? 'w-[60px]' : 'w-72 lg:w-64'} bg-portal-surface text-white flex flex-col h-full fixed left-0 top-0 shadow-xl transition-all duration-200 ease-out
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `} style={{ zIndex: 100 }}>
@@ -614,7 +624,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         {/* Command Palette shortcut — hide when collapsed */}
         {onOpenPalette && !isCollapsed && (
           <button
-            onClick={onOpenPalette}
+            onClick={() => { setIsMobileMenuOpen(false); onOpenPalette(); }}
             className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.07] hover:bg-white/[0.08] transition-colors text-portal-soft hover:text-portal-text group"
           >
             <Search className="w-3.5 h-3.5 flex-shrink-0" />
@@ -624,7 +634,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         )}
         {onOpenPalette && isCollapsed && (
           <button
-            onClick={onOpenPalette}
+            onClick={() => { setIsMobileMenuOpen(false); onOpenPalette(); }}
             className="w-full flex items-center justify-center p-2.5 rounded-lg bg-white/[0.04] border border-white/[0.07] hover:bg-white/[0.08] transition-colors text-portal-soft hover:text-portal-text"
             title="Search (⌘K)"
           >

@@ -686,7 +686,7 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5 lg:gap-2">
+          <div className="portal-my-work-filters flex flex-wrap items-center gap-1.5 lg:gap-2">
             {/* User Filter Dropdown */}
             <div className="relative flex-1 sm:flex-none">
               <select
@@ -806,7 +806,7 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
         {viewMode === 'table' ? (
           <div className="bg-portal-surface rounded-xl shadow-lg shadow-black/20 border border-white/[0.07] flex-1 flex flex-col overflow-hidden">
             <div className="overflow-y-auto flex-1">
-              <table className="w-full table-fixed">
+              <table className="portal-my-work-table w-full table-fixed">
                 <thead className="bg-portal-dark border-b border-white/[0.07] sticky top-0 z-10">
                   <tr>
                     <th className="text-left py-3 px-2 lg:px-4 text-xs font-semibold text-portal-soft uppercase w-[25%]">Task</th>

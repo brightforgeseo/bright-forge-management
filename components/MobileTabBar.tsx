@@ -4,12 +4,13 @@
  */
 
 import React from 'react';
-import { TableProperties, MessageSquare, CheckSquare, Zap, LayoutDashboard } from 'lucide-react';
+import { TableProperties, MessageSquare, CheckSquare, Menu, LayoutDashboard } from 'lucide-react';
 import { ToolView } from '../types';
 
 interface Props {
   currentView: ToolView;
   onNavigate: (view: ToolView) => void;
+  onOpenMenu: () => void;
 }
 
 const TABS = [
@@ -17,17 +18,18 @@ const TABS = [
   { view: ToolView.TASKS,           icon: TableProperties,   label: 'Tasks' },
   { view: ToolView.MY_WORK,         icon: CheckSquare,       label: 'Mine'  },
   { view: ToolView.TEAM_CHAT,       icon: MessageSquare,     label: 'Chat'  },
-  { view: ToolView.ECHO_WORKSPACES, icon: Zap,               label: 'Echo'  },
+
 ];
 
-const MobileTabBar: React.FC<Props> = ({ currentView, onNavigate }) => (
-  <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-portal-surface border-t border-white/[0.07] safe-area-inset-bottom">
+const MobileTabBar: React.FC<Props> = ({ currentView, onNavigate, onOpenMenu }) => (
+  <nav aria-label="Main navigation" className="portal-mobile-tabs lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-portal-surface border-t border-white/[0.07] safe-area-inset-bottom">
     <div className="flex items-stretch h-16">
       {TABS.map(({ view, icon: Icon, label }) => {
         const active = currentView === view;
         return (
           <button
             key={view}
+            aria-current={active ? 'page' : undefined}
             onClick={() => onNavigate(view)}
             className={`flex-1 flex flex-col items-center justify-center gap-1 transition-colors ${
               active ? 'text-brand-400' : 'text-white/40 hover:text-white/70'
@@ -43,6 +45,10 @@ const MobileTabBar: React.FC<Props> = ({ currentView, onNavigate }) => (
           </button>
         );
       })}
+      <button onClick={onOpenMenu} aria-label="Open all tools" className="flex-1 flex flex-col items-center justify-center gap-1 text-portal-soft">
+        <Menu size={20} />
+        <span className="text-xs font-medium">More</span>
+      </button>
     </div>
   </nav>
 );

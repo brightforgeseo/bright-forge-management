@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useDialogFocus } from '../lib/useDialogFocus';
 import { Plus, Sparkles, ChevronDown, ChevronUp, ChevronRight, Trash2, Briefcase, CheckCircle2, Settings, Mail, Phone, Globe, X, Image as ImageIcon, Edit3, Palette, Loader2, Upload, UserCircle, Link as LinkIcon, MessageCircle, Send, Search, Share2, Hash, Users, Archive, RotateCcw, UserPlus, GripVertical, CheckSquare, Paperclip, File as FileIcon } from 'lucide-react';
 import AssignToPartnerModal from './client-portal/AssignToPartnerModal';
 import { Task, TaskGroup, User, ClientBoard, ToastType, LabelDefinition, Profile, TaskComment, TaskAttachment, ChatChannel, ChatMessage, ArchivedTask } from '../types';
@@ -1701,10 +1702,12 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
       });
   };
 
+  useDialogFocus(!!taskModal && !activePicker && !activePersonPicker, '.portal-task-dialog', () => setTaskModal(null));
+
   if (isLoadingData) return <div className="flex h-full items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-brand-500" /></div>;
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-portal-surface relative">
+    <div className="portal-task-board flex flex-col h-full overflow-hidden bg-portal-surface relative">
       {/* Header - Fixed */}
       <div className="flex-none px-3 lg:px-8 py-3 lg:py-6 border-b border-white/[0.07] bg-portal-surface flex flex-col lg:flex-row lg:justify-between lg:items-start gap-3 lg:gap-4 z-20">
          <div className="space-y-2 lg:space-y-3">
@@ -2002,7 +2005,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                    onDrop={(e) => { if (draggedGroupId) handleGroupDrop(e, group.id); }}
                  >
                     {/* Group Header */}
-                    <div className={`flex items-center gap-2 mb-2 group cursor-pointer ${dragOverGroupPosition === group.id && draggedGroupId !== group.id ? 'border-2 border-blue-400 rounded-lg bg-blue-50/30' : ''}`}>
+                    <div className={`portal-task-group-header flex items-center gap-2 mb-2 group cursor-pointer ${dragOverGroupPosition === group.id && draggedGroupId !== group.id ? 'border-2 border-blue-400 rounded-lg bg-blue-50/30' : ''}`}>
                        <button
                          draggable
                          onDragStart={(e) => { e.stopPropagation(); handleGroupDragStart(e, group.id); }}
@@ -2047,7 +2050,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                         onDrop={(e) => { if (draggedTask) handleTaskDrop(e, group.id); }}
                       >
                          <div className="overflow-y-auto custom-scrollbar">
-                           <table className="w-full table-fixed">
+                           <table className="portal-task-table w-full table-fixed">
                               <thead className="bg-portal-dark border-b border-white/[0.07]">
                                 <tr>
                                   <th className="text-left py-3 px-2 lg:px-4 text-xs font-semibold text-portal-soft uppercase tracking-wider w-[25%] lg:w-[20%]">Item</th>
@@ -2387,7 +2390,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
       {/* Task Details Modal */}
       {taskModal && activeClient && (
         <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 animate-fadeIn backdrop-blur-sm">
-          <div className="bg-portal-surface rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden border border-white/[0.07] max-h-[90vh] flex flex-col">
+          <div role="dialog" aria-modal="true" aria-label="Task details" tabIndex={-1} className="portal-task-dialog bg-portal-surface rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden border border-white/[0.07] max-h-[90vh] flex flex-col">
             {/* Modal Header */}
             <div className="p-6 border-b border-white/[0.07] flex justify-between items-start bg-portal-dark">
               <div className="flex-1">
@@ -2413,7 +2416,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
                   <Share2 className="w-5 h-5" />
                   <span className="text-xs font-medium hidden sm:inline">Share</span>
                 </button>
-                <button onClick={() => setTaskModal(null)} className="text-portal-soft hover:text-portal-soft p-2 hover:bg-portal-surface2 rounded-lg transition-colors">
+                <button aria-label="Close task details" onClick={() => setTaskModal(null)} className="text-portal-soft hover:text-portal-soft p-2 hover:bg-portal-surface2 rounded-lg transition-colors">
                   <X className="w-5 h-5" />
                 </button>
               </div>

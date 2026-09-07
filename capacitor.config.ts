@@ -10,7 +10,7 @@ const config: CapacitorConfig = {
     // Load the live portal rather than the web assets bundled at build time.
     // Sideloaded APKs have no store-driven updates, so this is what keeps
     // phones current: install once, always see the latest deployed portal.
-    url: 'https://echo-ai.tailfdbc33.ts.net',
+    url: 'https://echo-ben.tailfdbc33.ts.net',
     androidScheme: 'https'
   },
   ios: {

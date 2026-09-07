@@ -1,0 +1,54 @@
+/* Team workspace only. Keep desktop tables and separate client portals intact. */
+@media (max-width: 1023px) {
+  .portal-calm { height: 100dvh; }
+  .portal-calm .portal-mobile-main { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
+  .portal-calm .portal-with-header { padding-top: calc(56px + env(safe-area-inset-top, 0px)); }
+  .portal-calm .portal-mobile-header { height: calc(56px + env(safe-area-inset-top, 0px)); padding-top: env(safe-area-inset-top, 0px); }
+  .portal-calm .portal-mobile-tabs { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .portal-calm .portal-sidebar { max-width: calc(100vw - 32px); padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .portal-calm .portal-sidebar img[alt="BrightForge"] { width: 100%; max-width: 180px; }
+  .portal-calm .portal-sidebar button { min-height: 44px; }
+  .portal-calm .portal-task-dialog { max-height: calc(100dvh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
+  .portal-calm .portal-task-dialog > div { padding: 16px; }
+  .portal-calm .portal-task-dialog input,
+  .portal-calm .portal-task-dialog textarea { font-size: 16px; }
+  .portal-calm .portal-task-dialog button { min-height: 44px; }
+}
+@media (max-width: 639px) {
+  .portal-calm .portal-my-work-filters > div:nth-child(-n+2) { flex-basis: calc(50% - 8px); min-width: 140px; }
+  .portal-calm .portal-my-work-table, .portal-calm .portal-my-work-table tbody { display: block; width: 100%; }
+  .portal-calm .portal-my-work-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .portal-calm .portal-my-work-table tbody tr { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 12px; padding: 12px; }
+  .portal-calm .portal-my-work-table td { padding: 0; min-width: 0; text-align: left; }
+  .portal-calm .portal-my-work-table td:first-child { grid-column: 1 / -1; min-height: 44px; }
+  .portal-calm .portal-my-work-table td span { white-space: normal; }
+  .portal-calm .portal-my-work-table td:nth-child(2)::before { content: 'Group'; }
+  .portal-calm .portal-my-work-table td:nth-child(3)::before { content: 'Board'; }
+  .portal-calm .portal-my-work-table td:nth-child(4)::before { content: 'Due date'; }
+  .portal-calm .portal-my-work-table td:nth-child(5)::before { content: 'Status'; }
+  .portal-calm .portal-my-work-table td:nth-child(6)::before { content: 'Priority'; }
+  .portal-calm .portal-my-work-table td::before { display: block; font-size: 11px; color: rgb(var(--calm-ink) / .65); margin-bottom: 4px; }
+
+  .portal-calm .portal-task-group-header { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; }
+  .portal-calm .portal-task-group-header > div:nth-child(2) { grid-column: 2 / -1; min-width: 0; padding-left: 0; padding-right: 0; }
+  .portal-calm .portal-task-group-header > div:nth-child(2) span { flex-shrink: 0; white-space: nowrap; }
+  .portal-calm .portal-task-group-header > div:nth-child(3) { grid-column: 2; justify-self: end; }
+  .portal-calm .portal-task-group-header button { min-height: 44px; min-width: 44px; opacity: 1; }
+  .portal-calm .portal-task-table,
+  .portal-calm .portal-task-table tbody { display: block; width: 100%; }
+  .portal-calm .portal-task-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .portal-calm .portal-task-table tr[data-task-id] { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; padding: 12px; cursor: default; }
+  .portal-calm .portal-task-table tr[data-task-id] > td { min-width: 0; padding: 0; }
+  .portal-calm .portal-task-table tr[data-task-id] > td:first-child { grid-column: 1 / -1; }
+  .portal-calm .portal-task-table tr[data-task-id] > td:first-child button { white-space: normal; overflow: visible; font-size: 14px; line-height: 1.5; min-height: 44px; }
+  .portal-calm .portal-task-table tr[data-task-id] > td:nth-child(4) { display: block; }
+  .portal-calm .portal-task-table tr[data-task-id] > td:nth-child(2)::before { content: 'Person'; }
+  .portal-calm .portal-task-table tr[data-task-id] > td:nth-child(3)::before { content: 'Status'; }
+  .portal-calm .portal-task-table tr[data-task-id] > td:nth-child(4)::before { content: 'Priority'; }
+  .portal-calm .portal-task-table tr[data-task-id] > td:nth-child(5)::before { content: 'Due date'; }
+  .portal-calm .portal-task-table tr[data-task-id] > td::before { display: block; text-align: left; font-size: 11px; color: rgb(var(--calm-ink) / .65); margin-bottom: 4px; }
+  .portal-calm .portal-task-table tr[data-task-id] > td:last-child { grid-column: 1 / -1; justify-self: end; }
+  .portal-calm .portal-task-table tr[data-task-id] button,
+  .portal-calm .portal-task-table tr[data-task-id] input { min-height: 44px; }
+  .portal-calm .portal-task-table tr[data-task-id] .opacity-0 { opacity: 1; }
+}

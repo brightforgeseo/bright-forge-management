@@ -1,4 +1,5 @@
 @import './team-calm.css';
+@import './mobile-workspace.css';
 
 @tailwind base;
 @tailwind components;
