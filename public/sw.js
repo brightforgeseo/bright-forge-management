@@ -30,7 +30,7 @@ self.addEventListener('push', (event) => {
     icon: data.icon || '/favicon.png',
     badge: '/favicon.png',
     tag: data.tag || undefined,           // collapses repeats with the same tag
-    renotify: !!data.tag,                 // still vibrate/sound on repeat tags
+    renotify: false,                      // retries replace the card without another alert
     requireInteraction: false,
     data: {
       url: data.url || '/',
@@ -48,7 +48,11 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
   const targetUrl = (() => {
-    const base = (event.notification.data && event.notification.data.url) || '/';
+    let base = '/';
+    try {
+      const candidate = new URL(event.notification.data?.url || '/', self.location.origin);
+      if (candidate.origin === self.location.origin) base = candidate.pathname + candidate.search + candidate.hash;
+    } catch {}
     const linkView = event.notification.data && event.notification.data.linkView;
     const linkData = event.notification.data && event.notification.data.linkData;
     if (!linkView) return base;

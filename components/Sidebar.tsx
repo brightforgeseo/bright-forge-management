@@ -259,7 +259,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       if (note.isRead) return;
 
       if (window.electronAPI?.showNotification) {
-        window.electronAPI.showNotification(note.title, note.message);
+        window.electronAPI.showNotification(note.title, note.message, note);
       } else if ('Notification' in window && Notification.permission === 'granted') {
         try {
           const browserNote = new Notification(note.title, {

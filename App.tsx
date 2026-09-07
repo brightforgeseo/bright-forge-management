@@ -66,7 +66,7 @@ import { ToolView, BrandingConfig, User, ToastNotification, ToastType, Profile }
 import { supabase, normalizeSupabaseAssetUrl } from './lib/supabaseClient';
 import { addToAllowlist, updateUserProfile, checkDueDateNotifications, fetchClientBoardSummaries, fetchProfiles } from './services/databaseService';
 import { isBenBusinessOsUser, isBusinessInboxUser } from './services/businessOsModel.mjs';
-import { listenForPushClicks } from './lib/pushNotifications';
+import { disableWebPush, listenForPushClicks } from './lib/pushNotifications';
 import { Copy, X, UserPlus, Check, Mail, RefreshCw, AlertTriangle, MessageSquare } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -208,6 +208,8 @@ const App: React.FC = () => {
   };
 
   const handleLogout = async () => {
+    window.electronAPI?.clearNotifications?.();
+    await disableWebPush();
     await supabase.auth.signOut();
     setIsAuthenticated(false);
     localStorage.removeItem('bf_auth_override');
@@ -240,9 +242,18 @@ const App: React.FC = () => {
     }
   }, [canNavigateToView, navigateToView]);
 
-  // 1) Cold-start: SW writes deep-link to URL hash when opening a new tab from a push.
+  // Native clicks share the in-app destination, but never cross account boundaries.
+  useEffect(() => {
+    return window.electronAPI?.onNotificationClick((destination) => {
+      if (!isAuthenticated || destination?.userId !== currentUser.id) return;
+      applyPushDeepLink(destination.linkView, destination.linkData);
+    });
+  }, [isAuthenticated, currentUser.id, applyPushDeepLink]);
+
+  // Cold-start URLs must survive the initial unauthenticated render.
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (!isAuthenticated) return;
     const hash = window.location.hash;
     const idx = hash.indexOf('push=');
     if (idx === -1) return;
@@ -254,7 +265,7 @@ const App: React.FC = () => {
     } catch (e) {
       console.error('[App] Failed to parse push hash:', e);
     }
-  }, [applyPushDeepLink]);
+  }, [isAuthenticated, applyPushDeepLink]);
 
   // 2) Warm-tab: SW posts a message when the user clicks a push and we already had a tab open.
   useEffect(() => {

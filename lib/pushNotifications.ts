@@ -63,10 +63,31 @@ async function persistSubscription(userId: string, subscription: PushSubscriptio
  * Register the SW, request permission if needed, subscribe via PushManager, and persist
  * the subscription server-side. Safe to call on every login / Sidebar mount.
  */
-export async function enableWebPush(userId: string, options: { requestPermission?: boolean } = {}): Promise<{
+let registrationEpoch = 0;
+let cancelReadiness: (() => void) | null = null;
+let activeUserId: string | null = null;
+let pendingCleanup: Promise<void> | null = null;
+let pendingRegistration: { userId: string; promise: ReturnType<typeof registerWebPush> } | null = null;
+
+export function enableWebPush(userId: string, options: { requestPermission?: boolean } = {}) {
+  if (pendingRegistration?.userId === userId) return pendingRegistration.promise;
+  if (activeUserId && activeUserId !== userId) void disableWebPush();
+  activeUserId = userId;
+  // registerWebPush invokes requestPermission synchronously, preserving the iOS gesture.
+  const promise = registerWebPush(userId, options, pendingCleanup);
+  pendingRegistration = { userId, promise };
+  void promise.finally(() => {
+    if (pendingRegistration?.promise === promise) pendingRegistration = null;
+  }).catch(() => {});
+  return promise;
+}
+
+async function registerWebPush(userId: string, options: { requestPermission?: boolean } = {}, cleanup: Promise<void> | null = null): Promise<{
   ok: boolean;
-  reason?: 'unsupported' | 'denied' | 'no-vapid' | 'subscribe-failed' | 'persist-failed' | 'permission-required';
+  reason?: 'unsupported' | 'denied' | 'no-vapid' | 'subscribe-failed' | 'persist-failed' | 'permission-required' | 'cancelled';
 }> {
+  const epoch = registrationEpoch;
+  const cancelled = () => epoch !== registrationEpoch;
   if (!isPushSupported()) return { ok: false, reason: 'unsupported' };
   if (!VAPID_PUBLIC_KEY) {
     console.warn('[Push] VAPID_PUBLIC_KEY is not configured — skipping web push subscribe.');
@@ -80,15 +101,24 @@ export async function enableWebPush(userId: string, options: { requestPermission
     perm = await Notification.requestPermission();
   }
   if (perm !== 'granted') return { ok: false, reason: 'denied' };
+  await cleanup;
+  if (cancelled()) return { ok: false, reason: 'cancelled' };
 
   const registration = await ensureServiceWorker();
   if (!registration) return { ok: false, reason: 'unsupported' };
+  if (cancelled()) return { ok: false, reason: 'cancelled' };
 
   // Wait until the SW is active before trying to subscribe
-  await navigator.serviceWorker.ready;
+  await Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise<void>(resolve => { cancelReadiness = resolve; })
+  ]);
+  cancelReadiness = null;
 
   try {
+    if (cancelled()) return { ok: false, reason: 'cancelled' };
     const existing = await registration.pushManager.getSubscription();
+    if (cancelled()) return { ok: false, reason: 'cancelled' };
     if (existing) {
       if (!await persistSubscription(userId, existing)) return { ok: false, reason: 'persist-failed' };
       return { ok: true };
@@ -98,6 +128,10 @@ export async function enableWebPush(userId: string, options: { requestPermission
       // Cast: lib.dom typings vary on whether this accepts Uint8Array directly
       applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as unknown as BufferSource
     });
+    if (cancelled()) {
+      await subscription.unsubscribe();
+      return { ok: false, reason: 'cancelled' };
+    }
     if (!await persistSubscription(userId, subscription)) return { ok: false, reason: 'persist-failed' };
     return { ok: true };
   } catch (e) {
@@ -107,7 +141,26 @@ export async function enableWebPush(userId: string, options: { requestPermission
 }
 
 /** Unsubscribe (e.g. on logout) and clean up the server row. */
-export async function disableWebPush(): Promise<void> {
+export function disableWebPush(): Promise<void> {
+  registrationEpoch++;
+  cancelReadiness?.();
+  const pending = pendingRegistration?.promise;
+  pendingRegistration = null;
+  activeUserId = null;
+  const previousCleanup = pendingCleanup;
+  const cleanup = (async () => {
+    await previousCleanup;
+    await pending?.catch(() => {});
+    await removeWebPush();
+  })();
+  pendingCleanup = cleanup;
+  void cleanup.finally(() => {
+    if (pendingCleanup === cleanup) pendingCleanup = null;
+  }).catch(() => {});
+  return cleanup;
+}
+
+async function removeWebPush(): Promise<void> {
   if (!isPushSupported()) return;
   try {
     const registration = await navigator.serviceWorker.getRegistration('/');

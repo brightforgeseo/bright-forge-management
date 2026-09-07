@@ -21,7 +21,14 @@ if (process.platform === 'win32') {
 }
 
 // Helper function to show native OS notification
-function showNativeNotification(title, body) {
+const activeNotifications = new Set();
+function clearNativeNotifications() {
+  const cards = [...activeNotifications];
+  activeNotifications.clear();
+  for (const card of cards) card.close();
+}
+
+function showNativeNotification(title, body, destination) {
   console.log('[Notification] Attempting to show notification:', { title, body, supported: Notification.isSupported() });
 
   if (Notification.isSupported()) {
@@ -40,13 +47,18 @@ function showNativeNotification(title, body) {
       }
 
       const notification = new Notification(notificationOptions);
+      activeNotifications.add(notification);
+      notification.on('close', () => activeNotifications.delete(notification));
 
       notification.on('click', () => {
+        if (!activeNotifications.has(notification)) return;
         // Focus the main window when notification is clicked
         if (mainWindow) {
           if (mainWindow.isMinimized()) mainWindow.restore();
           mainWindow.focus();
+          if (destination) mainWindow.webContents.send('notification-click', destination);
         }
+        activeNotifications.delete(notification);
       });
 
       notification.on('show', () => {
@@ -228,8 +240,12 @@ autoUpdater.on('error', (err) => {
 });
 
 // IPC handlers for renderer process communication
-ipcMain.on('show-notification', (event, { title, body }) => {
-  showNativeNotification(title, body);
+ipcMain.on('clear-notifications', (event) => {
+  if (event.sender === mainWindow?.webContents) clearNativeNotifications();
+});
+ipcMain.on('show-notification', (event, { title, body, destination }) => {
+  if (event.sender !== mainWindow?.webContents) return;
+  showNativeNotification(title, body, destination);
 });
 
 ipcMain.on('focus-window', () => {
