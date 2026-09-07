@@ -7,8 +7,9 @@ test('app logout removes push before revoking the authenticated session',async()
   const body=source.match(/const handleLogout = async \(\) => \{([\s\S]*?)\n  \};/)[1];
   const calls=[];
   await vm.runInNewContext('(async()=>{'+body+'})()',{
-    disableWebPush:async()=>calls.push('unsubscribe'),
-    supabase:{auth:{signOut:async()=>calls.push('signOut')}},
+    sessionIdentityRef:{current:'alice'},userSessionDebounceRef:{current:null},setPushSession:async()=>{},
+    disableWebPush:async()=>{calls.push('unsubscribe');return {ok:true};},
+    supabase:{auth:{signOut:async()=>{calls.push('signOut');return {error:null};}}},
     setIsAuthenticated:()=>{},localStorage:{removeItem:()=>{}},
     window:{electronAPI:{clearNotifications:()=>calls.push('clearNative')}},
   });

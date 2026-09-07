@@ -1,44 +1,40 @@
-# Desktop and PWA notification audit
+# Desktop/PWA and Settings lifecycle repair
 
-Stage: implemented locally, not deployed or device-delivery verified. Live writes and alerts: zero.
+Stage: integrated locally, not deployed and not physical-device delivery verified. Live alerts, production requests, deployments and database mutations: **zero**.
 
-Base: origin/main at 2c2a0f3 (version 1.0.322), fetched before creating independent branch `audit/desktop-pwa-notification-lifecycle`. The original dirty repository was not edited. No schema/migration or sender changes.
+Base: `e9fd3240db80131d5e67bffca77eb343d224f56a`, independent `desktop-pwa-src` worktree. The original dirty repository was not edited. Parent-supplied sender-contract and review repairs in this worktree were preserved.
 
-## Repairs with observed red -> green regressions
+## Implemented and exercised
 
-- Concurrent Web Push enable calls for the same user now share the pending operation, avoiding duplicate subscribe/save calls. Completed failures remain retryable.
-- Explicit logout cancels a pending registration, including a worker-readiness wait, unsubscribes and attempts row removal while still authenticated, before calling signOut.
-- Switching users cancels the previous registration and serialises cleanup before the new user's registration. Permission remains invoked directly from the user gesture, before awaits.
-- Electron notification destinations now travel Sidebar -> preload -> main-process card -> preload -> App. The App rejects native destinations for a different recipient or unauthenticated session.
-- Explicit logout closes tracked Electron cards and invalidates their stale callbacks. IPC writes are limited to the main window webContents sender.
-- Cold-start PWA destination hashes remain intact until authentication completes.
-- Service-worker click URLs are constrained to the portal origin, including malformed/external URL fallback.
-- Repeated tagged pushes replace the card without `renotify`, rather than requesting another vibration/sound.
+- Settings lists paginated real GoTrue auth users via `GET /api/admin/users`, not anonymous renderer admin calls or fabricated profiles. Password reset and delete use the same privileged boundary. Each call verifies the bearer with `/auth/v1/user`; the server checks the verified UUID against **server-configured owner IDs**, independently of user-editable profile/allowlist roles. Only display fields leave the API. Protected owner UUID comparisons handle valid case aliases. Password input is bounded and restricted to a password-only payload. Electron file-origin preflight is supported without cookie credentials.
+- Web Push registration has bounded permission, SW registration/readiness, subscribe and persistence waits. Logout cancels the whole registration, not just readiness. Late subscribe/persist operations compensate. Pending unsubscribe/delete operations remain quarantined after timeout, blocking a registration that late cleanup could subsequently invalidate. Cleanup returns explicit errors rather than claiming success.
+- The App revalidates sessions with GoTrue on startup, auth changes, focus, controller change and periodic checks. Cross-tab signout, remote verification failure and identity changes clear native cards, worker binding, deep-link state and authenticated views. Stale profile callbacks cannot reauthenticate a different account.
+- SW payloads and clicks require a matching, unexpired recipient binding. Sender payloads now include the authorised `userId` as `recipientId` (parent integration repair). Missing/different-recipient payloads fail closed. SW destinations are app view data, never arbitrary URLs. Cold and warm links enforce recipient identity; unauthenticated warm clicks survive in the URL until login.
+- Pending task/chat/My Work destinations use tab-local, account-scoped storage. Legacy origin-wide keys are discarded, and Sidebar persistence/dispatch uses the actual destination key.
+- Electron exposes a guarded native capability query. UI states that alerts require a running, signed-in app and OS settings; it does **not** claim closed-app push or confirmed OS permission.
+- Independent review additionally found a pre-existing malformed-percent URL crash in the touched server. A new red-to-green regression verifies HTTP 400 rather than an uncaught URIError.
 
-## Verification
+## Server setup and integration contract
 
-`npm test`: 36 passed, 0 failed, 0 skipped. Existing Node MODULE_TYPELESS_PACKAGE_JSON warnings remain.
+`SUPABASE_SERVICE_ROLE_KEY` and comma-separated `PORTAL_OWNER_IDS` are required in the **server environment**, never renderer build variables. An absent owner list/key returns 503. `SUPABASE_INTERNAL_URL` and `SUPABASE_ANON_KEY` identify the same GoTrue instance used by the portal. The new endpoint intentionally does not inherit the legacy demo service-key fallback.
 
-`npm run build`: exit 0. `git diff --check`: exit 0.
+The shipped `supabase_setup.sql` allows authenticated users to update `allowed_users`, so its role is not a safe privileged authority. Server owner IDs deliberately provide a separate trust root. Existing unrelated allowlist/partner-management RLS and functions are not comprehensively redesigned by this repair. `updateUserRole` is not an authority source for this API.
 
-Focused fixture tests execute the production registration module, service-worker handlers, Electron card/preload code and extracted App callbacks. All use synthetic recipients and fake browser/OS/database interfaces. They are not delivery tests or full authenticated UI tests.
+GoTrue validates token expiry and user validity. Standard Supabase access JWTs can remain valid until expiry after refresh-session revocation. This change does not claim instant server revocation of every previously issued JWT, nor does it read `auth.sessions` directly. The SW's cached recipient binding expires with the verified access session and needs an app session refresh after expiry.
 
-Evidence outside git, beside this worktree: `desktop-final-tests.log`, `desktop-build.log`, `desktop-baseline.log`, `desktop-electron-red.log`, `desktop-logout-red.log`. Earlier red failures are also in the agent execution transcript.
+Ship sender, web build and `public/sw.js` together. Package matching Electron main/preload; a web deployment does not upgrade an installed shell. The parent backend notification-route lane remains a separate integration responsibility.
 
-The isolated static build returned HTTP 200. Browser UI testing could not connect: the browser harness requires the user to approve Chrome remote debugging. No repeated connection was attempted. The temporary static server was stopped. No conflicting Electron process was launched.
+## Verification receipts
 
-## Unresolved acceptance gates / findings
+- `npm test`: **64 passed, 0 failed, 0 skipped**. Includes synthetic HTTP API tests, production SW/Card/registration logic, cancellation and timeout regressions, recipient/storage/session tests, and parent sender-to-worker regressions.
+- `npm run build`: exit 0. Existing Browserslist/baseline mapping age warnings remain.
+- `git diff --check`: exit 0.
+- `node tests/desktopBrowserHarness.cjs`: pass in standalone headless Chromium 1234, using an isolated Playwright context and local fixtures. Real App Settings displays both synthetic users through the real server API handler. Actual SW CacheStorage binding clears on cross-tab signout; wrong-recipient warm navigation is rejected; unauthenticated warm links remain pending. No page errors, external requests, or fixture writes. No browser notification permission was overridden or approved.
+- `electron-builder --linux dir --publish never --config.directories.output=../desktop-linux-package`: exit 0, Electron 28.3.3 x64 unpacked package. ASAR extraction byte-matches current `electron.js`, `preload.js`, `dist/sw.js`.
+- Independent review: `../desktop-independent-review.log` found four issues; all repaired with regressions. `../desktop-independent-rereview.log` verified those repairs and found only the malformed-path baseline issue, subsequently repaired and tested. It did not rerun browser/device QA.
 
-1. **Settings: Failed to load users:** `services/databaseService.ts:fetchAllAuthUsers` invokes `supabaseAdmin.auth.admin.listUsers()`, but `lib/supabaseClient.ts` deliberately binds that client to the anon key with no persisted session. This cannot perform GoTrue admin listing. Restore functionality via an authenticated server-side owner-authorised, paginated user-management API. Do NOT restore a service-role key in the renderer or fabricate auth-user data from profiles. Reset/delete/admin functions in the same service also need this privileged boundary. Left to the independent backend security lane; no frontend masking or schema change made.
-2. **Web Push account isolation is not complete across all paths.** Explicit app logout and in-process enable account switches are covered. Expired/revoked auth, logout in another tab, already-displayed SW cards, old unscoped deep-link storage keys and incoming payload recipient binding still require an end-to-end session design. `disableWebPush` still logs and swallows unsubscribe/delete failures; successful signOut does not prove successful server cleanup.
-3. **Remaining asynchronous failure gates:** cancellation while permission, service-worker registration, subscribe or persistence is stalled is not bounded by a timeout. Worker-readiness cancellation is covered. Native cards are cleared on explicit logout, not all possible auth-state changes.
-4. **Desktop background limitations:** Electron notifications depend on the renderer's realtime/polling session. This is not an OS-level closed-app push implementation. NotificationSetup still reports unsupported Web Push in file-based Electron; it does not expose an OS-notification capability/status interface.
-5. **Retry boundary:** same-ID Sidebar realtime/poll duplicates already deduplicate during a mount. Cross-mount and foreground browser-toast vs SW push duplicate coordination is not complete. `renotify:false` does not prove exactly-once delivery after a dismissed card or on iOS.
-6. **Warm PWA clicks:** recipient binding is absent from the current SW payload contract, and unauthenticated warm-tab click handling is not repaired here. Full authorisation remains a backend requirement, not a deep-link property.
-7. **Core acceptance:** existing automated suite and production build pass. Real Settings/boards/chat/upload workflows, desktop OS permission denial/approval, Windows/macOS/Linux cards, device lock/background/relaunch and iPhone Home Screen delivery remain unverified. Physical iOS device unavailable. No real team data or session was used.
+Evidence lives beside this worktree: `desktop-repair-final-tests.log`, `desktop-repair-build.log`, `desktop-repair-browser.log`, `desktop-linux-package.log`, `desktop-browser-evidence/{result.json,settings-owner.png,cross-tab-signed-out.png}`. The directory screenshot was inspected: both synthetic users and reset/delete controls render cleanly.
 
-## Integration
+## Honest remaining platform gates
 
-Cherry-pick this branch's commit into a CLEAN integration worktree, not the original dirty working copy. It touches App.tsx, Sidebar.tsx, electron.js/preload.js/electron.d.ts, lib/pushNotifications.ts, public/sw.js and new tests. Reconcile overlap with parallel native-mobile registration work, especially App logout, without removing either platform's cleanup.
-
-Run `npm test`, `npm run build`, and `git diff --check`. Ship the web build and copied `public/sw.js` together; package Electron with its matching preload and main-process files. A web-only deploy does not update the installed desktop shell. Run isolated browser/device acceptance before publishing. No push/release/deploy was performed by this audit.
+No release, migration or deployment was performed. Windows/macOS/Linux OS-card permission/Do Not Disturb behaviour, actual background delivery, mobile lock/relaunch, and iPhone Home Screen delivery still require device acceptance. The Linux package was assembled and its contents verified, not launched against team data. The tests prove the repaired local behaviour, not universal exactly-once delivery or all-platform closed-app push.

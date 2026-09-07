@@ -1,5 +1,5 @@
 
-import { supabase, supabaseAdmin, normalizeSupabaseAssetUrl } from '../lib/supabaseClient';
+import { supabase, normalizeSupabaseAssetUrl } from '../lib/supabaseClient';
 import { ClientBoard, ClientBoardSummary, ChatMessage, ChatChannel, Profile, AppNotification } from '../types';
 
 type TimedCache<T> = { value: T; expiresAt: number; inflight?: Promise<T> };
@@ -1535,41 +1535,35 @@ export interface AuthUser {
   };
 }
 
+async function userManagementRequest(path: string, method = 'GET', body?: object) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error('Sign in to manage users');
+  const origin = window.location.protocol.startsWith('http') ? window.location.origin : 'https://echo-ben.tailfdbc33.ts.net';
+  const response = await fetch(`${origin}/api/admin/users${path}`, {
+    method, headers: {authorization: `Bearer ${session.access_token}`, 'content-type': 'application/json'},
+    body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(10000)
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'User management request failed');
+  return data;
+}
+
 export const fetchAllAuthUsers = async (): Promise<AuthUser[]> => {
-  const { data, error } = await supabaseAdmin.auth.admin.listUsers();
-
-  if (error) {
-    console.error('Error fetching auth users:', error);
-    throw error;
+  const users = new Map<string, AuthUser>();
+  for (let page = 1; page <= 10000; page++) {
+    const data = await userManagementRequest(`?page=${page}&perPage=100`);
+    for (const user of data.users) users.set(user.id, user);
+    if (!data.hasMore) return [...users.values()];
   }
-
-  return data.users.map(user => ({
-    id: user.id,
-    email: user.email || '',
-    created_at: user.created_at,
-    last_sign_in_at: user.last_sign_in_at || null,
-    user_metadata: user.user_metadata || {}
-  }));
+  throw new Error('User directory pagination limit exceeded');
 };
 
 export const resetUserPassword = async (userId: string, newPassword: string): Promise<void> => {
-  const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-    password: newPassword
-  });
-
-  if (error) {
-    console.error('Error resetting password:', error);
-    throw error;
-  }
+  await userManagementRequest(`/${encodeURIComponent(userId)}`, 'PATCH', {password: newPassword});
 };
 
 export const deleteAuthUser = async (userId: string): Promise<void> => {
-  const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
-
-  if (error) {
-    console.error('Error deleting user:', error);
-    throw error;
-  }
+  await userManagementRequest(`/${encodeURIComponent(userId)}`, 'DELETE');
 };
 
 export const updateUserRole = async (email: string, newRole: string): Promise<void> => {

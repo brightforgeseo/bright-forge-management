@@ -1,3 +1,4 @@
+import {notificationLinkStorage} from '../lib/notificationLinkStorage.mjs';
 import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, Table as TableIcon, CheckCircle2, AlertCircle, Clock, ChevronLeft, ChevronRight, Users, Filter, MessageCircle, X, Send } from 'lucide-react';
 import { User, ToastType, Task, TaskGroup, ClientBoard, Profile, TaskComment } from '../types';
@@ -81,7 +82,7 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
   // Handle deep link from notification click
   useEffect(() => {
     const checkForDeepLink = () => {
-      const openTaskData = localStorage.getItem('openMyWorkTask');
+      const openTaskData = notificationLinkStorage.getItem('openMyWorkTask');
       if (!openTaskData) return;
 
       // Wait for tasks to load
@@ -97,16 +98,16 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
         if (task) {
           setSelectedTask(task);
           setIsTaskModalOpen(true);
-          localStorage.removeItem('openMyWorkTask');
+          notificationLinkStorage.removeItem('openMyWorkTask');
         } else {
           // Task not found in My Work (maybe user not assigned)
           // Clear the localStorage and let them know
-          localStorage.removeItem('openMyWorkTask');
+          notificationLinkStorage.removeItem('openMyWorkTask');
           console.warn('[MyWork] Task not found in My Work tasks:', linkData);
         }
       } catch (e) {
         console.error('[MyWork] Error processing deep link:', e);
-        localStorage.removeItem('openMyWorkTask');
+        notificationLinkStorage.removeItem('openMyWorkTask');
       }
     };
 
@@ -1287,7 +1288,7 @@ const MyWork: React.FC<MyWorkProps> = ({ currentUser, addToast, onNavigateToTask
               <div className="pt-4 border-t border-white/[0.07]">
                 <button
                   onClick={() => {
-                    localStorage.setItem('openTaskModal', JSON.stringify({
+                    notificationLinkStorage.setItem('openTaskModal', JSON.stringify({
                       taskId: selectedTask.id,
                       boardId: selectedTask.clientId,
                       groupId: selectedTask.groupId

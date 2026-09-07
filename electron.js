@@ -240,6 +240,10 @@ autoUpdater.on('error', (err) => {
 });
 
 // IPC handlers for renderer process communication
+ipcMain.handle('notification-status', (event) => {
+  if (event.sender !== mainWindow?.webContents) throw new Error('Untrusted sender');
+  return {supported:Notification.isSupported(), permission:'unknown', requiresRunningApp:true, closedAppPush:false};
+});
 ipcMain.on('clear-notifications', (event) => {
   if (event.sender === mainWindow?.webContents) clearNativeNotifications();
 });

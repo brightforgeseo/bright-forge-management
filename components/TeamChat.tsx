@@ -1,3 +1,4 @@
+import {notificationLinkStorage} from '../lib/notificationLinkStorage.mjs';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check, Smile, Film, SmilePlus, Video, Lock, UserPlus, Menu, ClipboardList, Calendar, ArrowRight, Palette, Paperclip, Download, File, Search, Pin, PinOff, Reply, ChevronDown, ChevronUp, ListTodo } from 'lucide-react';
 import { ChatChannel, ChatMessage, User, ToastType, Profile, MessageReaction } from '../types';
@@ -430,7 +431,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     if (!taskLink) return;
 
     // Store task data in localStorage for TaskBoard to pick up
-    localStorage.setItem('openTaskModal', JSON.stringify({
+    notificationLinkStorage.setItem('openTaskModal', JSON.stringify({
       taskId: taskLink.taskId,
       boardId: taskLink.boardId,
       groupId: taskLink.groupId
@@ -842,7 +843,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       }).catch(() => {});
 
       // Check for notification click (chat navigation)
-      const openChatNotification = localStorage.getItem('openChatNotification');
+      const openChatNotification = notificationLinkStorage.getItem('openChatNotification');
       if (openChatNotification) {
         try {
           const chatData = JSON.parse(openChatNotification);
@@ -857,10 +858,10 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
             console.warn('[TeamChat] Channel not found:', chatData.channelId);
           }
 
-          localStorage.removeItem('openChatNotification');
+          notificationLinkStorage.removeItem('openChatNotification');
         } catch (e) {
           console.error('[TeamChat] Failed to parse chat notification:', e);
-          localStorage.removeItem('openChatNotification');
+          notificationLinkStorage.removeItem('openChatNotification');
         }
       } else if (chans.length > 0 && !activeChannelId) {
         // No notification - default to general
@@ -912,10 +913,10 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     // is already on the TeamChat view (init() above only runs once on mount).
     const handleOpenChatNotification = (e: Event) => {
       const data = (e as CustomEvent).detail
-        || (() => { try { return JSON.parse(localStorage.getItem('openChatNotification') || '{}'); } catch { return {}; } })();
+        || (() => { try { return JSON.parse(notificationLinkStorage.getItem('openChatNotification') || '{}'); } catch { return {}; } })();
       if (!data || !data.channelId) return;
       selectChannel(data.channelId);
-      localStorage.removeItem('openChatNotification');
+      notificationLinkStorage.removeItem('openChatNotification');
     };
     window.addEventListener('openChatNotification', handleOpenChatNotification as EventListener);
 

@@ -77,6 +77,7 @@ serve(async (req: Request) => {
     }
 
     const payload = JSON.stringify({
+      recipientId: userId,
       title,
       body: body || '',
       tag: tag || undefined,

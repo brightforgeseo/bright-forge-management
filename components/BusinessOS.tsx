@@ -1,3 +1,4 @@
+import {notificationLinkStorage} from '../lib/notificationLinkStorage.mjs';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
@@ -292,7 +293,7 @@ const BusinessOSContent: React.FC<BusinessOSProps> = ({ currentUser, setCurrentV
 
   const openTask = (task: TaskWithContext) => {
     const detail = { taskId: task.task.id, boardId: task.boardId, groupId: task.groupId };
-    try { localStorage.setItem('openTaskModal', JSON.stringify(detail)); } catch {}
+    try { notificationLinkStorage.setItem('openTaskModal', JSON.stringify(detail)); } catch {}
     setCurrentView(ToolView.TASKS);
     window.requestAnimationFrame(() => window.dispatchEvent(new CustomEvent('openTaskModal', { detail })));
   };

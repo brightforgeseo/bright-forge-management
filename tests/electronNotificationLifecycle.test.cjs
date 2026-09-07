@@ -27,6 +27,7 @@ test('preload bridges destination and removes its click listener',()=>{
  const off=api.onNotificationClick(data=>received=data);
  listeners.get('notification-click')({},route);assert.equal(received,route);
  off();assert.equal(listeners.size,0);
+ assert.equal(typeof api.getNotificationStatus,'function');
  assert.equal(typeof api.clearNotifications,'function');
  api.clearNotifications();assert.equal(sent[1][0],'clear-notifications');
 });

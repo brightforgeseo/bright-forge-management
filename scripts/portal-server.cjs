@@ -36,6 +36,12 @@ const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
 const ANON_KEY = process.env.SUPABASE_ANON_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+const { createUserManagementHandler } = require('./user-management-api.cjs');
+const handleUserManagement = createUserManagementHandler({
+  supabaseUrl: SUPABASE_URL.href, anonKey: ANON_KEY,
+  serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  ownerIds: (process.env.PORTAL_OWNER_IDS || '').split(',').map(id => id.trim()),
+});
 const DIST = path.resolve(__dirname, '..', 'dist');
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
@@ -208,7 +214,9 @@ const doUpload = (req, res, requestUrl) => {
 // ---- static files from dist/ -------------------------------------------------
 
 const serveStatic = (req, res, requestUrl) => {
-  let pathname = decodeURIComponent(requestUrl.pathname);
+  let pathname;
+  try { pathname = decodeURIComponent(requestUrl.pathname); }
+  catch { res.writeHead(400, { 'content-type': 'text/plain' }); return res.end('Malformed request path'); }
   // Prevent path traversal
   pathname = path.posix.normalize(pathname).replace(/^(\.\.[/\\])+/, '');
   let filePath = path.join(DIST, pathname);
@@ -241,6 +249,7 @@ const server = http.createServer((req, res) => {
   const requestUrl = new URL(req.url, 'http://localhost');
   if (req.url.startsWith('/supabase/')) return proxySupabase(req, res);
   if (requestUrl.pathname === '/api/uploads' && req.method === 'POST') return handleUpload(req, res, requestUrl);
+  if (requestUrl.pathname === '/api/admin/users' || requestUrl.pathname.startsWith('/api/admin/users/')) return handleUserManagement(req, res);
   if (requestUrl.pathname === '/healthz') {
     res.writeHead(200, { 'content-type': 'text/plain' });
     return res.end('ok');

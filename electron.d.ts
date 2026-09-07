@@ -4,6 +4,7 @@ interface ElectronAPI {
   onNotificationClick: (handler: (destination: { userId: string; linkView?: string; linkData?: any }) => void) => () => void;
   focusWindow: () => void;
   clearNotifications: () => void;
+  getNotificationStatus: () => Promise<{supported:boolean; permission:'unknown'; requiresRunningApp:true; closedAppPush:false}>;
 }
 
 declare global {

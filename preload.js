@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('notification-click', listener);
     return () => ipcRenderer.removeListener('notification-click', listener);
   },
+  getNotificationStatus: () => ipcRenderer.invoke('notification-status'),
   clearNotifications: () => ipcRenderer.send('clear-notifications'),
   // Focus the main window (useful when notification is clicked)
   focusWindow: () => {

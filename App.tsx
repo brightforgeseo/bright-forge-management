@@ -66,7 +66,9 @@ import { ToolView, BrandingConfig, User, ToastNotification, ToastType, Profile }
 import { supabase, normalizeSupabaseAssetUrl } from './lib/supabaseClient';
 import { addToAllowlist, updateUserProfile, checkDueDateNotifications, fetchClientBoardSummaries, fetchProfiles } from './services/databaseService';
 import { isBenBusinessOsUser, isBusinessInboxUser } from './services/businessOsModel.mjs';
-import { disableWebPush, listenForPushClicks } from './lib/pushNotifications';
+import {notificationLinkStorage, setNotificationLinkUser} from './lib/notificationLinkStorage.mjs';
+import { startNotificationSession } from './lib/notificationSession.mjs';
+import { disableWebPush, listenForPushClicks, setPushSession } from './lib/pushNotifications';
 import { Copy, X, UserPlus, Check, Mail, RefreshCw, AlertTriangle, MessageSquare } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -115,30 +117,34 @@ const App: React.FC = () => {
      }
   };
 
+  const sessionIdentityRef = React.useRef<string | null>(null);
   useEffect(() => {
-    const checkSession = async () => {
-      try {
-        // Clear any old master password sessions
-        localStorage.removeItem('bf_auth_override');
-        localStorage.removeItem('bf_auth_email');
-
-        const { data } = await supabase.auth.getSession();
-        if (data?.session?.user) {
-          handleUserSession(data.session.user.id, data.session.user.email, data.session.user.user_metadata?.full_name);
-        }
-      } catch (err) { console.warn("Session check failed", err); }
-    };
-    checkSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) handleUserSession(session.user.id, session.user.email, session.user.user_metadata?.full_name);
-      else setIsAuthenticated(false);
+    localStorage.removeItem('bf_auth_override');
+    localStorage.removeItem('bf_auth_email');
+    const lifecycle = startNotificationSession({
+      auth:supabase.auth, bind:setPushSession, cleanup:disableWebPush,
+      onInvalidate:() => {
+        sessionIdentityRef.current = null;
+        setNotificationLinkUser(null);
+        if (userSessionDebounceRef.current) clearTimeout(userSessionDebounceRef.current);
+        window.electronAPI?.clearNotifications?.();
+        setIsAuthenticated(false);
+        setCurrentView(ToolView.DASHBOARD);
+        setPaletteClients([]); setPaletteProfiles([]); setToasts([]);
+        for (const key of ['openTaskModal','openChatNotification','openMyWorkTask']) localStorage.removeItem(key);
+      },
+      onSession:(session) => {
+        sessionIdentityRef.current = session.user.id;
+        setNotificationLinkUser(session.user.id);
+        handleUserSession(session.user.id,session.user.email,session.user.user_metadata?.full_name);
+      }
     });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []); // Empty dependency - subscription should only be set up once on mount
+    void lifecycle.check();
+    const check = () => { void lifecycle.check(); };
+    window.addEventListener('focus',check);
+    navigator.serviceWorker?.addEventListener('controllerchange',check);
+    return () => { lifecycle.stop();window.removeEventListener('focus',check);navigator.serviceWorker?.removeEventListener('controllerchange',check); };
+  }, []);
 
   const handleUserSession = async (uid: string, email: string | undefined, fullName?: string) => {
     if (!email) return;
@@ -189,6 +195,7 @@ const App: React.FC = () => {
         console.error('[App] Error fetching user data:', e);
     }
 
+    if (sessionIdentityRef.current !== uid) return;
     setCurrentUser({ id: uid, name, role, initials: name.substring(0, 2).toUpperCase(), email, avatarUrl });
     setIsAuthenticated(true);
 
@@ -209,8 +216,13 @@ const App: React.FC = () => {
 
   const handleLogout = async () => {
     window.electronAPI?.clearNotifications?.();
-    await disableWebPush();
-    await supabase.auth.signOut();
+    sessionIdentityRef.current = null;
+    if (userSessionDebounceRef.current) clearTimeout(userSessionDebounceRef.current);
+    await setPushSession(null,0).catch(() => {});
+    const cleanup = await disableWebPush();
+    const {error} = await supabase.auth.signOut();
+    if (error) { addToast('error','Sign out could not be confirmed. Please retry.'); return; }
+    if (!cleanup.ok) addToast('error','Signed out, but device cleanup was incomplete. Check notification settings before sharing this device.');
     setIsAuthenticated(false);
     localStorage.removeItem('bf_auth_override');
     localStorage.removeItem('bf_auth_email');
@@ -231,13 +243,13 @@ const App: React.FC = () => {
     if (!canNavigateToView(view)) return;
     navigateToView(view);
     if (linkView === 'TASKS' && linkData?.taskId) {
-      try { localStorage.setItem('openTaskModal', JSON.stringify(linkData)); } catch {}
+      try { notificationLinkStorage.setItem('openTaskModal', JSON.stringify(linkData)); } catch {}
       window.dispatchEvent(new CustomEvent('openTaskModal', { detail: linkData }));
     } else if (linkView === 'TEAM_CHAT' && linkData?.channelId) {
-      try { localStorage.setItem('openChatNotification', JSON.stringify(linkData)); } catch {}
+      try { notificationLinkStorage.setItem('openChatNotification', JSON.stringify(linkData)); } catch {}
       window.dispatchEvent(new CustomEvent('openChatNotification', { detail: linkData }));
     } else if (linkView === 'MY_WORK' && linkData?.taskId) {
-      try { localStorage.setItem('openMyWorkTask', JSON.stringify(linkData)); } catch {}
+      try { notificationLinkStorage.setItem('openMyWorkTask', JSON.stringify(linkData)); } catch {}
       window.dispatchEvent(new CustomEvent('openMyWorkTask', { detail: linkData }));
     }
   }, [canNavigateToView, navigateToView]);
@@ -259,13 +271,13 @@ const App: React.FC = () => {
     if (idx === -1) return;
     try {
       const raw = decodeURIComponent(hash.slice(idx + 5));
-      const { linkView, linkData } = JSON.parse(raw);
-      applyPushDeepLink(linkView, linkData);
+      const { recipientId, linkView, linkData } = JSON.parse(raw);
+      if (recipientId === currentUser.id) applyPushDeepLink(linkView, linkData);
       history.replaceState(null, '', window.location.pathname + window.location.search);
     } catch (e) {
       console.error('[App] Failed to parse push hash:', e);
     }
-  }, [isAuthenticated, applyPushDeepLink]);
+  }, [isAuthenticated, currentUser.id, applyPushDeepLink]);
 
   // 2) Warm-tab: SW posts a message when the user clicks a push and we already had a tab open.
   useEffect(() => {
@@ -274,13 +286,17 @@ const App: React.FC = () => {
       if (idx === -1) return;
       try {
         const raw = decodeURIComponent(url.slice(idx + 5));
-        const { linkView, linkData } = JSON.parse(raw);
-        applyPushDeepLink(linkView, linkData);
+        const { recipientId, linkView, linkData } = JSON.parse(raw);
+        if (!isAuthenticated) {
+          history.replaceState(null,'',window.location.pathname+window.location.search+'#push='+encodeURIComponent(JSON.stringify({recipientId,linkView,linkData})));
+          return;
+        }
+        if (recipientId === currentUser.id) applyPushDeepLink(linkView, linkData);
       } catch (e) {
         console.error('[App] Failed to parse push-click message:', e);
       }
     });
-  }, [applyPushDeepLink]);
+  }, [isAuthenticated, currentUser.id, applyPushDeepLink]);
 
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
   const userSessionDebounceRef = React.useRef<NodeJS.Timeout | null>(null);

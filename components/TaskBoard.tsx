@@ -1,4 +1,5 @@
 
+import {notificationLinkStorage} from '../lib/notificationLinkStorage.mjs';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useDialogFocus } from '../lib/useDialogFocus';
 import { Plus, Sparkles, ChevronDown, ChevronUp, ChevronRight, Trash2, Briefcase, CheckCircle2, Settings, Mail, Phone, Globe, X, Image as ImageIcon, Edit3, Palette, Loader2, Upload, UserCircle, Link as LinkIcon, MessageCircle, Send, Search, Share2, Hash, Users, Archive, RotateCcw, UserPlus, GripVertical, CheckSquare, Paperclip, File as FileIcon } from 'lucide-react';
@@ -326,7 +327,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
     const maxRetries = 10;
 
     const checkForDeepLink = () => {
-      const openTaskData = localStorage.getItem('openTaskModal');
+      const openTaskData = notificationLinkStorage.getItem('openTaskModal');
       if (!openTaskData) return;
 
       // If clients aren't loaded yet, wait and retry
@@ -338,7 +339,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
 
       if (clients.length === 0) {
         addToast('error', 'Unable to open task - boards not loaded. Please try again.');
-        localStorage.removeItem('openTaskModal');
+        notificationLinkStorage.removeItem('openTaskModal');
         return;
       }
 
@@ -409,11 +410,11 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
         } else {
           addToast('error', 'Board not found. The board may have been deleted.');
         }
-        localStorage.removeItem('openTaskModal');
+        notificationLinkStorage.removeItem('openTaskModal');
       } catch (e) {
         console.error('Error processing deep link:', e);
         addToast('error', 'Failed to open notification link. Please try again.');
-        localStorage.removeItem('openTaskModal');
+        notificationLinkStorage.removeItem('openTaskModal');
       }
     };
 
@@ -428,7 +429,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   // need to nudge it whenever a new openTaskModal entry shows up.
   useEffect(() => {
     const checkAndOpen = () => {
-      if (localStorage.getItem('openTaskModal') && clients.length > 0) {
+      if (notificationLinkStorage.getItem('openTaskModal') && clients.length > 0) {
         // Touch state to retrigger the deep-link effect
         setClients(prev => [...prev]);
       }

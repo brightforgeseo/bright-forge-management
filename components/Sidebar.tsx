@@ -1,4 +1,5 @@
 
+import {notificationLinkStorage} from '../lib/notificationLinkStorage.mjs';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useDialogFocus } from '../lib/useDialogFocus';
 import { LayoutDashboard, Search, PenTool, BarChart, Settings, TableProperties, MessageSquare, Hexagon, LogOut, UserPlus, MoreVertical, Bell, X, Check, CheckSquare, Menu, FileCheck, Zap, ChevronLeft, ChevronRight, Clock, Mail, Command } from 'lucide-react';
@@ -437,7 +438,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     // CustomEvent handles same-view clicks.
     const persistAndDispatch = (key: string, eventName: string) => {
       try {
-        localStorage.setItem(key, JSON.stringify(linkData));
+        notificationLinkStorage.setItem(key, JSON.stringify(linkData))
         window.dispatchEvent(new CustomEvent(eventName, { detail: linkData }));
       } catch (e) {
         console.error(`[Sidebar] persist/dispatch failed for ${eventName}:`, e);
