@@ -5,7 +5,7 @@ import { LayoutDashboard, Search, PenTool, BarChart, Settings, TableProperties, 
 import { ToolView, BrandingConfig, User, AppNotification } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { fetchNotifications, markNotificationRead, markAllNotificationsRead, deleteAllNotifications, deleteNotification } from '../services/databaseService';
-import { enableWebPush } from '../lib/pushNotifications';
+import NotificationSetup from './NotificationSetup';
 import { version } from '../package.json';
 import logoUrl from '../logo';
 import { isBenBusinessOsUser, isBusinessInboxUser } from '../services/businessOsModel.mjs';
@@ -221,18 +221,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     return () => window.removeEventListener('chatUnreadCount', handler);
   }, [currentView]);
 
-  // Request notification permission + register web push subscription on mount.
-  // enableWebPush handles permission, SW registration, PushManager.subscribe, and persistence.
-  useEffect(() => {
-    if (!currentUser || currentUser.id === 'guest') return;
-    if (!('Notification' in window)) return;
-
-    enableWebPush(currentUser.id).then(result => {
-      console.log('[Notifications] Web push enable result:', result);
-    }).catch(err => {
-      console.error('[Notifications] enableWebPush threw:', err);
-    });
-  }, [currentUser?.id]);
 
   useEffect(() => {
     if (!currentUser || currentUser.id === 'guest') return;
@@ -745,6 +733,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       </nav>
 
       <div className={`${isCollapsed ? 'p-1' : 'p-2'} border-t border-white/[0.07] flex-shrink-0`}>
+        <NotificationSetup userId={currentUser.id} collapsed={isCollapsed}/>
         {/* User Profile */}
         <div className="relative">
           {isCollapsed ? (

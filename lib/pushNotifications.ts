@@ -3,13 +3,13 @@
 // and keeps the row in `push_subscriptions` in sync.
 
 import { supabase } from './supabaseClient';
+import { WEB_PUSH_PUBLIC_KEY } from './pushPublicConfig';
 
-// VAPID public key. Replace via env var in production. The literal fallback is harmless —
-// it's an example key that will fail to send, surfacing the misconfiguration loudly.
+// Public VAPID key must match the server. No private signing material is bundled.
 const VAPID_PUBLIC_KEY: string =
   (typeof process !== 'undefined' && (process as any)?.env?.VAPID_PUBLIC_KEY) ||
   (typeof window !== 'undefined' && (window as any).VAPID_PUBLIC_KEY) ||
-  '';
+  WEB_PUSH_PUBLIC_KEY || '';
 
 // Convert a base64url VAPID key into the Uint8Array PushManager.subscribe expects.
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
@@ -56,16 +56,16 @@ async function persistSubscription(userId: string, subscription: PushSubscriptio
       user_agent: navigator.userAgent,
       updated_at: new Date().toISOString()
     }, { onConflict: 'endpoint' });
-  if (error) console.error('[Push] Failed to persist subscription:', error);
+  return !error;
 }
 
 /**
  * Register the SW, request permission if needed, subscribe via PushManager, and persist
  * the subscription server-side. Safe to call on every login / Sidebar mount.
  */
-export async function enableWebPush(userId: string): Promise<{
+export async function enableWebPush(userId: string, options: { requestPermission?: boolean } = {}): Promise<{
   ok: boolean;
-  reason?: 'unsupported' | 'denied' | 'no-vapid' | 'subscribe-failed';
+  reason?: 'unsupported' | 'denied' | 'no-vapid' | 'subscribe-failed' | 'persist-failed' | 'permission-required';
 }> {
   if (!isPushSupported()) return { ok: false, reason: 'unsupported' };
   if (!VAPID_PUBLIC_KEY) {
@@ -76,6 +76,7 @@ export async function enableWebPush(userId: string): Promise<{
   // Permission gate
   let perm = Notification.permission;
   if (perm === 'default') {
+    if (!options.requestPermission) return { ok: false, reason: 'permission-required' };
     perm = await Notification.requestPermission();
   }
   if (perm !== 'granted') return { ok: false, reason: 'denied' };
@@ -89,7 +90,7 @@ export async function enableWebPush(userId: string): Promise<{
   try {
     const existing = await registration.pushManager.getSubscription();
     if (existing) {
-      await persistSubscription(userId, existing);
+      if (!await persistSubscription(userId, existing)) return { ok: false, reason: 'persist-failed' };
       return { ok: true };
     }
     const subscription = await registration.pushManager.subscribe({
@@ -97,7 +98,7 @@ export async function enableWebPush(userId: string): Promise<{
       // Cast: lib.dom typings vary on whether this accepts Uint8Array directly
       applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as unknown as BufferSource
     });
-    await persistSubscription(userId, subscription);
+    if (!await persistSubscription(userId, subscription)) return { ok: false, reason: 'persist-failed' };
     return { ok: true };
   } catch (e) {
     console.error('[Push] subscribe failed:', e);
