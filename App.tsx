@@ -73,6 +73,7 @@ import { Copy, X, UserPlus, Check, Mail, RefreshCw, AlertTriangle, MessageSquare
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [currentView, setCurrentView] = useState<ToolView>(ToolView.DASHBOARD);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
@@ -118,6 +119,7 @@ const App: React.FC = () => {
   };
 
   const sessionIdentityRef = React.useRef<string | null>(null);
+  const notificationSessionRef = React.useRef<ReturnType<typeof startNotificationSession> | null>(null);
   useEffect(() => {
     localStorage.removeItem('bf_auth_override');
     localStorage.removeItem('bf_auth_email');
@@ -139,6 +141,7 @@ const App: React.FC = () => {
         handleUserSession(session.user.id,session.user.email,session.user.user_metadata?.full_name);
       }
     });
+    notificationSessionRef.current = lifecycle;
     void lifecycle.check();
     const check = () => { void lifecycle.check(); };
     window.addEventListener('focus',check);
@@ -215,17 +218,28 @@ const App: React.FC = () => {
   };
 
   const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+    notificationSessionRef.current?.pause();
+    setIsAuthenticated(false);
     window.electronAPI?.clearNotifications?.();
     sessionIdentityRef.current = null;
     if (userSessionDebounceRef.current) clearTimeout(userSessionDebounceRef.current);
     await setPushSession(null,0).catch(() => {});
     const cleanup = await disableWebPush();
     const {error} = await supabase.auth.signOut();
+
     if (error) { addToast('error','Sign out could not be confirmed. Please retry.'); return; }
     if (!cleanup.ok) addToast('error','Signed out, but device cleanup was incomplete. Check notification settings before sharing this device.');
     setIsAuthenticated(false);
     localStorage.removeItem('bf_auth_override');
     localStorage.removeItem('bf_auth_email');
+    } catch {
+      addToast('error','Sign out could not be confirmed. Please retry.');
+    } finally {
+      notificationSessionRef.current?.resume();
+      setIsLoggingOut(false);
+    }
   };
 
   const [branding, setBranding] = useState<BrandingConfig>(() => {
@@ -482,6 +496,7 @@ ${currentUser.name}`;
     return <Suspense fallback={<ViewFallback />}>{view}</Suspense>;
   };
 
+  if (isLoggingOut) return <div role="status" className="min-h-screen flex items-center justify-center">Signing out and clearing this device…</div>;
   if (!isAuthenticated) return <Login onLogin={(email) => {
       // For legacy/fallback login, we might not have the UUID immediately available here
       // The useEffect will catch the session change and update the ID correctly

@@ -26,7 +26,7 @@ Ship sender, web build and `public/sw.js` together. Package matching Electron ma
 
 ## Verification receipts
 
-- `npm test`: **64 passed, 0 failed, 0 skipped**. Includes synthetic HTTP API tests, production SW/Card/registration logic, cancellation and timeout regressions, recipient/storage/session tests, and parent sender-to-worker regressions.
+- `npm test`: **66 passed, 0 failed, 0 skipped**. Includes synthetic HTTP API tests, production SW/Card/registration logic, cancellation and timeout regressions, recipient/storage/session tests, and parent sender-to-worker regressions.
 - `npm run build`: exit 0. Existing Browserslist/baseline mapping age warnings remain.
 - `git diff --check`: exit 0.
 - `node tests/desktopBrowserHarness.cjs`: pass in standalone headless Chromium 1234, using an isolated Playwright context and local fixtures. Real App Settings displays both synthetic users through the real server API handler. Actual SW CacheStorage binding clears on cross-tab signout; wrong-recipient warm navigation is rejected; unauthenticated warm links remain pending. No page errors, external requests, or fixture writes. No browser notification permission was overridden or approved.
@@ -37,4 +37,4 @@ Evidence lives beside this worktree: `desktop-repair-final-tests.log`, `desktop-
 
 ## Honest remaining platform gates
 
-No release, migration or deployment was performed. Windows/macOS/Linux OS-card permission/Do Not Disturb behaviour, actual background delivery, mobile lock/relaunch, and iPhone Home Screen delivery still require device acceptance. The Linux package was assembled and its contents verified, not launched against team data. The tests prove the repaired local behaviour, not universal exactly-once delivery or all-platform closed-app push.
+No release, migration or deployment was performed. Windows/macOS/Linux OS-card permission/Do Not Disturb behaviour, actual background delivery, mobile lock/relaunch, and iPhone Home Screen delivery still require device acceptance. The Linux package was assembled, its contents verified, and launched on an isolated virtual display against synthetic local users. Settings and native capability IPC passed with zero page errors; no OS cards or team data were used. The tests prove the repaired local behaviour, not universal exactly-once delivery or all-platform closed-app push.
