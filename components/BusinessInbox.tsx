@@ -188,7 +188,7 @@ const BusinessInbox: React.FC<Props> = ({ currentUser, addToast }) => {
   }
 
   return (
-    <div className="h-full p-4 lg:p-6 text-white">
+    <div className="h-full overflow-y-auto lg:overflow-visible p-4 lg:p-6 text-white">
       <div className="mb-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
         <div>
           <div className="flex items-center gap-2 text-white/50 text-xs uppercase tracking-widest font-semibold">
@@ -220,7 +220,7 @@ const BusinessInbox: React.FC<Props> = ({ currentUser, addToast }) => {
         </div>
       )}
 
-      <div className="grid h-[calc(100vh-190px)] min-h-[620px] grid-cols-1 lg:grid-cols-[390px_1fr] gap-4">
+      <div className="grid h-auto lg:h-[calc(100vh-190px)] min-h-[620px] grid-cols-1 lg:grid-cols-[390px_1fr] gap-4">
         <section className="rounded-2xl border border-white/10 bg-portal-surface overflow-hidden flex flex-col">
           <div className="p-3 border-b border-white/10 space-y-3">
             <div className="flex gap-1 overflow-x-auto">
