@@ -5,10 +5,11 @@ import { readFile } from 'node:fs/promises';
 const read = path => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
 
 test('Business OS is wired as a Ben-only first-class Portal view', async () => {
-  const [types, app, sidebar, palette, page] = await Promise.all([
+  const [types, app, shell, routes, palette, page] = await Promise.all([
     read('types.ts'),
     read('App.tsx'),
-    read('components/Sidebar.tsx'),
+    read('components/PortalShell.tsx'),
+    read('lib/portalRoutes.mjs'),
     read('components/CommandPalette.tsx'),
     read('components/BusinessOS.tsx'),
   ]);
@@ -19,14 +20,16 @@ test('Business OS is wired as a Ben-only first-class Portal view', async () => {
   assert.match(app, /canNavigateToView/);
   assert.match(app, /if \(!Object\.values\(ToolView\)\.includes\(view\)\) return false;/);
   assert.match(app, /const navigateToView = useCallback/);
-  assert.match(app, /onChangeView=\{navigateToView\}/);
+  assert.match(app, /<PortalShell[^>]+onNavigate=\{navigateToView\}[^>]+canAccess=\{canNavigateToView\}/);
   assert.match(app, /target && canNavigateToView\(target\)/);
   assert.match(app, /if \(requested\) navigateToView\(requested\)/);
   assert.match(app, /if \(isBenBusinessOsUser\(currentUser\.id\)\) loadBusinessOS/);
   const priorityPreload = app.match(/const priorityLoaders = \[[\s\S]*?\];/)?.[0] || '';
   assert.doesNotMatch(priorityPreload, /loadBusinessOS/);
-  assert.match(sidebar, /label:\s*['"]Business OS['"]/);
-  assert.match(sidebar, /isBenBusinessOsUser\(currentUser\.id\)/);
+  assert.match(routes, /BUSINESS_OS:\s*['"]business['"]/);
+  assert.match(shell, /view:ToolView\.BUSINESS_OS,label:'Business overview'/);
+  assert.match(shell, /tools\.filter\(tool=>canAccess\(tool\.view\)\)/);
+  assert.match(app, /view === ToolView\.BUSINESS_OS\) return isBenBusinessOsUser\(currentUser\.id\)/);
   assert.match(palette, /\[ToolView\.BUSINESS_OS\]/);
   assert.match(page, />Business OS</);
   assert.match(page, /const BusinessOSContent/);

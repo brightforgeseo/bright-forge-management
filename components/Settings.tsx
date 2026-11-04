@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrandingConfig, ToastType, User, ClientBoardSummary } from '../types';
 import { PartnerWithStats } from '../types-portal';
 import { Save, Monitor, User as UserIcon, Upload, Loader2, Users, Key, Trash2, Shield, X, Building2, Plus, UserPlus, Check, Copy, Mail } from 'lucide-react';
-import { supabase } from '../lib/supabaseClient';
+import { supabase, ACCOUNT_ADMIN_UNAVAILABLE } from '../lib/supabaseClient';
 import { uploadFile, fetchAllAuthUsers, resetUserPassword, deleteAuthUser, updateUserRole, AuthUser, fetchClientBoardSummaries } from '../services/databaseService';
 import { fetchAllPartners, createPartnerAccount, deletePartnerAccount, togglePartnerActive, grantClientAccess, revokeClientAccess } from '../services/clientPortalService';
 import ActivityLog from './ActivityLog';
@@ -45,7 +45,6 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
   // Fetch users and partners on mount for Owners
   useEffect(() => {
     if (currentUser.role === 'Owner') {
-      loadUsers();
       loadPartners();
     }
   }, [currentUser.role]);
@@ -175,10 +174,10 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
 
     try {
       if (hasAccess) {
-        await revokeClientAccess(partnerId, clientId);
+        if (!await revokeClientAccess(partnerId, clientId)) throw new Error('Access was not revoked');
         setPartnerClientIds(prev => prev.filter(id => id !== clientId));
       } else {
-        await grantClientAccess(partnerId, clientId, currentUser.id);
+        if (!await grantClientAccess(partnerId, clientId, currentUser.id)) throw new Error('Access was not granted');
         setPartnerClientIds(prev => [...prev, clientId]);
       }
     } catch (error) {
@@ -470,61 +469,11 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
               <Users className="w-5 h-5 text-portal-soft" />
               <h3 className="font-semibold text-white">User Management</h3>
             </div>
-            <button
-              onClick={loadUsers}
-              disabled={loadingUsers}
-              className="text-sm text-brand-600 hover:text-brand-700 font-medium"
-            >
-              {loadingUsers ? 'Loading...' : 'Refresh'}
-            </button>
+
           </div>
 
           <div className="p-6">
-            {loadingUsers ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-portal-soft" />
-              </div>
-            ) : authUsers.length === 0 ? (
-              <p className="text-portal-soft text-center py-8">No users found</p>
-            ) : (
-              <div className="space-y-3">
-                {authUsers.map(user => (
-                  <div
-                    key={user.id}
-                    className="flex items-center justify-between p-4 bg-portal-dark rounded-xl border border-white/[0.07]"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-white truncate">
-                        {user.user_metadata?.full_name || user.email.split('@')[0]}
-                      </p>
-                      <p className="text-sm text-portal-soft truncate">{user.email}</p>
-                      <p className="text-xs text-portal-soft mt-1">
-                        Last login: {user.last_sign_in_at
-                          ? new Date(user.last_sign_in_at).toLocaleDateString()
-                          : 'Never'}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 ml-4">
-                      <button
-                        onClick={() => setResetPasswordModal({ open: true, user })}
-                        className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                        title="Reset Password"
-                      >
-                        <Key className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setDeleteModal({ open: true, user })}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Delete User"
-                        disabled={user.email === currentUser.email}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <p role="status" className="text-sm text-portal-soft">{ACCOUNT_ADMIN_UNAVAILABLE}</p>
           </div>
         </div>
       )}
@@ -546,8 +495,9 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
                 {loadingPartners ? 'Loading...' : 'Refresh'}
               </button>
               <button
-                onClick={() => setShowCreatePartnerModal(true)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-sm rounded-lg font-medium"
+                disabled
+                title={ACCOUNT_ADMIN_UNAVAILABLE}
+                className="flex items-center gap-2 px-3 py-1.5 bg-brand-600 text-white text-sm rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Plus className="w-4 h-4" />
                 Add Partner
@@ -564,7 +514,7 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
               <div className="text-center py-8">
                 <Building2 className="w-12 h-12 text-portal-text mx-auto mb-3" />
                 <p className="text-portal-soft">No partner accounts yet</p>
-                <p className="text-sm text-portal-soft mt-1">Create a partner account to give agencies access to their clients</p>
+                <p className="text-sm text-portal-soft mt-1">{ACCOUNT_ADMIN_UNAVAILABLE}</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -609,9 +559,9 @@ const Settings: React.FC<SettingsProps> = ({ branding, setBranding, addToast, cu
                         <Shield className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => setShowDeletePartnerModal({ open: true, partner })}
+                        disabled
                         className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Delete Partner"
+                        title={ACCOUNT_ADMIN_UNAVAILABLE}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>

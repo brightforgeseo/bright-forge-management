@@ -1,0 +1,16 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict');
+const {createGoogleWorkspace}=require('../scripts/private-bot-google-workspace.cjs');
+function fixture(kind='document'){
+ const owner='staff',source='12345678901234567890';let active=true;
+ let data={accounts:{staff:{email:'staff@example.com',sub:'staff-sub',access:'fixture-only',expires:Date.now()+3600000}}};
+ const store={read:()=>structuredClone(data),write:x=>{data=structuredClone(x)}};const calls=[];
+ const api=async(p)=>p.includes('private_bot_owners')?[{email:'staff@example.com'}]:p.includes('private_bot_access')?active:p.includes('client_boards')?[{id:'board',board_data:{groups:[{tasks:[{id:'task',assignedTo:owner,worksheet:`https://docs.google.com/${kind==='document'?'document':'spreadsheets'}/d/${source}/edit`}]}]}}]:[];
+ const http=async(u,o)=>{calls.push({url:u,method:o.method||'GET'});return {ok:true,json:async()=>u.includes('/drive/')?{id:source,name:'Source',mimeType:'application/vnd.google-apps.'+(kind==='document'?'document':'spreadsheet'),version:'1',capabilities:{canEdit:true}}:u.includes('docs.googleapis.com')?{documentId:source,revisionId:'rev1',body:{content:[{paragraph:{elements:[{textRun:{content:'Actual source text.\n'}}]}}]}}:{range:"'June'!A1:B2",values:[['One','Two'],['Three','Four']]}}};
+ return {owner,source,api,http,store,grants:[{owner,boardId:'board',source,client:'Client'}],calls,revoke:()=>{active=false}};
+}
+test('read assigned native document content through own account, not metadata',async()=>{const f=fixture(),r=await createGoogleWorkspace(f).route(f.owner,'read','POST',{fileId:f.source});assert.equal(r.content.documentId,f.source);assert.match(JSON.stringify(r.content),/Actual source text/);assert.equal(r.contentReadback,true);assert.equal(f.calls.filter(x=>x.url.includes('docs.googleapis.com')).length,1)});
+test('read exact bounded native Sheet range with formulas',async()=>{const f=fixture('sheet'),r=await createGoogleWorkspace(f).route(f.owner,'read','POST',{fileId:f.source,range:"'June'!A1:B2"});assert.deepEqual(r.content.values,[['One','Two'],['Three','Four']]);assert.match(f.calls[1].url,/valueRenderOption=FORMULA/)});
+test('invalid/unbounded range, ungranted source, revoked account cannot read content',async()=>{for(const range of ['A1:B2',"'June'!A:Z","'June'!A1:ZZ99999",'June!A1:B2?x=y']){const f=fixture('sheet');await assert.rejects(createGoogleWorkspace(f).route(f.owner,'read','POST',{fileId:f.source,range}),/INVALID_GOOGLE_RANGE/);assert.equal(f.calls.filter(x=>x.url.includes('sheets.googleapis.com')).length,0)}const f=fixture();await assert.rejects(createGoogleWorkspace({...f,grants:[]}).route(f.owner,'read','POST',{fileId:f.source}),/GOOGLE_TARGET_NOT_ASSIGNED/);f.revoke();await assert.rejects(createGoogleWorkspace(f).route(f.owner,'read','POST',{fileId:f.source}),/CAPABILITY_DENIED/)});
+test('native mutation grant rejects article and control-plane task surfaces',async()=>{const f=fixture(),api=f.api;f.api=async p=>{const r=await api(p);if(p.includes('client_boards'))r[0].board_data.groups[0].title='Article Generation';return r};await assert.rejects(createGoogleWorkspace(f).grant(f.owner,f.source,'native'),/GOOGLE_ORDINARY_TASK_REQUIRED/)});
+module.exports={fixture};

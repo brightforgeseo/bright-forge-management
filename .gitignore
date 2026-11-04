@@ -31,3 +31,16 @@ config.ts
 *.sw?
 .env
 setup-api-key.html
+
+# Private operational state and generated Python caches
+native-receipts/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+
+# Local credentials and QA authentication material
+**/google_token*.json
+**/google_client_secret*.json
+**/qa-*-session.json
+

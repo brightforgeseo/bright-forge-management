@@ -158,17 +158,22 @@ site_url = "http://127.0.0.1:3000"
 additional_redirect_urls = ["https://127.0.0.1:3000"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
+# Required protected credentials. No stock-secret fallback on an unconfigured restart.
+jwt_secret = "env(SUPABASE_AUTH_JWT_SECRET)"
+anon_key = "env(SUPABASE_AUTH_ANON_KEY)"
+service_role_key = "env(SUPABASE_AUTH_SERVICE_ROLE_KEY)"
 # JWT issuer URL. If not set, defaults to auth.external_url.
 # jwt_issuer = ""
-# Path to JWT signing key. DO NOT commit your signing keys file to git.
-# signing_keys_path = "./signing_keys.json"
+# Private generated ES256 key, outside source control. Never use CLI demo keys.
+signing_keys_path = "/home/benecho/.config/bright-forge/portal-signing-keys.json"
 # If disabled, the refresh token will never expire.
 enable_refresh_token_rotation = true
 # Allows refresh tokens to be reused after expiry, up to the specified interval in seconds.
 # Requires enable_refresh_token_rotation = true.
 refresh_token_reuse_interval = 10
-# Allow/disallow new user signups to your project.
-enable_signup = true
+# Internal Portal: existing users sign in; owner provisions new accounts.
+# Client-side allowlist checks are not a server-side admission boundary.
+enable_signup = false
 # Allow/disallow anonymous sign-ins to your project.
 enable_anonymous_sign_ins = false
 # Allow/disallow testing manual linking of accounts

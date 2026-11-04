@@ -6,7 +6,10 @@ test('mobile navigation exposes the full menu from every view including chat', (
  const tabs = read('components/MobileTabBar.tsx');
  assert.match(tabs, /onOpenMenu/);
  assert.match(tabs, /aria-label="Open all tools"/);
- assert.match(read('App.tsx'), /onOpenMenu=\{\(\) => setIsMobileMenuOpen\(true\)\}/);
+ assert.match(read('App.tsx'), /<PortalShell key=\{currentUser\.id\}/);
+ const shell=read('components/PortalShell.tsx');
+ assert.match(shell,/aria-label="All apps"/);
+ assert.match(shell,/tools\.filter\(tool=>canAccess\(tool\.view\)\)/);
 });
 test('desktop collapse preference cannot collapse the phone menu', () => {
  const sidebar = read('components/Sidebar.tsx');

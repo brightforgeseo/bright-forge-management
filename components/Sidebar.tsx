@@ -1,4 +1,5 @@
 
+import {notificationLinkStorage, decodeNotificationLinkData} from '../lib/notificationLinkStorage.mjs';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useDialogFocus } from '../lib/useDialogFocus';
 import { LayoutDashboard, Search, PenTool, BarChart, Settings, TableProperties, MessageSquare, Hexagon, LogOut, UserPlus, MoreVertical, Bell, X, Check, CheckSquare, Menu, FileCheck, Zap, ChevronLeft, ChevronRight, Clock, Mail, Command } from 'lucide-react';
@@ -6,6 +7,9 @@ import { ToolView, BrandingConfig, User, AppNotification } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { fetchNotifications, markNotificationRead, markAllNotificationsRead, deleteAllNotifications, deleteNotification } from '../services/databaseService';
 import NotificationSetup from './NotificationSetup';
+import UnifiedResearchNav from './UnifiedResearchNav';
+import {readStudioNavigation,validStudioNavigation,navigateStudio} from '../lib/researchNavigation.mjs';
+import './UnifiedNavigation.css';
 import { version } from '../package.json';
 import logoUrl from '../logo';
 import { isBenBusinessOsUser, isBusinessInboxUser } from '../services/businessOsModel.mjs';
@@ -189,8 +193,11 @@ const Sidebar: React.FC<SidebarProps> = ({
     try { return JSON.parse(localStorage.getItem('sidebar-recent') || '[]'); } catch { return []; }
   });
   const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [studioRoute,setStudioRoute]=useState(()=>readStudioNavigation(currentUser.id));
+  useEffect(()=>{const handler=(event:Event)=>{const route=(event as CustomEvent).detail;if(validStudioNavigation(route,currentUser.id))setStudioRoute(route);};setStudioRoute(readStudioNavigation(currentUser.id));window.addEventListener('echoStudioNavigation',handler);return()=>window.removeEventListener('echoStudioNavigation',handler);},[currentUser.id]);
 
   const handleViewChange = (view: ToolView) => {
+    if(view===ToolView.ECHO_WORKSPACES)navigateStudio(currentUser.id,{mode:'chat'});
     onChangeView(view);
     setIsMobileMenuOpen(false);
     // Track recent views (last 3, no duplicates, exclude current)
@@ -221,7 +228,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     return () => window.removeEventListener('chatUnreadCount', handler);
   }, [currentView]);
 
-
   useEffect(() => {
     if (!currentUser || currentUser.id === 'guest') return;
 
@@ -230,11 +236,12 @@ const Sidebar: React.FC<SidebarProps> = ({
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let pollTimer: ReturnType<typeof setInterval> | null = null;
     const seenIds = new Set<string>();
+    const browserCards = new Set<Notification>();
 
     // Push a notification into local state + show OS toast + sound + favicon flash.
     // De-duplicates by id so realtime + polling can't double-fire.
     const ingestNotification = (raw: any) => {
-      if (!raw || !raw.id) return;
+      if (!isMounted || !raw || !raw.id || (raw.user_id ?? raw.userId) !== currentUser.id) return;
       if (seenIds.has(raw.id)) return;
       seenIds.add(raw.id);
 
@@ -245,7 +252,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         message: raw.message,
         type: raw.type,
         linkView: raw.link_view ?? raw.linkView,
-        linkData: raw.link_data ?? raw.linkData,
+        linkData: decodeNotificationLinkData(raw.link_data ?? raw.linkData),
         isRead: raw.is_read ?? raw.isRead ?? false,
         createdAt: raw.created_at ?? raw.createdAt
       };
@@ -259,7 +266,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       if (note.isRead) return;
 
       if (window.electronAPI?.showNotification) {
-        window.electronAPI.showNotification(note.title, note.message);
+        window.electronAPI.showNotification(note.title, note.message, note);
       } else if ('Notification' in window && Notification.permission === 'granted') {
         try {
           const browserNote = new Notification(note.title, {
@@ -269,7 +276,10 @@ const Sidebar: React.FC<SidebarProps> = ({
             requireInteraction: false,
             silent: true
           });
+          browserCards.add(browserNote);
+          browserNote.onclose = () => browserCards.delete(browserNote);
           browserNote.onclick = () => {
+            if (!isMounted) return;
             window.focus();
             browserNote.close();
           };
@@ -334,6 +344,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           filter: `user_id=eq.${currentUser.id}`
         }, (payload) => {
           const updated = payload.new as any;
+          if (!isMounted || updated?.user_id !== currentUser.id) return;
           setNotifications(prev => prev.map(n => n.id === updated.id ? {
             ...n,
             isRead: updated.is_read,
@@ -383,6 +394,9 @@ const Sidebar: React.FC<SidebarProps> = ({
 
     return () => {
       isMounted = false;
+      for (const card of browserCards) { card.onclick = null; card.close(); }
+      browserCards.clear();
+      window.electronAPI?.clearNotifications?.();
       window.removeEventListener('focus', onFocus);
       if (reconnectTimer) clearTimeout(reconnectTimer);
       if (pollTimer) clearInterval(pollTimer);
@@ -437,7 +451,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     // CustomEvent handles same-view clicks.
     const persistAndDispatch = (key: string, eventName: string) => {
       try {
-        localStorage.setItem(key, JSON.stringify(linkData));
+        notificationLinkStorage.setItem(key, JSON.stringify(linkData))
         window.dispatchEvent(new CustomEvent(eventName, { detail: linkData }));
       } catch (e) {
         console.error(`[Sidebar] persist/dispatch failed for ${eventName}:`, e);
@@ -453,10 +467,11 @@ const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  const navGroups = [
+  const navGroups: Array<{label:string;items:Array<{id:ToolView;label:string;icon:React.ElementType;shortcut:string|null}>}> = [
     {
       label: 'WORK',
       items: [
+        { id: ToolView.ECHO_WORKSPACES, label: 'Echo chat', icon: Zap, shortcut: 'G E' },
         ...(isBenBusinessOsUser(currentUser.id) ? [{ id: ToolView.BUSINESS_OS, label: 'Business OS', icon: Command, shortcut: 'G O' }] : []),
         { id: ToolView.DASHBOARD,   label: 'Dashboard',     icon: LayoutDashboard, shortcut: 'G D' },
         { id: ToolView.TASKS,       label: 'Project Tasks', icon: TableProperties, shortcut: 'G T' },
@@ -466,11 +481,10 @@ const Sidebar: React.FC<SidebarProps> = ({
       ],
     },
     {
-      label: 'AI TOOLS',
+      label: 'TOOLS',
       items: [
-        { id: ToolView.ECHO_WORKSPACES,   label: 'Echo Workspaces',   icon: Zap,        shortcut: 'G E' },
         { id: ToolView.CONTENT_GENERATOR, label: 'Content Generator', icon: PenTool,    shortcut: null },
-        { id: ToolView.KEYWORD_RESEARCH,  label: 'Keyword Research',  icon: Search,     shortcut: null },
+
         { id: ToolView.SITE_AUDIT,        label: 'SEO Audit',         icon: BarChart,   shortcut: null },
         { id: ToolView.QA_CHECKER,        label: 'QA Checker',        icon: FileCheck,  shortcut: null },
       ],
@@ -499,7 +513,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       )}
 
       {/* Sidebar */}
-      <div id="portal-tool-menu" role={!isDesktop && isMobileMenuOpen ? 'dialog' : undefined} aria-modal={!isDesktop && isMobileMenuOpen ? true : undefined} aria-label="All tools" tabIndex={-1} inert={!isDesktop && !isMobileMenuOpen} className={`
+      <div data-collapsed={isCollapsed} id="portal-tool-menu" role={!isDesktop && isMobileMenuOpen ? 'dialog' : undefined} aria-modal={!isDesktop && isMobileMenuOpen ? true : undefined} aria-label="All tools" tabIndex={-1} inert={!isDesktop && !isMobileMenuOpen} className={`
         portal-sidebar ${isCollapsed ? 'w-[60px]' : 'w-72 lg:w-64'} bg-portal-surface text-white flex flex-col h-full fixed left-0 top-0 shadow-xl transition-all duration-200 ease-out
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `} style={{ zIndex: 100 }}>
@@ -663,7 +677,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <div className="space-y-0.5">
               {group.items.map((item) => {
                 const Icon = item.icon;
-                const isActive = currentView === item.id;
+                const isActive = currentView === item.id && (item.id!==ToolView.ECHO_WORKSPACES || studioRoute.mode==='chat');
                 const chatBadge = item.id === ToolView.TEAM_CHAT && unreadChatCount > 0;
                 return (
                   <button
@@ -705,6 +719,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 );
               })}
             </div>
+            {group.label==='WORK'&&<UnifiedResearchNav key={currentUser.id} ownerId={currentUser.id} active={currentView===ToolView.ECHO_WORKSPACES} collapsed={isCollapsed} onExpand={toggleCollapsed} onOpen={()=>{onChangeView(ToolView.ECHO_WORKSPACES);setIsMobileMenuOpen(false);}}/>}
           </div>
         ))}
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, X, Bot, Send, Loader2, Trash2, Edit2, Check, Zap, ChevronDown,
   Paperclip, FileText, Image as ImageIcon, Database, ClipboardPaste, Search,
@@ -7,10 +7,10 @@ import {
 } from 'lucide-react';
 import { ChatMessage, ClientBoardSummary, ToastType, User } from '../types';
 import { fetchClientBoardSummaries, sendChatMessage } from '../services/databaseService';
-import { getBridgeUrl } from '../lib/bridgeClient';
+import { createEchoQueueClient } from '../lib/echoQueueClient';
+import { supabase } from '../lib/supabaseClient';
+import ArtifactMessage from './ArtifactMessage';
 
-const BRIDGE_URL = getBridgeUrl();
-const BRIDGE_SECRET = 'brightforge-echo-bridge-2026';
 const GENERAL_CHANNEL_ID = '12d8fb3a-4ddf-4557-97ea-b9dbac2520bc';
 const MAX_WORKSPACES = 10;
 const MAX_CONTEXT_FILES = 20;
@@ -30,7 +30,7 @@ const MODEL_CONFIG: Record<WorkspaceModel, { label: string; badge: string; badge
     bestFor: 'Quick board checks, team ops, status questions',
   },
   hermes: {
-    label: 'ChatGPT 5.5',
+    label: 'Echo',
     badge: 'Cloud',
     badgeClass: 'bg-blue-500/20 text-blue-300',
     dot: 'bg-blue-400',
@@ -43,7 +43,7 @@ const WORKSPACE_TEMPLATES: Record<WorkspaceTemplateId, { label: string; descript
   blank: {
     label: 'Blank workspace',
     description: 'Freeform AI workspace with manual context',
-    model: 'sassin',
+    model: 'hermes',
     starter: '',
     operatingMode: 'General Bright Forge workspace. Ask clarifying questions only when context is genuinely missing.',
     outputHint: 'Answer directly and keep next actions clear.',
@@ -91,7 +91,7 @@ const WORKSPACE_TEMPLATES: Record<WorkspaceTemplateId, { label: string; descript
   'team-ops': {
     label: 'Team Ops',
     description: 'Operational sweeps, task uptake and accountability',
-    model: 'sassin',
+    model: 'hermes',
     starter: 'Review operational state and tell me what is stuck, overdue, unassigned or needs chasing.',
     operatingMode: 'Team operations workspace. Focus on boards, owners, blockers, overdue work and practical accountability.',
     outputHint: 'Return issues, owners, blockers, required evidence and chase wording.',
@@ -192,12 +192,41 @@ function makeWorkspace(name?: string, templateId: WorkspaceTemplateId = 'blank',
 }
 
 function safeStoredAttachment(att: WorkspaceAttachment): WorkspaceAttachment {
-  const keepDataUrl = att.dataUrl && att.dataUrl.length < 350000 ? att.dataUrl : undefined;
-  return {
-    ...att,
-    dataUrl: keepDataUrl,
-    text: att.text ? att.text.slice(0, 120000) : undefined,
-  };
+  // Never silently replace original bytes with a truncated preview or filename.
+  return { ...att };
+}
+
+const ATTACHMENT_FORMATS = new Set(['txt', 'md', 'csv', 'json', 'pdf', 'xlsx', 'docx']);
+function validateAttachmentName(name: string) {
+  const format = name.split('.').pop()?.toLowerCase() || '';
+  if (!name || name.length > 180 || /[\x00-\x1f/\\]/.test(name)) throw new Error('Use a filename of at most 180 characters without path separators.');
+  if (!ATTACHMENT_FORMATS.has(format)) throw new Error(`${name}: unsupported file type. Nothing sent. Use TXT, MD, CSV, JSON, PDF, XLSX or DOCX.`);
+  return format;
+}
+
+function prepareAttachmentPayload(files: WorkspaceAttachment[]) {
+  if (files.length > 6) throw new Error('A message can include at most 6 files in total, including pinned context. Remove files before sending; your files and draft are unchanged.');
+  let total = 0;
+  return files.map(file => {
+    const format = validateAttachmentName(file.name);
+    let base64: string;
+    if (file.dataUrl) {
+      const match = /^data:[^,]*;base64,([\s\S]*)$/.exec(file.dataUrl);
+      if (!match) throw new Error(`${file.name}: original file bytes are unavailable. Nothing sent.`);
+      base64 = match[1];
+    } else if (typeof file.text === 'string') {
+      base64 = btoa(Array.from(new TextEncoder().encode(file.text), byte => String.fromCharCode(byte)).join(''));
+    } else throw new Error(`${file.name}: only the filename remains; original file bytes are unavailable. Nothing sent.`);
+    if (base64.length > 2800000) throw new Error(`${file.name}: maximum file size is 2 MiB. Nothing sent.`);
+    if (!base64 || base64.length % 4 || /[^A-Za-z0-9+/=]/.test(base64) || !/^[^=]*={0,2}$/.test(base64)) throw new Error(`${file.name}: invalid file bytes. Nothing sent.`);
+    const decoded = atob(base64);
+    if (btoa(decoded) !== base64) throw new Error(`${file.name}: invalid file bytes. Nothing sent.`);
+    if (decoded.length > 2 * 1024 * 1024) throw new Error(`${file.name}: maximum file size is 2 MiB. Nothing sent.`);
+    if (!decoded.length || decoded.length !== file.size) throw new Error(`${file.name}: original file bytes are missing or incomplete. Nothing sent.`);
+    total += decoded.length;
+    if (total > 6 * 1024 * 1024) throw new Error('Pinned context and staged files exceed 6 MiB combined. Remove files before sending; your files and draft are unchanged.');
+    return { name: file.name, format, base64 };
+  });
 }
 
 function buildWorkspaceBrief(ws: Workspace) {
@@ -222,14 +251,34 @@ function inferOutputTitle(text: string, ws: Workspace) {
 }
 
 const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
+  const ownerId = currentUser.id;
+  const storageKey = `echo-workspaces:v2:${ownerId}`;
+  const scopeRef = useRef({ active: true, controller: new AbortController() });
+  const [ownerValid, setOwnerValid] = useState(true);
+  useLayoutEffect(() => {
+    const scope = { active: true, controller: new AbortController() };
+    scopeRef.current = scope;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session || session.user.id !== ownerId) { scope.active = false; scope.controller.abort(); setOwnerValid(false); }
+    });
+    return () => { scope.active = false; scope.controller.abort(); subscription.unsubscribe(); };
+  }, [ownerId]);
+  const isCurrent = (scope = scopeRef.current) => scope.active && scope === scopeRef.current;
+  // Global legacy keys have no trustworthy owner. Leave them intact and unread,
+  // quarantined in place for explicit recovery. Never assign them to this login.
+  const [stored] = useState(() => {
+    try {
+      const value = JSON.parse(localStorage.getItem(storageKey) || 'null');
+      return value?.ownerId === ownerId && Array.isArray(value.workspaces) ? value : null;
+    } catch { return null; }
+  });
   const [workspaces, setWorkspaces] = useState<Workspace[]>(() => {
     try {
-      const saved = localStorage.getItem('echo-workspaces');
-      if (saved) {
-        const parsed = JSON.parse(saved) as Workspace[];
+      if (stored?.workspaces.length) {
+        const parsed = stored.workspaces as Workspace[];
         return parsed.map(w => {
           const savedModel = (w as any).model;
-          const model: WorkspaceModel = savedModel === 'hermes' || savedModel === 'sassin' ? savedModel : 'sassin';
+          const model: WorkspaceModel = currentUser.role !== 'Owner' ? 'hermes' : savedModel === 'hermes' || savedModel === 'sassin' ? savedModel : 'hermes';
           return {
             ...w,
             model,
@@ -246,7 +295,7 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
     return [makeWorkspace('Workspace 1')];
   });
   const [activeId, setActiveId] = useState<string>(() => {
-    try { return localStorage.getItem('echo-workspaces-active') || ''; } catch { return ''; }
+    return typeof stored?.activeId === 'string' ? stored.activeId : '';
   });
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [editingTabName, setEditingTabName] = useState('');
@@ -273,7 +322,7 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
 
   useEffect(() => {
     let alive = true;
-    fetchClientBoardSummaries().then(rows => { if (alive) setClients(rows); });
+    fetchClientBoardSummaries().then(rows => { if (alive && isCurrent()) setClients(rows); });
     return () => { alive = false; };
   }, []);
 
@@ -297,6 +346,7 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
   }, [workspaces, activeId, showArchived]);
 
   useEffect(() => {
+    if (!isCurrent()) return;
     try {
       const toSave = workspaces.map(w => ({
         ...w,
@@ -306,19 +356,12 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
         status: 'Idle',
         contextFiles: (w.contextFiles || []).map(safeStoredAttachment),
       }));
-      localStorage.setItem('echo-workspaces', JSON.stringify(toSave));
+      localStorage.setItem(storageKey, JSON.stringify({ ownerId, workspaces: toSave, activeId }));
     } catch (err) {
-      console.warn('[EchoWorkspaces] local storage quota hit, saving compact workspace state', err);
-      try {
-        const compact = workspaces.map(w => ({ ...w, messages: w.messages.slice(-25), contextFiles: (w.contextFiles || []).map(({ dataUrl, text, ...rest }) => rest) }));
-        localStorage.setItem('echo-workspaces', JSON.stringify(compact));
-      } catch {}
+      console.warn('[EchoWorkspaces] workspace could not be persisted', err);
+      addToast('error', 'Browser storage is full or unavailable. This workspace is only in memory; previous saved data is unchanged. Do not close it before saving your work.');
     }
-  }, [workspaces]);
-
-  useEffect(() => {
-    try { localStorage.setItem('echo-workspaces-active', activeId); } catch {}
-  }, [activeId]);
+  }, [workspaces, activeId, storageKey]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -326,9 +369,9 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
 
   const isOwner = currentUser.role === 'Owner';
   const availableModels = (Object.entries(MODEL_CONFIG) as [WorkspaceModel, typeof MODEL_CONFIG[WorkspaceModel]][])
-    .filter(([key]) => key !== 'hermes' || isOwner);
+    .filter(([key]) => isOwner || key === 'hermes');
   const activeWorkspace = workspaces.find(w => w.id === activeId) ?? workspaces.find(w => !w.archived) ?? workspaces[0];
-  const activeCfg = MODEL_CONFIG[activeWorkspace?.model || 'sassin'] || MODEL_CONFIG.sassin;
+  const activeCfg = MODEL_CONFIG[isOwner ? activeWorkspace?.model || 'hermes' : 'hermes'] || MODEL_CONFIG.hermes;
   const activeTemplate = WORKSPACE_TEMPLATES[activeWorkspace?.templateId || 'blank'] || WORKSPACE_TEMPLATES.blank;
 
   const visibleWorkspaces = useMemo(() => {
@@ -348,8 +391,27 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
   }, [clients, clientSearch]);
 
   const updateWorkspace = useCallback((id: string, updater: (w: Workspace) => Workspace) => {
+    if (!isCurrent()) return;
     setWorkspaces(prev => prev.map(w => w.id === id ? updater(w) : w));
   }, []);
+
+  useEffect(() => {
+    const consume = (event?: Event) => {
+      if (!isCurrent()) return;
+      if (event && (event as CustomEvent).detail?.ownerId !== currentUser.id) return;
+      const key = 'echoResearchDraft:' + currentUser.id;
+      try {
+        const draft = localStorage.getItem(key);
+        if (!draft) return;
+        updateWorkspace(activeId, w => ({...w, input: w.input.trim() ? w.input + '\n\n' + draft.slice(0, 11500) : draft.slice(0, 11500)}));
+        localStorage.removeItem(key);
+        inputRef.current?.focus();
+      } catch { addToast('error', 'Could not recover the research draft.'); }
+    };
+    consume();
+    window.addEventListener('echoResearchDraft', consume);
+    return () => window.removeEventListener('echoResearchDraft', consume);
+  }, [activeId, currentUser.id, updateWorkspace]);
 
   const addWorkspace = (templateId: WorkspaceTemplateId = 'blank', client?: ClientBoardSummary) => {
     if (workspaces.filter(w => !w.archived).length >= MAX_WORKSPACES) {
@@ -357,7 +419,7 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
       return;
     }
     const base = makeWorkspace(undefined, templateId, client);
-    const ws = base.model === 'hermes' && !isOwner ? { ...base, model: 'sassin' as WorkspaceModel } : base;
+    const ws = base;
     setWorkspaces(prev => [...prev, ws]);
     setActiveId(ws.id);
     setTemplatePickerOpen(false);
@@ -386,6 +448,7 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
   const clearChat = (id: string) => updateWorkspace(id, w => ({ ...w, messages: [] }));
 
   const setWorkspaceModel = (id: string, model: WorkspaceModel) => {
+    if (!isOwner) return;
     updateWorkspace(id, w => ({ ...w, model }));
     setModelPickerOpen(false);
   };
@@ -395,7 +458,7 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
     updateWorkspace(id, w => ({
       ...w,
       templateId,
-      model: template.model === 'hermes' && !isOwner ? 'sassin' : template.model,
+      model: template.model,
       name: w.name.startsWith('Workspace') || w.name === WORKSPACE_TEMPLATES[w.templateId]?.label ? templateTitle(templateId, w.pinnedClientName) : w.name,
       input: w.input.trim() ? w.input : template.starter,
     }));
@@ -417,7 +480,6 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
   const fileToAttachment = (file: File): Promise<WorkspaceAttachment> =>
     new Promise((resolve, reject) => {
       const isImage = file.type.startsWith('image/');
-      const isText = file.type.startsWith('text/') || /\.(txt|md|csv|json|html?|xml)$/i.test(file.name);
       const reader = new FileReader();
       reader.onerror = () => reject(new Error(`Could not read ${file.name}`));
       reader.onload = () => resolve({
@@ -426,30 +488,36 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
         mimeType: file.type || (isImage ? 'image/png' : 'application/octet-stream'),
         size: file.size,
         kind: isImage ? 'image' : 'document',
-        dataUrl: isImage || !isText ? String(reader.result || '') : undefined,
-        text: isText && !isImage ? String(reader.result || '').slice(0, 120000) : undefined,
+        dataUrl: String(reader.result || ''),
       });
-      if (isImage || !isText) reader.readAsDataURL(file);
-      else reader.readAsText(file);
+      reader.readAsDataURL(file);
     });
 
   const prepareFiles = async (files: FileList | File[], dest: 'stage' | 'context', wsId: string) => {
-    const fileArray = Array.from(files).slice(0, 6);
-    const tooLarge = fileArray.find(f => f.size > 8 * 1024 * 1024);
+    const scope = scopeRef.current;
+    if (!isCurrent(scope)) return;
+    const fileArray = Array.from(files);
+    if (fileArray.length > 6) { addToast('error', 'Select at most 6 files at once. Nothing was added.'); return; }
+    const tooLarge = fileArray.find(f => f.size > 2 * 1024 * 1024);
     if (tooLarge) {
-      addToast('error', `${tooLarge.name} is too large. Keep uploads under 8MB`);
+      addToast('error', `${tooLarge.name} is too large. Maximum file size is 2 MiB.`);
       return;
     }
     try {
+      fileArray.forEach(f => validateAttachmentName(f.name));
+      const existing = dest === 'stage' ? stagedAttachments[wsId] || [] : workspaces.find(w => w.id === wsId)?.contextFiles || [];
+      const limit = dest === 'stage' ? MAX_STAGED_FILES : MAX_CONTEXT_FILES;
+      if (existing.length + fileArray.length > limit) throw new Error(`This area can hold ${limit} files. Nothing was added; remove files first.`);
       const atts = await Promise.all(fileArray.map(fileToAttachment));
+      if (!isCurrent(scope)) return;
       if (dest === 'stage') {
-        setStagedAttachments(prev => ({ ...prev, [wsId]: [...(prev[wsId] || []), ...atts].slice(0, MAX_STAGED_FILES) }));
+        setStagedAttachments(prev => ({ ...prev, [wsId]: [...(prev[wsId] || []), ...atts] }));
       } else {
-        updateWorkspace(wsId, w => ({ ...w, contextFiles: [...(w.contextFiles || []), ...atts].slice(0, MAX_CONTEXT_FILES) }));
+        updateWorkspace(wsId, w => ({ ...w, contextFiles: [...(w.contextFiles || []), ...atts] }));
         addToast('success', `${atts.length} file${atts.length > 1 ? 's' : ''} saved to workspace context`);
       }
     } catch (err: any) {
-      addToast('error', err.message || 'Could not read file');
+      if (isCurrent(scope)) addToast('error', err.message || 'Could not read file');
     }
   };
 
@@ -491,10 +559,29 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
   };
 
   const sendMessage = async (workspaceId: string) => {
+    const scope = scopeRef.current;
+    if (!isCurrent(scope)) return;
     const ws = workspaces.find(w => w.id === workspaceId);
     const staged = stagedAttachments[workspaceId] || [];
     if (!ws || (!ws.input.trim() && staged.length === 0) || ws.isThinking) return;
 
+    let attachments: ReturnType<typeof prepareAttachmentPayload>;
+    try { attachments = prepareAttachmentPayload([...(ws.contextFiles || []), ...staged]); }
+    catch (err: any) { addToast('error', err.message); return; }
+    // Fence every POST and poll at token lookup and immediately before fetch.
+    const queue = createEchoQueueClient({
+      baseUrl: window.location.protocol.startsWith('http') && !window.location.hostname.endsWith('vercel.app') ? window.location.origin : 'https://echo-ben.tailfdbc33.ts.net',
+      getAccessToken: async () => {
+        if (!isCurrent(scope)) throw new Error('Account changed; nothing further sent.');
+        const { data } = await supabase.auth.getSession();
+        if (!isCurrent(scope) || data.session?.user.id !== ownerId) throw new Error('Account changed; nothing further sent.');
+        return data.session.access_token;
+      },
+      fetchFn: (url, init) => {
+        if (!isCurrent(scope)) throw new Error('Account changed; nothing further sent.');
+        return fetch(url, { ...init, signal: scope.controller.signal });
+      },
+    });
     const userText = ws.input.trim() || 'Analyse the attached file(s).';
     const userMsg: WorkspaceMessage = {
       id: makeId(),
@@ -504,8 +591,7 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
       attachments: staged.map(({ dataUrl, text, ...a }) => a),
     };
 
-    updateWorkspace(workspaceId, w => ({ ...w, messages: [...w.messages, userMsg], input: '', isThinking: true, status: 'Preparing context' }));
-    setStagedAttachments(prev => ({ ...prev, [workspaceId]: [] }));
+    updateWorkspace(workspaceId, w => ({ ...w, isThinking: true, status: 'Preparing context' }));
 
     const statusTimers = [
       window.setTimeout(() => updateWorkspace(workspaceId, w => w.isThinking ? ({ ...w, status: 'Reading workspace files' }) : w), 900),
@@ -519,45 +605,43 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
         db_id: ws.pinnedClientDbId,
         name: ws.pinnedClientName,
       } : null;
-      const res = await fetch(`${BRIDGE_URL}/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${BRIDGE_SECRET}` },
-        body: JSON.stringify({
-          message: userText,
-          userId: currentUser.id,
-          sessionKey: `${currentUser.id}-ws-${workspaceId}`,
-          userName: currentUser.name,
-          history: [],
-          model: ws.model,
-          attachments: staged,
-          contextFiles: ws.contextFiles || [],
-          pinnedClient,
-          workspaceTemplate: {
-            id: ws.templateId,
-            label: WORKSPACE_TEMPLATES[ws.templateId].label,
-            operatingMode: WORKSPACE_TEMPLATES[ws.templateId].operatingMode,
-            outputHint: WORKSPACE_TEMPLATES[ws.templateId].outputHint,
-          },
-          workspaceBrief: buildWorkspaceBrief(ws),
-        }),
+      const contextText = [...(ws.contextFiles || []), ...staged]
+        .map((file) => file.text ? `${file.name}:\n${file.text}` : `${file.name} (${file.mimeType}, ${file.size} bytes)`)
+        .join('\n\n')
+        .slice(0, 6000);
+      // Literal human approval must reach the broker unchanged. Never extract it from context files or history.
+      const queuedMessage = /^\/google approve [0-9a-f-]{36}$/.test(userText) ? userText : [
+        buildWorkspaceBrief(ws),
+        pinnedClient ? `Pinned client: ${pinnedClient.name}` : '',
+        contextText ? `Workspace files:\n${contextText}` : '',
+        `Request:\n${userText}`,
+      ].filter(Boolean).join('\n\n');
+      const response = await queue.run({
+        kind: 'chat',
+        message: queuedMessage,
+        sessionKey: `${currentUser.id}-ws-${workspaceId}`,
+        attachments,
+        history: ws.messages.slice(-10).map((item) => ({ role: item.role, content: item.text })),
       });
-      if (!res.ok) throw new Error(`Bridge error ${res.status}`);
-      const data = await res.json();
+      if (!isCurrent(scope)) return;
       const assistantId = makeId();
-      const assistantText = data.response || '(no response)';
+      const assistantText = response || '(no response)';
       updateWorkspace(workspaceId, w => ({
         ...w,
         isThinking: false,
         status: 'Idle',
-        messages: [...w.messages, { id: assistantId, role: 'assistant', text: assistantText, timestamp: new Date().toISOString(), routedTo: data.routed_to }],
+        input: w.input === ws.input ? '' : w.input,
+        messages: [...w.messages, userMsg, { id: assistantId, role: 'assistant', text: assistantText, timestamp: new Date().toISOString(), routedTo: 'hermes' }],
       }));
+      setStagedAttachments(prev => ({ ...prev, [workspaceId]: (prev[workspaceId] || []).filter(file => !staged.some(sent => sent.id === file.id)) }));
       addSavedOutput(workspaceId, assistantText, assistantId);
     } catch (err: any) {
+      if (!isCurrent(scope)) return;
       updateWorkspace(workspaceId, w => ({
         ...w,
         isThinking: false,
         status: 'Idle',
-        messages: [...w.messages, { id: makeId(), role: 'assistant', text: `Error: ${err.message}. Is the bridge running?`, timestamp: new Date().toISOString() }],
+        messages: [...w.messages, { id: makeId(), role: 'assistant', text: `Error: ${err.message}`, timestamp: new Date().toISOString() }],
       }));
     } finally {
       statusTimers.forEach(window.clearTimeout);
@@ -630,16 +714,16 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
       sassin: { cls: 'bg-purple-500/20 text-purple-300', label: 'Local' },
       'sassin-member': { cls: 'bg-purple-500/20 text-purple-300', label: 'Local' },
       echo: { cls: 'bg-amber-500/20 text-amber-300', label: 'Local Echo' },
-      hermes: { cls: 'bg-blue-500/20 text-blue-300', label: 'ChatGPT 5.5' },
+      hermes: { cls: 'bg-blue-500/20 text-blue-300', label: 'Echo Cloud' },
       'hermes-input': { cls: 'bg-blue-500/20 text-blue-300', label: 'Input analysis' },
-      'hermes-fallback': { cls: 'bg-yellow-500/20 text-yellow-300', label: 'ChatGPT fallback' },
+      'hermes-fallback': { cls: 'bg-yellow-500/20 text-yellow-300', label: 'Cloud fallback' },
       batch: { cls: 'bg-brand-500/20 text-brand-300', label: 'Batch' },
     };
     const m = map[routedTo] || { cls: 'bg-white/10 text-white/50', label: routedTo };
     return <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${m.cls}`}>{m.label}</span>;
   };
 
-  if (!activeWorkspace) return null;
+  if (!activeWorkspace || !ownerValid) return null;
 
   const staged = stagedAttachments[activeWorkspace.id] || [];
   const contextFiles = activeWorkspace.contextFiles || [];
@@ -735,13 +819,13 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
           </div>
 
           <div className="relative" ref={pickerRef}>
-            <button onClick={() => setModelPickerOpen(o => !o)} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-xs">
+            <button disabled={!isOwner} onClick={() => setModelPickerOpen(o => !o)} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-xs">
               <span className={`w-2 h-2 rounded-full ${activeCfg.dot}`} />
               <span className="text-white/70 font-medium">{activeCfg.label}</span>
               <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${activeCfg.badgeClass}`}>{activeCfg.badge}</span>
               <ChevronDown size={11} className={`text-white/40 transition-transform ${modelPickerOpen ? 'rotate-180' : ''}`} />
             </button>
-            {modelPickerOpen && (
+            {modelPickerOpen && isOwner && (
               <div className="absolute top-full mt-2 left-0 w-72 bg-portal-surface border border-white/[0.1] rounded-xl shadow-xl shadow-black/40 overflow-hidden z-50">
                 <div className="px-4 py-2 text-[10px] uppercase tracking-wider text-white/30 border-b border-white/[0.06]">Recommended model: {MODEL_CONFIG[activeTemplate.model].label}</div>
                 {availableModels.map(([key, cfg]) => (
@@ -801,7 +885,7 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
                 <div className={`max-w-[75%] flex flex-col gap-1 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                   <div className={`relative px-3.5 py-2.5 rounded-2xl text-sm ${msg.role === 'user' ? 'bg-brand-600 text-white rounded-tr-sm' : 'bg-brand-500/10 border border-brand-500/20 text-portal-text rounded-tl-sm'}`}>
                     {(msg.attachments || []).filter(a => a.kind === 'image').length > 0 && <div className="flex flex-wrap gap-1.5 mb-2">{(msg.attachments || []).filter(a => a.kind === 'image').map(att => <div key={att.id} className="flex items-center gap-1.5 text-[11px] bg-black/20 rounded-lg px-2 py-1 text-white/70"><ImageIcon size={11} /><span className="max-w-[160px] truncate">{att.name}</span><span className="text-white/35">{formatBytes(att.size)}</span></div>)}</div>}
-                    <span className="whitespace-pre-wrap leading-relaxed">{msg.text}</span>
+                    <span className="whitespace-pre-wrap leading-relaxed"><ArtifactMessage text={msg.text} owner={currentUser.id}/></span>
                     {(msg.attachments || []).filter(a => a.kind === 'document').length > 0 && <div className="mt-2 space-y-1">{(msg.attachments || []).filter(a => a.kind === 'document').map(att => <div key={att.id} className="flex items-center gap-2 rounded-lg bg-black/15 px-2 py-1.5 text-xs text-white/70"><FileText size={11} /><span className="truncate max-w-[200px]">{att.name}</span><span className="text-white/35">{formatBytes(att.size)}</span></div>)}</div>}
                     {msg.role === 'assistant' && (
                       <div className="absolute top-1 left-full ml-1 hidden group-hover:flex items-center gap-0.5 bg-portal-surface border border-white/[0.07] rounded-lg px-1 py-0.5 shadow-lg z-10">
@@ -889,4 +973,7 @@ const EchoWorkspaces: React.FC<Props> = ({ currentUser, addToast }) => {
   );
 };
 
-export default EchoWorkspaces;
+export default function OwnerScopedEchoWorkspaces({ currentUser, addToast }: Props) {
+  if (!currentUser.id || currentUser.id === 'guest') return null;
+  return <EchoWorkspaces key={currentUser.id} currentUser={currentUser} addToast={addToast} />;
+}

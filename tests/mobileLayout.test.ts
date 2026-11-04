@@ -4,8 +4,11 @@ import {readFileSync} from 'node:fs';
 const read=(p:string)=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
 test('mobile shell reserves safe areas and gives every non-chat screen header space',()=>{
  const app=read('App.tsx');
- assert.match(app,/portal-mobile-main/);
- assert.match(app,/currentView === ToolView.TEAM_CHAT \? '' : 'portal-with-header'/);
+ assert.match(app,/<PortalShell key=\{currentUser\.id\}/);
+ const shellCss=read('components/PortalShell.css');
+ assert.match(shellCss,/env\(safe-area-inset-top/);
+ assert.match(shellCss,/env\(safe-area-inset-bottom/);
+ assert.match(shellCss,/\.pp-topbar\{[^}]*flex-shrink:0/);
  const css=read('mobile-workspace.css');
  assert.match(css,/100dvh/);
  assert.match(css,/env\(safe-area-inset-bottom/);

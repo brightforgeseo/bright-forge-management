@@ -1,16 +1,19 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import {notificationLinkStorage} from '../lib/notificationLinkStorage.mjs';
+import {usePrivateDraft}from'../lib/usePrivateDraft';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { Hash, Plus, Trash2, Image as ImageIcon, Send, Bot, User as UserIcon, Loader2, FileText, Users, MessageSquare, RefreshCw, Edit2, X, Check, Smile, Film, SmilePlus, Video, Lock, UserPlus, Menu, ClipboardList, Calendar, ArrowRight, Palette, Paperclip, Download, File, Search, Pin, PinOff, Reply, ChevronDown, ChevronUp, ListTodo } from 'lucide-react';
 import { ChatChannel, ChatMessage, User, ToastType, Profile, MessageReaction } from '../types';
-import { getChatResponse } from '../services/geminiService';
-import { storeEchoConversation, buildConversationContext } from '../services/echoMemory';
+import { storeEchoConversation } from '../services/echoMemory';
 import { fetchChatMessages, sendChatMessage, clearChatHistory, uploadFile, fetchChannels, createChannel, deleteChannel, fetchProfiles, getOrCreateDMChannel, createNotification, editChatMessage, fetchMessageReactions, addMessageReaction, removeMessageReaction, fetchChannelMembers, addChannelMember, removeChannelMember, deleteChatMessage, isChannelMember, searchChatMessages, SearchResult, pinMessage, unpinMessage, fetchPinnedMessages, sendReplyMessage, fetchThreadReplies, markChannelRead, fetchUnreadCounts } from '../services/databaseService';
 import { startEchoListener } from '../services/echoListener';
 import { fetchAllPartners, fetchPartnerMessages, sendPartnerMessage, markPartnerMessagesRead } from '../services/clientPortalService';
 import { PartnerWithStats, PartnerMessage } from '../types-portal';
 import { supabase, normalizeSupabaseAssetUrl } from '../lib/supabaseClient';
-import { getBridgeUrl } from '../lib/bridgeClient';
+import { runEchoJob } from '../lib/echoQueueClient';
 import { formatChatRow, resolveChatMessageAvatar } from '../lib/chatMessageFormatter';
 import ChatTodoList from './ChatTodoList';
+import { ArtifactButton } from './ArtifactMessage';
+import { artifactRef, chatMessageParts } from '../lib/artifactDelivery';
 // Removed custom VideoCall - now using Google Meet
 
 // Play a short notification sound for new chat messages
@@ -37,6 +40,11 @@ interface TeamChatProps {
   currentUser: User;
   addToast: (type: ToastType, message: string) => void;
   onNavigateToTask?: (taskId: string, boardId: string, groupId: string) => void;
+  requestedChannelId?:string;
+  active?:boolean;
+  isActiveConversation?:(id:string)=>boolean;
+  onChannelReady?:(id:string)=>void;
+  draftBridge?:React.MutableRefObject<any>;
 }
 
 
@@ -58,16 +66,26 @@ const mergeChatChannels = (existing: ChatChannel[], incoming: ChatChannel[]): Ch
   return incoming.map(ch => ({ ...ch, unread: unreadById.get(ch.id) || ch.unread || 0 }));
 };
 
-const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateToTask }) => {
-  // SIMPLE STATE MODEL - No caching, no drafts
+const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateToTask,requestedChannelId,active=true,draftBridge,isActiveConversation,onChannelReady }) => {
+  // Conversation drafts are owner-scoped and saved independently of recipient navigation.
   const [channels, setChannels] = useState<ChatChannel[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [activeChannelId, setActiveChannelId] = useState<string>('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const visibleRef=useRef(active);visibleRef.current=active;
+  const requestedRef=useRef(requestedChannelId);requestedRef.current=requestedChannelId;
+  const accessRef=useRef(isActiveConversation);accessRef.current=isActiveConversation;
+  const readyRef=useRef(onChannelReady);readyRef.current=onChannelReady;
+  const mayUseChannel=(id:string)=>visibleRef.current&&document.visibilityState==='visible'&&(!accessRef.current||accessRef.current(id));
+  useLayoutEffect(()=>{if(activeChannelId)readyRef.current?.(activeChannelId);},[activeChannelId]);
   // Bumped to force the realtime subscription effect to re-run after a dropped
   // connection (CHANNEL_ERROR / TIMED_OUT / CLOSED) so messages keep flowing.
   const [subscriptionGen, setSubscriptionGen] = useState(0);
-  const [message, setMessage] = useState('');
+  const messageDraft=usePrivateDraft(currentUser.id,'chat:'+(activeChannelId||'none'),{text:'',attachment:null},true);
+  if(draftBridge)draftBridge.current={owner:currentUser.id,flush:messageDraft.flush,current:messageDraft.current};
+  useEffect(()=>{visibleRef.current=active;return()=>{visibleRef.current=false;};},[active]);
+  const message=typeof messageDraft.value?.text==='string'?messageDraft.value.text:'';
+  const setMessage=(text:string)=>{if(messageDraft.ready)messageDraft.set((old:any)=>({...old,text}));};
   const [loading, setLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [showCreateChannel, setShowCreateChannel] = useState(false);
@@ -123,6 +141,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
   // channel doesn't hammer the DB. Badges reset immediately in local state;
   // this just makes the reset survive reloads.
   const touchChannelRead = (channelId: string, force = false) => {
+    if(!mayUseChannel(channelId))return;
     if (!force && Date.now() - lastMarkReadRef.current < 10000) return;
     lastMarkReadRef.current = Date.now();
     markChannelRead(channelId, currentUser.id).catch(() => {});
@@ -159,7 +178,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Staged attachment state (for paste preview before sending)
-  const [stagedAttachment, setStagedAttachment] = useState<{ url: string; file: File; type: 'image' | 'video' | 'file'; name: string } | null>(null);
+  const stagedAttachment=messageDraft.value?.attachment||null;
+  const setStagedAttachment=(attachment:any)=>{if(messageDraft.ready)messageDraft.set((old:any)=>({...old,attachment:attachment?{url:attachment.url,type:attachment.type,name:attachment.name}:null}));};
 
   // Pinned messages state
   const [pinnedMessages, setPinnedMessages] = useState<ChatMessage[]>([]);
@@ -394,13 +414,17 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
   // Render text with highlighted @mentions and clickable links
   const renderTextWithMentions = (text: string) => {
-    // Combined regex for URLs and @mentions
-    const combinedRegex = /(https?:\/\/[^\s]+)|(@everyone|@[\w\s]+?)(?=\s@|\s|$|[.,!?])/gi;
-    const parts = text.split(combinedRegex).filter(Boolean);
+    // Shared balanced Markdown/URL tokenizer; mentions never split a URL.
+    const parts = chatMessageParts(text);
 
     return parts.map((part, index) => {
       // Check if it's a URL
       if (part.match(/^https?:\/\//i)) {
+        const file = artifactRef(part);
+        if (file) return <ArtifactButton key={index} file={file} owner={currentUser.id}/>;
+        let url: URL;
+        try { url = new URL(part); } catch { return part; }
+        if (url.username || url.password || url.searchParams.has('ordinaryArtifact') || url.searchParams.has('privateArtifact')) return part;
         return (
           <a
             key={index}
@@ -430,7 +454,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     if (!taskLink) return;
 
     // Store task data in localStorage for TaskBoard to pick up
-    localStorage.setItem('openTaskModal', JSON.stringify({
+    notificationLinkStorage.setItem('openTaskModal', JSON.stringify({
       taskId: taskLink.taskId,
       boardId: taskLink.boardId,
       groupId: taskLink.groupId
@@ -697,6 +721,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
   // polling and realtime handlers pointed at the selected room immediately.
   const selectChannel = useCallback((channelId: string) => {
     activeChannelRef.current = channelId;
+    try{localStorage.setItem('portalTeamContext:'+currentUser.id,channelId);}catch{}
     const cachedMessages = messageCacheRef.current.get(channelId) || [];
     setActivePartnerId(null);
     setActiveChannelId(channelId);
@@ -712,6 +737,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
   }, []);
 
 
+  useEffect(()=>{if(active&&requestedChannelId&&channels.some(c=>c.id===requestedChannelId)&&activeChannelRef.current!==requestedChannelId)selectChannel(requestedChannelId);},[requestedChannelId,channels,active,selectChannel]);
+
   // Load Data
   const refreshData = async () => {
     setIsRefreshing(true);
@@ -720,7 +747,10 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       fetchChannels(),
       fetchProfiles(),
       // Only fetch partners for Owners/Admins
-      isAdminOrOwner ? fetchAllPartners().catch(() => []) : Promise.resolve([])
+      isAdminOrOwner ? fetchAllPartners().catch(() => {
+        addToast('error', 'Partner chats could not be loaded. Please check your session and access.');
+        return [];
+      }) : Promise.resolve([])
     ]);
     setChannels(prev => mergeChatChannels(prev, chans));
     setProfiles(profs);
@@ -736,6 +766,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       const msgs = await fetchPartnerMessages(partnerId);
       setPartnerMessages(msgs);
     } catch (error) {
+      setPartnerMessages([]);
+      addToast('error', 'Partner messages could not be loaded. Please check your session and access.');
       console.error('Error loading partner messages:', error);
     } finally {
       setLoadingPartnerMessages(false);
@@ -842,7 +874,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       }).catch(() => {});
 
       // Check for notification click (chat navigation)
-      const openChatNotification = localStorage.getItem('openChatNotification');
+      const openChatNotification = notificationLinkStorage.getItem('openChatNotification');
       if (openChatNotification) {
         try {
           const chatData = JSON.parse(openChatNotification);
@@ -857,15 +889,18 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
             console.warn('[TeamChat] Channel not found:', chatData.channelId);
           }
 
-          localStorage.removeItem('openChatNotification');
+          notificationLinkStorage.removeItem('openChatNotification');
         } catch (e) {
           console.error('[TeamChat] Failed to parse chat notification:', e);
-          localStorage.removeItem('openChatNotification');
+          notificationLinkStorage.removeItem('openChatNotification');
         }
       } else if (chans.length > 0 && !activeChannelId) {
         // No notification - default to general
         const general = chans.find(c => c.name === 'general');
-        selectChannel(general ? general.id : chans[0].id);
+        let remembered='';try{remembered=localStorage.getItem('portalTeamContext:'+currentUser.id)||'';}catch{}
+        const restored=chans.find(c=>c.id===(activeChannelRef.current||remembered));
+        const requested=chans.find(c=>c.id===requestedRef.current);
+        if(visibleRef.current)selectChannel(requested?requested.id:restored?restored.id:general?general.id:chans[0].id);
       }
     };
     init();
@@ -912,10 +947,10 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     // is already on the TeamChat view (init() above only runs once on mount).
     const handleOpenChatNotification = (e: Event) => {
       const data = (e as CustomEvent).detail
-        || (() => { try { return JSON.parse(localStorage.getItem('openChatNotification') || '{}'); } catch { return {}; } })();
+        || (() => { try { return JSON.parse(notificationLinkStorage.getItem('openChatNotification') || '{}'); } catch { return {}; } })();
       if (!data || !data.channelId) return;
       selectChannel(data.channelId);
-      localStorage.removeItem('openChatNotification');
+      notificationLinkStorage.removeItem('openChatNotification');
     };
     window.addEventListener('openChatNotification', handleOpenChatNotification as EventListener);
 
@@ -1294,7 +1329,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       }
 
       // Reset unread count (locally, and server-side so it survives reloads)
-      setChannels(prev => prev.map(c =>
+      if(mayUseChannel(currentChannelId))setChannels(prev => prev.map(c =>
         c.id === currentChannelId ? { ...c, unread: 0 } : c
       ));
       touchChannelRead(currentChannelId, true);
@@ -1711,6 +1746,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
   // Send message with optimistic local rendering so chat feels instant
   const handleSendMessage = async () => {
+    if(!mayUseChannel(activeChannelRef.current))return;
     console.log('[handleSendMessage] Starting...');
     console.log('[handleSendMessage] Message text:', message);
     console.log('[handleSendMessage] Active channel ID:', activeChannelId);
@@ -1772,7 +1808,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
     // Send to database. Realtime or the insert result will reconcile the temp row.
     console.log('[handleSendMessage] Calling sendChatMessage...');
     try {
-      let result;
+      let result:Awaited<ReturnType<typeof sendChatMessage>>;
 
       // Check if this is a reply to another message
       if (savedReplyingTo) {
@@ -1941,40 +1977,17 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
       }
 
       try {
-        // Route through portal bridge — handles admin/member permissions and local model routing
-        const BRIDGE_URL = getBridgeUrl();
-        const BRIDGE_SECRET = 'brightforge-echo-bridge-2026';
-        const bridgeRes = await fetch(`${BRIDGE_URL}/chat`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${BRIDGE_SECRET}`,
-          },
-          body: JSON.stringify({
-            message: userMsg.text,
-            userId: currentUser.id,
-            userName: currentUser.name,
-            history: messages.slice(-8).map(m => ({
-              role: m.isAi ? 'assistant' : 'user',
-              content: `${m.sender}: ${m.text}`,
-            })),
-          }),
+        const recentHistory = messages.slice(-10).map(m => ({
+          role: m.isAi ? 'assistant' as const : 'user' as const,
+          content: `${m.sender}: ${m.text}`,
+        }));
+        const response = await runEchoJob({
+          kind: 'chat',
+          message: userMsg.text,
+          sourceMessageId: insertedUserMessageId,
+          sessionKey: `${currentUser.id}-channel-${activeChannelId}`,
+          history: recentHistory,
         });
-
-        let response: string;
-        if (bridgeRes.ok) {
-          const data = await bridgeRes.json();
-          response = data.response || '(no response)';
-        } else {
-          // Fallback to getChatResponse if bridge is down
-          const recentHistory = messages.slice(-10).map(m => `${m.sender}: ${m.text}`).join('\n');
-          let pastContext = '';
-          try { pastContext = await buildConversationContext(currentUser.id, activeChannelId); } catch (e) {}
-          response = await getChatResponse(pastContext + '\n\n' + recentHistory, userMsg.text, {
-            id: currentUser.id,
-            name: currentUser.name
-          });
-        }
 
         // If we have a placeholder, edit it in place; otherwise insert fresh.
         if (placeholderMsgId) {
@@ -2134,333 +2147,15 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
   const allDmChannels = channels.filter(c => isUserInDM(c, currentUser.id));
   const echoAIChannel = allDmChannels.find(c => isEchoAIChannel(c));
   const dmChannels = allDmChannels.filter(c => !isEchoAIChannel(c));
+  const teamRoom=publicChannels.find(c=>c.name.toLowerCase()==='general');
+  const recipientProfiles=profiles.filter(p=>p.id!==currentUser.id&&p.id!==ECHO_BOT_ID);
+  const otherId=activeChannel?.type==='dm'?parseDMChannel(activeChannel.name).find(id=>id!==currentUser.id):null;
+  const recipientValue=activePartnerId?'partner:'+activePartnerId:otherId&&recipientProfiles.some(p=>p.id===otherId)?'person:'+otherId:'room:'+(activeChannelId||'');
+  const recipientPicker=<label className="pp-team-recipient"><span>{activePartnerId||activeChannel?.type==='dm'?'PRIVATE CONVERSATION':'TEAM CHAT'}</span><select aria-label="Chat recipient" value={recipientValue} onChange={e=>{const value=e.target.value;if(value.startsWith('person:'))void handleStartDM(value.slice(7));else if(value.startsWith('partner:'))handleSelectPartner(value.slice(8));else selectChannel(value.slice(5));}}>{teamRoom&&<option value={'room:'+teamRoom.id}>Team chat · everyone</option>}{recipientProfiles.length>0&&<optgroup label="Speak privately">{recipientProfiles.map(p=><option value={'person:'+p.id} key={p.id}>{p.full_name||p.email?.split('@')[0]||'Team member'}</option>)}</optgroup>}{publicChannels.filter(c=>c.id!==teamRoom?.id).length>0&&<optgroup label="Earlier rooms">{publicChannels.filter(c=>c.id!==teamRoom?.id).map(c=><option value={'room:'+c.id} key={c.id}>{c.name}</option>)}</optgroup>}{allDmChannels.filter(c=>{const id=parseDMChannel(c.name).find(id=>id!==currentUser.id);return !recipientProfiles.some(p=>p.id===id);}).length>0&&<optgroup label="Saved conversations">{allDmChannels.filter(c=>{const id=parseDMChannel(c.name).find(id=>id!==currentUser.id);return !recipientProfiles.some(p=>p.id===id);}).map(c=><option value={'room:'+c.id} key={c.id}>{getDMInfo(c).name}</option>)}</optgroup>}{partners.length>0&&<optgroup label="Partner conversations">{partners.map(p=><option key={p.id} value={'partner:'+p.id}>{p.company_name}</option>)}</optgroup>}</select><small>{messageDraft.status==='loading'?'Restoring draft...':messageDraft.status==='error'||messageDraft.status==='conflict'?'Draft not synced':messageDraft.dirty?'Saving draft...':message||stagedAttachment?'Draft saved':'Messages stay in their own conversation'}</small></label>;
+
 
   return (
-    <div className="flex h-full overflow-hidden bg-portal-dark">
-      {/* Mobile Sidebar Overlay */}
-      {isMobileSidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
-          onClick={() => setIsMobileSidebarOpen(false)}
-        />
-      )}
-
-      {/* Channels Sidebar */}
-      <div className={`
-        w-72 md:w-64 bg-portal-surface flex flex-col flex-shrink-0
-        fixed md:relative inset-y-0 left-0 z-50
-        transform transition-transform duration-300 ease-out
-        ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-      `}>
-        <div className="h-14 md:h-11 px-3 flex items-center justify-between border-b border-white/[0.07] flex-shrink-0 safe-area-inset-top">
-          <h2 className="font-bold text-white truncate text-base md:text-sm">Bright Forge</h2>
-          <div className="flex items-center gap-2 md:gap-1">
-            {currentUser.role === 'Owner' && (
-              <button onClick={() => setShowCreateChannel(true)} className="p-2 md:p-1 text-portal-text hover:text-white hover:bg-portal-surface2 rounded-lg md:rounded transition-colors active:bg-portal-surface2" title="New Channel">
-                <Plus className="w-5 h-5 md:w-4 md:h-4" />
-              </button>
-            )}
-            <button
-              onClick={() => setIsMobileSidebarOpen(false)}
-              className="md:hidden p-2 text-portal-text hover:text-white hover:bg-portal-surface2 rounded-lg transition-colors active:bg-portal-surface2"
-              title="Close"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        {showCreateChannel && (
-          <div className="p-2 bg-portal-surface2 border-b border-white/[0.07]">
-            <input
-              autoFocus
-              className="w-full text-xs p-1 rounded text-slate-900 bg-white outline-none mb-1"
-              placeholder="channel-name"
-              value={newChannelName}
-              onChange={e => setNewChannelName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleCreateChannel()}
-            />
-            <label className="flex items-center text-xs text-portal-soft mb-1 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isPrivateChannel}
-                onChange={e => setIsPrivateChannel(e.target.checked)}
-                className="mr-2"
-              />
-              Private channel (only invited members can access)
-            </label>
-            <div className="flex gap-1">
-              <button onClick={handleCreateChannel} className="flex-1 bg-green-600 text-white text-[10px] py-0.5 rounded">Create</button>
-              <button onClick={() => setShowCreateChannel(false)} className="flex-1 bg-slate-600 text-white text-[10px] py-0.5 rounded">Cancel</button>
-            </div>
-          </div>
-        )}
-
-        <div className="flex-1 overflow-y-auto custom-scrollbar py-2 space-y-3 min-h-0">
-
-          {/* Search */}
-          <div className="px-2">
-            <div className="flex items-center gap-2 px-2.5 py-1.5 bg-portal-surface2 rounded-lg border border-white/[0.05]">
-              <Search className="w-3.5 h-3.5 text-portal-soft flex-shrink-0" />
-              <input
-                type="text"
-                placeholder="Search…"
-                value={channelSearch}
-                onChange={e => setChannelSearch(e.target.value)}
-                className="flex-1 bg-transparent text-xs text-portal-text placeholder-portal-soft outline-none min-w-0"
-              />
-              {channelSearch && (
-                <button onClick={() => setChannelSearch('')} className="text-portal-soft hover:text-white">
-                  <X className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* AI Assistant Section */}
-          <div>
-            <div className="px-3 flex items-center justify-between text-portal-soft mb-1">
-              <span className="text-[10px] font-semibold uppercase tracking-wider">AI Assistant</span>
-            </div>
-            <ul>
-              {echoAIChannel ? (
-                <li
-                  key={echoAIChannel.id}
-                  onClick={() => selectChannel(echoAIChannel.id)}
-                  className={`px-3 py-2.5 md:py-2 flex items-center justify-between cursor-pointer mx-1.5 rounded-lg group active:opacity-80 ${activeChannelId === echoAIChannel.id ? 'bg-portal-accent text-white' : 'text-portal-soft hover:bg-portal-surface2'}`}
-                >
-                  <div className="flex items-center gap-2.5 md:gap-2 truncate">
-                    <div className="w-6 h-6 md:w-5 md:h-5 rounded-md bg-brand-500 flex items-center justify-center flex-shrink-0">
-                      <Bot className="w-3.5 h-3.5 text-white" />
-                    </div>
-                    <span className={`truncate text-sm font-medium ${echoAIChannel.unread ? 'text-white' : ''}`}>
-                      Echo AI
-                    </span>
-                  </div>
-                  {echoAIChannel.unread ? (
-                    <span className="ml-2 min-w-[18px] h-[18px] bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1 flex-shrink-0">
-                      {echoAIChannel.unread}
-                    </span>
-                  ) : null}
-                </li>
-              ) : (
-                <li
-                  onClick={handleStartEchoAI}
-                  className="px-3 py-2.5 md:py-2 flex items-center gap-2.5 md:gap-2 mx-1.5 rounded-lg text-portal-soft hover:bg-portal-surface2 cursor-pointer active:opacity-80"
-                >
-                  <div className="w-6 h-6 md:w-5 md:h-5 rounded-md bg-brand-500/30 flex items-center justify-center flex-shrink-0">
-                    <Bot className="w-3.5 h-3.5 text-brand-400" />
-                  </div>
-                  <span className="truncate text-sm">Start Echo AI Chat</span>
-                </li>
-              )}
-            </ul>
-          </div>
-
-          {/* Public Channels */}
-          <div>
-            <div className="px-3 flex items-center justify-between group text-portal-soft mb-1">
-              <span className="text-[10px] font-semibold uppercase tracking-wider">Channels</span>
-            </div>
-            <ul className="space-y-0.5">
-              {publicChannels
-                .filter(c => !channelSearch || c.name.toLowerCase().includes(channelSearch.toLowerCase()))
-                .map(channel => (
-                <li
-                  key={channel.id}
-                  onClick={() => selectChannel(channel.id)}
-                  className={`px-3 py-2.5 md:py-2 flex items-center justify-between cursor-pointer mx-1.5 rounded-lg group active:opacity-80 ${activeChannelId === channel.id ? 'bg-portal-accent text-white' : 'text-portal-soft hover:bg-portal-surface2'}`}
-                >
-                  <div className="flex items-center gap-2 md:gap-1.5 truncate min-w-0">
-                    {channel.is_private ? (
-                      <Lock className="w-3.5 h-3.5 flex-shrink-0 opacity-60" />
-                    ) : (
-                      <Hash className="w-3.5 h-3.5 flex-shrink-0 opacity-60" />
-                    )}
-                    <span className={`truncate text-sm ${channel.unread ? 'font-semibold text-white' : ''}`}>
-                      {channel.name}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1 flex-shrink-0 ml-1">
-                    {channel.unread ? (
-                      <span className="min-w-[18px] h-[18px] bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1">
-                        {channel.unread}
-                      </span>
-                    ) : null}
-                    {channel.is_private && channel.owner_id === currentUser.id && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setShowMembersModal(true); loadChannelMembers(channel.id); }}
-                        className="opacity-0 group-hover:opacity-100 text-portal-soft hover:text-blue-400 p-0.5"
-                        title="Manage members"
-                      >
-                        <UserPlus className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                    {currentUser.role === 'Owner' && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete #${channel.name} and all its messages?`)) handleDeleteChannel(channel.id); }}
-                        className="opacity-0 group-hover:opacity-100 text-portal-soft hover:text-red-400 p-0.5"
-                        title="Delete channel"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Direct Messages List */}
-          <div>
-            <div className="px-3 flex items-center justify-between group text-portal-soft mb-1">
-              <span className="text-[10px] font-semibold uppercase tracking-wider">Direct Messages</span>
-              <button onClick={refreshData} title="Refresh" className={`${isRefreshing ? 'animate-spin' : ''} hover:text-white p-0.5`}>
-                <RefreshCw className="w-2.5 h-2.5" />
-              </button>
-            </div>
-            <ul className="space-y-0.5">
-              {dmChannels
-                .filter(c => {
-                  if (!channelSearch) return true;
-                  const { name } = getDMInfo(c);
-                  return name.toLowerCase().includes(channelSearch.toLowerCase());
-                })
-                .map(channel => {
-                  const { name, avatar, isOnline } = getDMInfo(channel);
-                  return (
-                    <li
-                      key={channel.id}
-                      onClick={() => selectChannel(channel.id)}
-                      className={`px-3 py-2 md:py-1.5 flex items-center gap-2.5 md:gap-2 mx-1.5 rounded-lg group cursor-pointer active:opacity-80 ${activeChannelId === channel.id ? 'bg-portal-accent text-white' : 'text-portal-soft hover:bg-portal-surface2'}`}
-                    >
-                      <div className="relative w-6 h-6 flex-shrink-0">
-                        {avatar ? (
-                          <img src={avatar} alt="" className="w-6 h-6 rounded-full object-cover" />
-                        ) : (
-                          <div className="w-6 h-6 rounded-full bg-portal-dark flex items-center justify-center text-[10px] text-white font-bold">
-                            {name.charAt(0)}
-                          </div>
-                        )}
-                        {channel.unread ? (
-                          <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full border border-portal-surface" />
-                        ) : isOnline ? (
-                          <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full border border-portal-surface" />
-                        ) : null}
-                      </div>
-                      <span className={`truncate text-sm flex-1 ${channel.unread ? 'font-semibold text-white' : ''}`}>
-                        {name}
-                      </span>
-                      {channel.unread ? (
-                        <span className="min-w-[18px] h-[18px] bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1 flex-shrink-0">
-                          {channel.unread}
-                        </span>
-                      ) : null}
-                      <button
-                        onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete conversation with ${name}?`)) handleDeleteChannel(channel.id); }}
-                        className="opacity-0 group-hover:opacity-100 text-portal-soft hover:text-red-400 flex-shrink-0 p-0.5"
-                        title="Delete conversation"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </li>
-                  );
-                })}
-              {dmChannels.length === 0 && <li className="px-3 text-[10px] text-portal-soft italic py-1">No active chats</li>}
-            </ul>
-          </div>
-
-          {/* Partner Chats */}
-          {partners.length > 0 && (currentUser.role === 'Owner' || currentUser.role === 'Admin') && (
-            <div>
-              <div className="px-3 flex items-center justify-between group text-portal-soft mb-1">
-                <span className="text-[10px] font-semibold uppercase tracking-wider">Partner Chats</span>
-                <Users className="w-2.5 h-2.5 text-purple-400" />
-              </div>
-              <ul className="space-y-0.5">
-                {partners.map(partner => (
-                  <li
-                    key={partner.id}
-                    onClick={() => handleSelectPartner(partner.id)}
-                    className={`px-3 py-2 md:py-1.5 flex items-center gap-2.5 md:gap-2 mx-1.5 rounded-lg group cursor-pointer active:opacity-80 ${activePartnerId === partner.id ? 'bg-purple-600 text-white' : 'text-portal-soft hover:bg-portal-surface2'}`}
-                  >
-                    <div className="relative w-6 h-6 flex-shrink-0">
-                      {partner.avatar_url ? (
-                        <img src={partner.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
-                      ) : (
-                        <div className="w-6 h-6 rounded-full bg-purple-500 flex items-center justify-center text-[10px] text-white font-bold">
-                          {partner.company_name.charAt(0)}
-                        </div>
-                      )}
-                      {partner.unreadMessages > 0 && (
-                        <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full border border-portal-surface" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <span className={`truncate text-sm block ${partner.unreadMessages > 0 ? 'font-semibold text-white' : ''}`}>
-                        {partner.company_name}
-                      </span>
-                      <span className="text-[10px] text-portal-soft truncate block">{partner.full_name}</span>
-                    </div>
-                    {partner.unreadMessages > 0 && (
-                      <span className="min-w-[18px] h-[18px] bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1 flex-shrink-0">
-                        {partner.unreadMessages}
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Team — collapsible */}
-          <div>
-            <button
-              onClick={() => setIsTeamExpanded(prev => !prev)}
-              className="w-full px-3 flex items-center justify-between text-portal-soft mb-1 hover:text-portal-text transition-colors"
-            >
-              <span className="text-[10px] font-semibold uppercase tracking-wider">Team</span>
-              <div className="flex items-center gap-1">
-                <Users className="w-2.5 h-2.5" />
-                <ChevronDown className={`w-3 h-3 transition-transform duration-150 ${isTeamExpanded ? 'rotate-180' : ''}`} />
-              </div>
-            </button>
-            {isTeamExpanded && (
-              <ul className="space-y-0.5">
-                {profiles
-                  .filter(p => !channelSearch || (p.full_name || '').toLowerCase().includes(channelSearch.toLowerCase()))
-                  .map(p => (
-                  <li
-                    key={p.id}
-                    onClick={() => handleStartDM(p.id)}
-                    className="px-3 py-2 md:py-1.5 flex items-center gap-2.5 md:gap-2 mx-1.5 text-portal-soft hover:bg-portal-surface2 rounded-lg cursor-pointer transition-colors active:opacity-80"
-                  >
-                    <div className="relative w-6 h-6 flex-shrink-0">
-                      {p.avatar_url ? (
-                        <img src={p.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
-                      ) : (
-                        <div className="w-6 h-6 rounded-full bg-portal-dark flex items-center justify-center text-[10px] text-white font-bold">
-                          {p.full_name?.charAt(0) || '?'}
-                        </div>
-                      )}
-                      <div className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-portal-surface ${p.isOnline ? 'bg-green-500' : 'bg-slate-600'}`} />
-                    </div>
-                    <span className="truncate text-sm flex-1">
-                      {p.full_name || p.email?.split('@')[0] || 'Team Member'}
-                      {p.id === currentUser.id && <span className="ml-1 text-[10px] text-portal-soft">(You)</span>}
-                    </span>
-                    {p.isOnline && p.id !== currentUser.id && (
-                      <span className="text-[9px] text-green-400 flex-shrink-0">●</span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-        </div>
-      </div>
-
+    <div className="pp-team-chat flex h-full overflow-hidden bg-portal-dark">
       {/* Main Chat */}
       <div className="flex-1 flex flex-col min-w-0 bg-portal-surface h-full">
         {/* Partner Chat View */}
@@ -2468,34 +2163,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
           <>
             {/* Partner Chat Header */}
             <div className="h-14 md:h-16 border-b border-white/[0.07] flex items-center justify-between px-2 md:px-6 flex-shrink-0 bg-portal-dark safe-area-inset-top">
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <button
-                  onClick={() => setIsMobileSidebarOpen(true)}
-                  className="md:hidden p-2.5 hover:bg-portal-surface2 rounded-xl flex-shrink-0 active:bg-portal-surface2 transition-colors"
-                  title="Open menu"
-                  aria-label="Open channel list"
-                >
-                  <Menu className="w-6 h-6 text-portal-soft" />
-                </button>
-                {(() => {
-                  const activePartner = partners.find(p => p.id === activePartnerId);
-                  return activePartner ? (
-                    <div className="flex items-center gap-2">
-                      {activePartner.avatar_url ? (
-                        <img src={activePartner.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover" />
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-white font-bold text-sm">
-                          {activePartner.company_name.charAt(0)}
-                        </div>
-                      )}
-                      <div>
-                        <h3 className="font-bold text-white text-sm md:text-base">{activePartner.company_name}</h3>
-                        <p className="text-xs text-portal-soft">{activePartner.full_name} - Partner</p>
-                      </div>
-                    </div>
-                  ) : null;
-                })()}
-              </div>
+              <div className="pp-team-recipient-wrap">{recipientPicker}</div>
               <button
                 onClick={() => {
                   setActivePartnerId(null);
@@ -2577,45 +2245,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
         ) : (
         <>
         {/* Regular Channel Chat Header */}
-        <div className="h-14 md:h-16 border-b border-white/[0.07] flex items-center justify-between px-2 md:px-6 flex-shrink-0 bg-portal-surface safe-area-inset-top">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <button
-              onClick={() => setIsMobileSidebarOpen(true)}
-              className="md:hidden p-2.5 hover:bg-portal-surface2 rounded-xl flex-shrink-0 active:bg-portal-surface2 transition-colors"
-              title="Open menu"
-              aria-label="Open channel list"
-            >
-              <Menu className="w-6 h-6 text-portal-soft" />
-            </button>
-            {activeChannel?.type === 'dm' ? (
-              <div className="flex items-center gap-2">
-                {isEchoAIChannel(activeChannel) ? (
-                  <>
-                    <div className="w-6 h-6 rounded-full bg-brand-500 flex items-center justify-center">
-                      <Bot className="w-4 h-4 text-white" />
-                    </div>
-                    <h3 className="font-bold text-white truncate text-sm md:text-base">Echo AI</h3>
-                    <span className="hidden sm:inline px-2 py-0.5 bg-brand-100 text-brand-700 text-xs rounded-full font-medium">AI Assistant</span>
-                  </>
-                ) : getDMInfo(activeChannel!).avatar && getDMInfo(activeChannel!).avatar !== 'bot' ? (
-                  <>
-                    <img src={getDMInfo(activeChannel!).avatar!} alt="" className="w-6 h-6 rounded-full object-cover" />
-                    <h3 className="font-bold text-white truncate text-sm md:text-base">{getDMInfo(activeChannel!).name}</h3>
-                  </>
-                ) : (
-                  <>
-                    <UserIcon className="w-5 h-5 text-portal-soft" />
-                    <h3 className="font-bold text-white truncate text-sm md:text-base">{getDMInfo(activeChannel!).name}</h3>
-                  </>
-                )}
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 min-w-0">
-                <Hash className="w-4 h-4 md:w-5 md:h-5 text-portal-soft flex-shrink-0" />
-                <h3 className="font-bold text-white truncate text-sm md:text-base">{activeChannel?.name}</h3>
-              </div>
-            )}
-          </div>
+        <div data-chat-toolbar className="h-14 md:h-16 border-b border-white/[0.07] flex items-center justify-between px-2 md:px-6 flex-shrink-0 bg-portal-surface safe-area-inset-top">
+          <div className="pp-team-recipient-wrap">{recipientPicker}</div>
           <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
             {/* Pinned Messages Button */}
             {pinnedMessages.length > 0 && (
@@ -3401,6 +3032,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
 
             <textarea
               value={message}
+              disabled={!messageDraft.ready||!activeChannelId||!active}
               onChange={(e) => {
                 const value = e.target.value;
                 setMessage(value);
@@ -3574,7 +3206,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ currentUser, addToast, onNavigateTo
               </div>
               <button
                 onClick={handleSendMessage}
-                disabled={loading || (!message.trim() && !isUploading)}
+                disabled={!messageDraft.ready || loading || (!message.trim() && !isUploading)}
                 className="p-1.5 md:p-2 bg-green-700 text-white rounded-lg hover:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isUploading ? <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin" /> : <Send className="w-4 h-4 md:w-5 md:h-5" />}

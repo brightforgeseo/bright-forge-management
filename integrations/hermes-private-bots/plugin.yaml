@@ -1,0 +1,5 @@
+name: portal-private-bots
+version: 1.0.0
+description: Owner-isolated Portal bot commands in private Telegram chats
+provides_hooks:
+  - pre_gateway_dispatch

@@ -1,7 +1,8 @@
-import { getBridgeUrl } from '../lib/bridgeClient';
+import { supabase } from '../lib/supabaseClient';
 
-const BRIDGE_URL = getBridgeUrl();
-const BRIDGE_SECRET = 'brightforge-echo-bridge-2026';
+const PORTAL_ORIGIN = typeof window !== 'undefined' && window.location.protocol.startsWith('http') && !window.location.hostname.endsWith('vercel.app')
+  ? window.location.origin
+  : 'https://echo-ben.tailfdbc33.ts.net';
 
 export interface BusinessInboxAttachment {
   filename: string;
@@ -55,13 +56,16 @@ export interface SendBusinessEmailPayload {
 export type BusinessEmailAction = 'mark-read' | 'mark-unread' | 'archive' | 'delete';
 
 async function postBusinessInbox<T>(userId: string, payload: Record<string, any>): Promise<T> {
-  const res = await fetch(`${BRIDGE_URL}/business-inbox`, {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+  if (!token) throw new Error('Sign in again before opening Business Inbox');
+  const res = await fetch(`${PORTAL_ORIGIN}/api/business-inbox`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${BRIDGE_SECRET}`,
+      'Authorization': `Bearer ${token}`,
     },
-    body: JSON.stringify({ userId, ...payload }),
+    body: JSON.stringify(payload),
   });
 
   const data = await res.json().catch(() => ({}));

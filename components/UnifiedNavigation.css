@@ -1,0 +1,24 @@
+.portal-sidebar{background:#171d26!important;border-right:1px solid #303b4b;box-shadow:none!important}
+.portal-sidebar>div:first-child{padding-top:18px;padding-bottom:18px;min-height:82px}
+.portal-sidebar[data-collapsed=false]>div:first-child img{width:165px;height:54px;max-width:165px;max-height:54px;object-fit:cover;object-position:center}
+.portal-sidebar nav{scrollbar-width:thin;scrollbar-color:#465369 transparent;padding-top:18px}
+.portal-sidebar nav button{font-size:14px;letter-spacing:0}
+.portal-sidebar nav>button:first-child{min-height:42px;border-color:#3a4658;border-radius:9px}
+.portal-sidebar nav>button:first-child span{font-size:13px}
+.portal-sidebar nav button kbd{opacity:.45}
+.portal-sidebar nav button:hover kbd{opacity:.8}
+.unified-research-nav{margin-top:26px;padding-top:22px;border-top:1px solid #303b4b}
+.unified-research-nav h2{font-size:10px;line-height:1.6;font-weight:600;letter-spacing:1.2px;color:#94a4bb;padding:0 12px;margin:0 0 12px}
+.portal-sidebar .unified-group-toggle{display:flex;align-items:center;gap:10px;width:100%;min-height:42px;padding:10px 12px;border:0;border-radius:8px;background:transparent;color:#c2cddb;font-size:14px;text-align:left}
+.portal-sidebar .unified-group-toggle>svg:first-child{color:#f08354;flex-shrink:0}
+.portal-sidebar .unified-group-toggle>span{flex:1;font-weight:500}
+.portal-sidebar .unified-group-toggle>svg:last-child:not(:first-child){color:#8092ab;transition:transform .15s}
+.portal-sidebar .unified-group-toggle>svg.is-open{transform:rotate(180deg)}
+.portal-sidebar .unified-group-toggle:hover{background:#263141;color:#fff}
+.portal-sidebar .unified-group-toggle.is-current{color:#fff}
+.unified-tool-links{margin:3px 8px 10px 20px;padding:2px 0 2px 12px;border-left:1px solid #3c4a5e}
+.portal-sidebar .unified-tool-links button{display:block;width:100%;text-align:left;min-height:36px;padding:8px 10px;margin:2px 0;color:#aebcd0;font-size:13px;background:transparent;border:0;border-radius:7px;line-height:1.6}
+.portal-sidebar .unified-tool-links button:hover{background:#283649;color:#fff}
+.portal-sidebar .unified-tool-links button.is-current{color:#ffb18d;background:#f0622a19;font-weight:600;box-shadow:inset 2px 0 #f0622a}
+.portal-sidebar .unified-group-toggle:focus-visible,.portal-sidebar .unified-tool-links button:focus-visible{outline:2px solid #f08354;outline-offset:2px}
+@media(max-width:1023px){.portal-sidebar .unified-group-toggle{min-height:46px}.portal-sidebar .unified-tool-links button{min-height:42px;font-size:14px}.portal-sidebar nav{scrollbar-width:none}.portal-sidebar nav::-webkit-scrollbar{display:none}}

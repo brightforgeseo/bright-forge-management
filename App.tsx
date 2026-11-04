@@ -1,11 +1,19 @@
 
 import React, { useState, useEffect, useRef, useCallback, Suspense, lazy } from 'react';
-import Sidebar from './components/Sidebar';
+import PortalShell from './components/PortalShell';
+import {readRoute,saveRoute,viewFromHash}from'./lib/portalRoutes.mjs';
+import {hasPendingPush,consumeColdPush}from'./lib/portalPushRoute.mjs';
+const ViewActivity=(React as any).Activity;
+const HumanMessenger=lazy(()=>import('./components/Messenger'));
+const PortalResearch=lazy(()=>import('./components/PortalResearch'));
+const ClientPlatform=lazy(()=>import('./components/ClientPlatform'));
+const PortalHome=lazy(()=>import('./components/ClientPlatform').then(m=>({default:m.PortalHome})));
+const EchoDockConversations=lazy(()=>import('./components/EchoHub').then(m=>({default:m.EchoConversations})));
 import Dashboard from './components/Dashboard';
 import ToastContainer from './components/ToastContainer';
 import Login from './components/Login';
 import CommandPalette from './components/CommandPalette';
-import MobileTabBar from './components/MobileTabBar';
+
 
 // Heavy tools are code-split, then preloaded after login so navigation does not
 // show a spinner every time Ben moves between features.
@@ -19,7 +27,7 @@ const loadMyWork = () => import('./components/MyWork');
 const loadTeamChat = () => import('./components/TeamChat');
 const loadBusinessInbox = () => import('./components/BusinessInbox');
 const loadSettings = () => import('./components/Settings');
-const loadEchoWorkspaces = () => import('./components/EchoWorkspaces');
+const loadEchoWorkspaces = () => import('./components/EchoHub');
 
 const preloadViewChunks = () => {
   const priorityLoaders = [
@@ -66,12 +74,15 @@ import { ToolView, BrandingConfig, User, ToastNotification, ToastType, Profile }
 import { supabase, normalizeSupabaseAssetUrl } from './lib/supabaseClient';
 import { addToAllowlist, updateUserProfile, checkDueDateNotifications, fetchClientBoardSummaries, fetchProfiles } from './services/databaseService';
 import { isBenBusinessOsUser, isBusinessInboxUser } from './services/businessOsModel.mjs';
-import { listenForPushClicks } from './lib/pushNotifications';
+import { notificationLinkStorage, setNotificationLinkUser, decodeNotificationLinkData } from './lib/notificationLinkStorage.mjs';
+import { startNotificationSession } from './lib/notificationSession.mjs';
+import { disableWebPush, listenForPushClicks, setPushSession } from './lib/pushNotifications';
 import { Copy, X, UserPlus, Check, Mail, RefreshCw, AlertTriangle, MessageSquare } from 'lucide-react';
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [currentView, setCurrentView] = useState<ToolView>(ToolView.DASHBOARD);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [currentView, setCurrentView] = useState<ToolView>(() => ['privateBot','privateGoogleCallback','ordinaryArtifact'].some(key=>new URLSearchParams(window.location.search).has(key)) ? ToolView.ECHO_WORKSPACES : ToolView.DASHBOARD);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     try { return localStorage.getItem('sidebar-collapsed') === 'true'; } catch { return false; }
@@ -79,7 +90,7 @@ const App: React.FC = () => {
 
   // Command Palette
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
-  const [paletteClients, setPaletteClients] = useState<{ id: string; name: string }[]>([]);
+  const [paletteClients, setPaletteClients] = useState<{ id: string; name: string; db_id?:string }[]>([]);
   const [paletteProfiles, setPaletteProfiles] = useState<Profile[]>([]);
   const gKeyRef = useRef(false);
   const gKeyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -91,6 +102,12 @@ const App: React.FC = () => {
     id: 'guest', name: 'Guest', role: 'Visitor', initials: 'GU', email: ''
   });
 
+  const [requestedClient,setRequestedClient]=useState<{id:string;token:string}|null>(null);
+  const [visited,setVisited]=useState<{owner:string;views:ToolView[]}>({owner:'',views:[]});
+  const [dock,setDock]=useState({owner:'',mounted:false,visible:false});
+  const humanDraftRef=useRef<any>(null);
+  const openEchoDock=useCallback(()=>{window.dispatchEvent(new CustomEvent('portalMessengerMinimise',{detail:{ownerId:currentUser.id}}));setDock({owner:currentUser.id,mounted:true,visible:true});},[currentUser.id]);
+
   const canNavigateToView = useCallback((view: ToolView) => {
     if (!Object.values(ToolView).includes(view)) return false;
     if (view === ToolView.BUSINESS_OS) return isBenBusinessOsUser(currentUser.id);
@@ -99,8 +116,20 @@ const App: React.FC = () => {
   }, [currentUser.id]);
 
   const navigateToView = useCallback((view: ToolView) => {
-    setCurrentView(canNavigateToView(view) ? view : ToolView.DASHBOARD);
-  }, [canNavigateToView]);
+    const safe=canNavigateToView(view)?view:ToolView.DASHBOARD;
+    setCurrentView(safe);saveRoute(currentUser.id,safe);
+  }, [canNavigateToView,currentUser.id]);
+  const openClient=useCallback((id:string)=>{navigateToView(ToolView.CLIENTS);setRequestedClient({id,token:crypto.randomUUID()});},[navigateToView]);
+  useEffect(()=>{if(!isAuthenticated)return;setVisited(old=>old.owner===currentUser.id?{owner:old.owner,views:old.views.includes(currentView)?old.views:[...old.views,currentView]}:{owner:currentUser.id,views:[currentView]});},[currentView,currentUser.id,isAuthenticated]);
+  useEffect(()=>{const pop=()=>{const view=viewFromHash(location.hash) as ToolView;setCurrentView(canNavigateToView(view)?view:ToolView.DASHBOARD);};window.addEventListener('popstate',pop);return()=>window.removeEventListener('popstate',pop);},[canNavigateToView]);
+  useEffect(()=>{const echo=(event:Event)=>{if((event as CustomEvent).detail?.ownerId===currentUser.id)openEchoDock();};const client=(event:Event)=>{const detail=(event as CustomEvent).detail;if(detail?.ownerId===currentUser.id){const found=paletteClients.find((c:any)=>c.id===detail.clientId||c.db_id===detail.clientId);if(found)openClient((found as any).db_id||found.id);}};const human=(event:Event)=>{if((event as CustomEvent).detail?.ownerId===currentUser.id)setDock(old=>({...old,visible:false}));};window.addEventListener('portalHumanChatOpened',human);window.addEventListener('portalOpenEcho',echo);window.addEventListener('echoResearchDraft',echo);window.addEventListener('portalOpenClient',client);return()=>{window.removeEventListener('portalHumanChatOpened',human);window.removeEventListener('portalOpenEcho',echo);window.removeEventListener('echoResearchDraft',echo);window.removeEventListener('portalOpenClient',client);};},[currentUser.id,openEchoDock,openClient,paletteClients]);
+
+  const studioLandingRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isAuthenticated) { studioLandingRef.current = null; return; }
+    if(hasPendingPush(location.hash))return;
+    if(studioLandingRef.current!==currentUser.id){studioLandingRef.current=currentUser.id;const deep=['privateBot','ordinaryArtifact','privateGoogleCallback'].some(k=>new URLSearchParams(location.search).has(k));const restored=(deep?ToolView.ECHO_WORKSPACES:location.hash?viewFromHash(location.hash):readRoute(currentUser.id)) as ToolView;const safe=canNavigateToView(restored)?restored:ToolView.DASHBOARD;setCurrentView(safe);saveRoute(currentUser.id,safe,{replace:true,preserveNested:true});if(deep)openEchoDock();}
+  }, [isAuthenticated,currentUser.id,canNavigateToView,openEchoDock]);
 
   useEffect(() => {
     if (!Object.values(ToolView).includes(currentView) || !canNavigateToView(currentView)) {
@@ -115,33 +144,51 @@ const App: React.FC = () => {
      }
   };
 
+  const sessionIdentityRef = React.useRef<string | null>(null);
+  const sessionRevisionRef = React.useRef(0);
+  const [notificationWarning, setNotificationWarning] = useState(false);
+  const notificationSessionRef = React.useRef<ReturnType<typeof startNotificationSession> | null>(null);
   useEffect(() => {
-    const checkSession = async () => {
-      try {
-        // Clear any old master password sessions
-        localStorage.removeItem('bf_auth_override');
-        localStorage.removeItem('bf_auth_email');
-
-        const { data } = await supabase.auth.getSession();
-        if (data?.session?.user) {
-          handleUserSession(data.session.user.id, data.session.user.email, data.session.user.user_metadata?.full_name);
-        }
-      } catch (err) { console.warn("Session check failed", err); }
-    };
-    checkSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) handleUserSession(session.user.id, session.user.email, session.user.user_metadata?.full_name);
-      else setIsAuthenticated(false);
+    localStorage.removeItem('bf_auth_override');
+    localStorage.removeItem('bf_auth_email');
+    const lifecycle = startNotificationSession({
+      auth:supabase.auth, bind:setPushSession, cleanup:disableWebPush,
+      onNotificationError:() => setNotificationWarning(true),
+      onInvalidate:() => {
+        sessionRevisionRef.current++;
+        sessionIdentityRef.current = null;
+        setNotificationLinkUser(null);
+        if (userSessionDebounceRef.current) clearTimeout(userSessionDebounceRef.current);
+        try { if (typeof window.electronAPI?.clearNotifications === 'function') window.electronAPI.clearNotifications(); } catch { setNotificationWarning(true); }
+        setIsAuthenticated(false);
+        setCurrentView(ToolView.DASHBOARD);
+        setPaletteClients([]); setPaletteProfiles([]); setToasts([]);
+        for (const key of ['openTaskModal','openChatNotification','openMyWorkTask']) localStorage.removeItem(key);
+      },
+      onSession:(session:any) => {
+        sessionIdentityRef.current = session.user.id;
+        setNotificationLinkUser(session.user.id);
+        handleUserSession(session.user.id,session.user.email,session.user.user_metadata?.full_name);
+      }
     });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []); // Empty dependency - subscription should only be set up once on mount
+    notificationSessionRef.current = lifecycle;
+    void lifecycle.check();
+    const check = () => { void lifecycle.check(); };
+    window.addEventListener('focus',check);
+    navigator.serviceWorker?.addEventListener('controllerchange',check);
+    return () => { lifecycle.stop();window.removeEventListener('focus',check);navigator.serviceWorker?.removeEventListener('controllerchange',check); };
+  }, []);
 
   const handleUserSession = async (uid: string, email: string | undefined, fullName?: string) => {
-    if (!email) return;
+    if (!email || sessionIdentityRef.current !== uid) return;
+    const revision = sessionRevisionRef.current;
+    // Authentication is already verified by GoTrue. Profile display enrichment
+    // is optional and must not strand a valid login behind a slow REST request.
+    const initialName = fullName || email.split('@')[0];
+    setCurrentUser(previous => previous.id === uid ? previous : {
+      id:uid, name:initialName, role:'Team Member', initials:initialName.substring(0,2).toUpperCase(), email
+    });
+    setIsAuthenticated(true);
 
     // Debounce to prevent multiple rapid calls
     if (userSessionDebounceRef.current) {
@@ -189,6 +236,7 @@ const App: React.FC = () => {
         console.error('[App] Error fetching user data:', e);
     }
 
+    if (sessionIdentityRef.current !== uid || sessionRevisionRef.current !== revision) return;
     setCurrentUser({ id: uid, name, role, initials: name.substring(0, 2).toUpperCase(), email, avatarUrl });
     setIsAuthenticated(true);
 
@@ -208,10 +256,29 @@ const App: React.FC = () => {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    setIsLoggingOut(true);
+    try {
+    notificationSessionRef.current?.pause();
+    setIsAuthenticated(false);
+    try { if (typeof window.electronAPI?.clearNotifications === 'function') window.electronAPI.clearNotifications(); } catch { setNotificationWarning(true); }
+    sessionIdentityRef.current = null;
+    if (userSessionDebounceRef.current) clearTimeout(userSessionDebounceRef.current);
+    const [cleanup, {error}] = await Promise.all([disableWebPush(), supabase.auth.signOut()]);
+
+    if (error) { addToast('error','Sign out could not be confirmed. Please retry.'); return; }
+    if (!cleanup.ok) {
+      setNotificationWarning(true);
+      addToast('error','Signed out, but device cleanup was incomplete. Check notification settings before sharing this device.');
+    }
     setIsAuthenticated(false);
     localStorage.removeItem('bf_auth_override');
     localStorage.removeItem('bf_auth_email');
+    } catch {
+      addToast('error','Sign out could not be confirmed. Please retry.');
+    } finally {
+      notificationSessionRef.current?.resume();
+      setIsLoggingOut(false);
+    }
   };
 
   const [branding, setBranding] = useState<BrandingConfig>(() => {
@@ -224,37 +291,45 @@ const App: React.FC = () => {
   // Handle web-push notification clicks: route to the right view + replay the deep-link
   // events that the Sidebar click flow already wires up.
   const applyPushDeepLink = React.useCallback((linkView: string, linkData: any) => {
+    linkData = decodeNotificationLinkData(linkData);
     if (!linkView) return;
     const view = linkView as ToolView;
     if (!canNavigateToView(view)) return;
     navigateToView(view);
     if (linkView === 'TASKS' && linkData?.taskId) {
-      try { localStorage.setItem('openTaskModal', JSON.stringify(linkData)); } catch {}
+      try { notificationLinkStorage.setItem('openTaskModal', JSON.stringify(linkData)); } catch {}
       window.dispatchEvent(new CustomEvent('openTaskModal', { detail: linkData }));
     } else if (linkView === 'TEAM_CHAT' && linkData?.channelId) {
-      try { localStorage.setItem('openChatNotification', JSON.stringify(linkData)); } catch {}
+      try { notificationLinkStorage.setItem('openChatNotification', JSON.stringify(linkData)); } catch {}
       window.dispatchEvent(new CustomEvent('openChatNotification', { detail: linkData }));
     } else if (linkView === 'MY_WORK' && linkData?.taskId) {
-      try { localStorage.setItem('openMyWorkTask', JSON.stringify(linkData)); } catch {}
+      try { notificationLinkStorage.setItem('openMyWorkTask', JSON.stringify(linkData)); } catch {}
       window.dispatchEvent(new CustomEvent('openMyWorkTask', { detail: linkData }));
     }
   }, [canNavigateToView, navigateToView]);
 
-  // 1) Cold-start: SW writes deep-link to URL hash when opening a new tab from a push.
+  // Native clicks share the in-app destination, but never cross account boundaries.
+  useEffect(() => {
+    const bridge = window.electronAPI;
+    if (typeof bridge?.onNotificationClick !== 'function') return;
+    const unsubscribe = bridge.onNotificationClick((destination) => {
+      if (!isAuthenticated || sessionIdentityRef.current !== currentUser.id || destination?.userId !== currentUser.id || !destination.linkView) return;
+      applyPushDeepLink(destination.linkView, destination.linkData);
+    });
+    return typeof unsubscribe === 'function' ? unsubscribe : undefined;
+  }, [isAuthenticated, currentUser.id, applyPushDeepLink]);
+
+  // Cold-start URLs must survive the initial unauthenticated render.
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const hash = window.location.hash;
-    const idx = hash.indexOf('push=');
-    if (idx === -1) return;
-    try {
-      const raw = decodeURIComponent(hash.slice(idx + 5));
-      const { linkView, linkData } = JSON.parse(raw);
-      applyPushDeepLink(linkView, linkData);
-      history.replaceState(null, '', window.location.pathname + window.location.search);
-    } catch (e) {
-      console.error('[App] Failed to parse push hash:', e);
-    }
-  }, [applyPushDeepLink]);
+    if (!isAuthenticated) return;
+    const hash=window.location.hash;
+    if(!hasPendingPush(hash))return;
+    studioLandingRef.current=currentUser.id;
+    consumeColdPush({hash,owner:currentUser.id,canAccess:canNavigateToView,
+      clear:()=>history.replaceState(null,'',window.location.pathname+window.location.search),
+      apply:applyPushDeepLink,fallback:()=>navigateToView(ToolView.DASHBOARD)});
+  }, [isAuthenticated,currentUser.id,applyPushDeepLink,canNavigateToView,navigateToView]);
 
   // 2) Warm-tab: SW posts a message when the user clicks a push and we already had a tab open.
   useEffect(() => {
@@ -263,13 +338,17 @@ const App: React.FC = () => {
       if (idx === -1) return;
       try {
         const raw = decodeURIComponent(url.slice(idx + 5));
-        const { linkView, linkData } = JSON.parse(raw);
-        applyPushDeepLink(linkView, linkData);
+        const { recipientId, linkView, linkData } = JSON.parse(raw);
+        if (!isAuthenticated) {
+          history.replaceState(null,'',window.location.pathname+window.location.search+'#push='+encodeURIComponent(JSON.stringify({recipientId,linkView,linkData})));
+          return;
+        }
+        if (recipientId === currentUser.id) applyPushDeepLink(linkView, linkData);
       } catch (e) {
         console.error('[App] Failed to parse push-click message:', e);
       }
     });
-  }, [applyPushDeepLink]);
+  }, [isAuthenticated, currentUser.id, applyPushDeepLink]);
 
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
   const userSessionDebounceRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -280,7 +359,7 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!isAuthenticated) return;
     fetchClientBoardSummaries().then(boards => {
-      setPaletteClients(boards.map(b => ({ id: b.id, name: b.name })));
+      setPaletteClients(boards.map(b => ({ id: b.id, name: b.name, db_id:b.db_id })));
     }).catch(() => {});
     fetchProfiles().then(setPaletteProfiles).catch(() => {});
   }, [isAuthenticated]);
@@ -433,9 +512,11 @@ ${currentUser.name}`;
     return `mailto:${inviteForm.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
 
-  const renderContent = () => {
+  const renderContent = (targetView:ToolView=currentView) => {
     const view = (() => {
-      switch (currentView) {
+      switch (targetView) {
+        case ToolView.CLIENTS:return <ClientPlatform currentUser={currentUser} addToast={addToast} onNavigate={navigateToView} initialClientId={requestedClient?.id} initialRequestToken={requestedClient?.token}/>;
+        case ToolView.OPERATIONS:return <Dashboard currentUser={currentUser} setCurrentView={navigateToView}/>;
         case ToolView.BUSINESS_OS: return isBenBusinessOsUser(currentUser.id)
           ? <BusinessOS currentUser={currentUser} setCurrentView={navigateToView} />
           : <Dashboard currentUser={currentUser} setCurrentView={navigateToView} />;
@@ -445,41 +526,35 @@ ${currentUser.name}`;
         case ToolView.QA_CHECKER: return <QAChecker />;
         case ToolView.TASKS: return <TaskBoard currentUser={currentUser} addToast={addToast} />;
         case ToolView.MY_WORK: return <MyWork currentUser={currentUser} addToast={addToast} onNavigateToTasks={() => navigateToView(ToolView.TASKS)} />;
-        case ToolView.TEAM_CHAT: return <TeamChat currentUser={currentUser} addToast={addToast} onNavigateToTask={() => navigateToView(ToolView.TASKS)} />;
+        case ToolView.TEAM_CHAT: return null;
         case ToolView.BUSINESS_INBOX: return <BusinessInbox currentUser={currentUser} addToast={addToast} />;
-        case ToolView.ECHO_WORKSPACES: return <EchoWorkspaces currentUser={currentUser} addToast={addToast} />;
+        case ToolView.ECHO_WORKSPACES: return <PortalResearch key={currentUser.id} currentUser={currentUser} addToast={addToast}/>;
         case ToolView.SETTINGS: return <Settings branding={branding} setBranding={setBranding} addToast={addToast} currentUser={currentUser} />;
-        default: return <Dashboard currentUser={currentUser} setCurrentView={navigateToView} />;
+        default: return <PortalHome currentUser={currentUser} onNavigate={navigateToView} onOpenClient={openClient}/>;
       }
     })();
     return <Suspense fallback={<ViewFallback />}>{view}</Suspense>;
   };
 
-  if (!isAuthenticated) return <Login onLogin={(email) => {
-      // For legacy/fallback login, we might not have the UUID immediately available here
-      // The useEffect will catch the session change and update the ID correctly
-      // We just trigger a temporary state update here
-      if(localStorage.getItem('bf_auth_override')) {
-         handleUserSession('master-override-id', email);
-      }
-  }} branding={branding} />;
+  if (isLoggingOut) return <div role="status" className="min-h-screen flex items-center justify-center">Signing out and clearing this device…</div>;
+  if (!isAuthenticated) return <><Login onLogin={() => { void notificationSessionRef.current?.check(); }} branding={branding} />{notificationWarning && <div role="alert" className="fixed bottom-4 right-4 z-[100] max-w-md rounded-xl bg-amber-950 p-4 text-sm text-amber-100">A device notification check failed. Do not share this device until notification cleanup is confirmed. This is separate from checking your password.</div>}</>;
 
+  const visibleViews=Array.from(new Set<ToolView>([...(visited.owner===currentUser.id?visited.views:[]),currentView])).filter(canNavigateToView);
   const isFullHeight = currentView === ToolView.TASKS || currentView === ToolView.TEAM_CHAT || currentView === ToolView.BUSINESS_INBOX || currentView === ToolView.ECHO_WORKSPACES;
 
   return (
-    <div className="portal-calm flex h-screen bg-portal-dark overflow-hidden font-sans text-white">
-      <Sidebar
-        currentView={currentView}
-        onChangeView={navigateToView}
-        branding={branding}
-        currentUser={currentUser}
-        onLogout={handleLogout}
-        onInvite={() => { generatePassword(); setShowInviteModal(true); }}
-        onOpenPalette={() => setIsPaletteOpen(true)}
-        isMobileMenuOpen={isMobileMenuOpen}
-        setIsMobileMenuOpen={setIsMobileMenuOpen}
-      />
-
+    <div className="portal-calm h-screen overflow-hidden font-sans">
+      {notificationWarning && <div role="alert" className="fixed bottom-4 right-4 z-[100] max-w-md rounded-xl bg-amber-950 p-4 text-sm text-amber-100 shadow-lg">Signed in. A background notification check failed. Background alerts must not be relied on. Do not share this device until notification cleanup is confirmed.</div>}
+      <PortalShell key={currentUser.id} currentUser={currentUser} branding={branding} view={currentView} onNavigate={navigateToView} canAccess={canNavigateToView} onSearch={()=>setIsPaletteOpen(true)} onEcho={openEchoDock} onLogout={handleLogout} onInvite={()=>{generatePassword();setShowInviteModal(true);}}>
+        <main className="pp-content" key={currentUser.id+':'+sessionRevisionRef.current}>
+          {visibleViews.map(view=><ViewActivity key={currentUser.id+':'+view} mode={view===currentView?'visible':'hidden'}><section className="pp-visited-page" data-view={view} hidden={view!==currentView}>
+            {[ToolView.OPERATIONS,ToolView.TASKS,ToolView.MY_WORK,ToolView.BUSINESS_INBOX].includes(view)?<><nav className="pp-work-tabs" aria-label="Work pages">{[{id:ToolView.OPERATIONS,label:'Overview'},{id:ToolView.TASKS,label:'Client tasks'},{id:ToolView.MY_WORK,label:'My tasks'},{id:ToolView.BUSINESS_INBOX,label:'Inbox'}].filter(item=>canNavigateToView(item.id)).map(item=><button key={item.id} className={item.id===view?'is-active':''} onClick={()=>navigateToView(item.id)}>{item.label}</button>)}</nav><div className="pp-work-frame">{renderContent(view)}</div></>:renderContent(view)}
+          </section></ViewActivity>)}
+        </main>
+        <Suspense fallback={null}><HumanMessenger key={currentUser.id} currentUser={currentUser} view={currentView} addToast={addToast} onNavigate={navigateToView} draftRef={humanDraftRef}/></Suspense>
+        {dock.owner===currentUser.id&&dock.mounted&&<section className="pp-echo-dock" hidden={!dock.visible} aria-label="Echo conversation"><header><strong>Echo</strong><button aria-label="Close Echo" onClick={()=>setDock(old=>({...old,visible:false}))}><X size={18}/></button></header><div><Suspense fallback={<ViewFallback/>}><EchoDockConversations key={currentUser.id} currentUser={currentUser} addToast={addToast}/></Suspense></div></section>}
+        {!(dock.owner===currentUser.id&&dock.visible)&&<button className="pp-echo-toggle" onClick={openEchoDock}><MessageSquare size={19}/>Ask Echo</button>}
+      </PortalShell>
       <CommandPalette
         isOpen={isPaletteOpen}
         onClose={() => setIsPaletteOpen(false)}
@@ -489,40 +564,6 @@ ${currentUser.name}`;
         profiles={paletteProfiles}
       />
 
-      <MobileTabBar
-        currentView={currentView}
-        onOpenMenu={() => setIsMobileMenuOpen(true)}
-        onNavigate={(view) => { navigateToView(view); setIsMobileMenuOpen(false); }}
-      />
-
-      {/* Mobile Header - Hidden on TeamChat which has its own header */}
-      {currentView !== ToolView.TEAM_CHAT && (
-      <div className="portal-mobile-header lg:hidden fixed top-0 left-0 right-0 h-14 bg-portal-surface border-b border-white/[0.07] z-30 flex items-center justify-between px-3 safe-area-inset-top">
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          <button
-            onClick={() => setIsMobileMenuOpen(true)}
-            className="p-2.5 hover:bg-portal-surface2 rounded-xl transition-colors active:bg-portal-surface2 flex-shrink-0"
-            aria-label="Open menu"
-          >
-            <svg className="w-6 h-6 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-8 h-8 bg-gradient-to-br from-brand-500 to-brand-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
-              <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-              </svg>
-            </div>
-            <span className="font-bold text-white truncate text-sm">{branding.companyName}</span>
-          </div>
-        </div>
-      </div>
-      )}
-
-      <main className={`portal-mobile-main min-w-0 flex-1 ${isSidebarCollapsed ? 'lg:ml-[60px]' : 'lg:ml-64'} h-full overflow-hidden relative transition-all duration-200 ${isFullHeight ? '' : 'bg-portal-dark'} ${currentView === ToolView.TEAM_CHAT ? '' : 'portal-with-header'} lg:pt-0 pb-16 lg:pb-0`}>
-        {isFullHeight ? renderContent() : <ScrollablePageWrapper>{renderContent()}</ScrollablePageWrapper>}
-      </main>
       <ToastContainer toasts={toasts} removeToast={removeToast} />
 
       {showInviteModal && (

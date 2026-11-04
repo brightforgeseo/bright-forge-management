@@ -1,7 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { KeywordResult, KeywordResearchOptions, AuditOptions, AuditResult, AuditIssue, ContentResult, Task, QACorrection } from "../types";
 import { generateLittleEchoContent } from "./littleEchoService";
-import { getBridgeUrl } from "../lib/bridgeClient";
+import { runEchoJob } from "../lib/echoQueueClient";
 
 const getAiClient = () => {
   let apiKey;
@@ -16,8 +16,6 @@ const getAiClient = () => {
   return new GoogleGenAI({ apiKey: apiKey || 'dummy_key_to_prevent_init_crash' });
 };
 
-const ECHO_BRIDGE_URL = getBridgeUrl();
-const ECHO_BRIDGE_SECRET = String.fromCharCode(98,114,105,103,104,116,102,111,114,103,101,45,101,99,104,111,45,98,114,105,100,103,101,45,50,48,50,54);
 
 function normaliseKeywordResults(raw: unknown): KeywordResult[] {
   if (!Array.isArray(raw)) return [];
@@ -67,27 +65,19 @@ function normaliseKeywordResults(raw: unknown): KeywordResult[] {
 }
 
 export const generateKeywords = async (seedKeyword: string, options: KeywordResearchOptions = {}): Promise<KeywordResult[]> => {
-  // Primary path: ChatGPT via Hermes bridge, with SE Ranking MCP tools available server-side.
+  // Primary path: authenticated durable Echo queue, with Hermes tools available server-side.
   // Keeps the old keyword-result shape while allowing richer SEO fields for the upgraded UI.
   try {
-    const res = await fetch(`${ECHO_BRIDGE_URL}/keywords`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${ECHO_BRIDGE_SECRET}`,
-      },
-      body: JSON.stringify({ seedKeyword, ...options }),
-      signal: AbortSignal.timeout(180_000),
+    const raw = await runEchoJob({
+      kind: 'keywords',
+      message: `Research SEO keyword opportunities for ${JSON.stringify(seedKeyword)} using these options: ${JSON.stringify(options)}. Return only a valid JSON array of keyword objects with keyword, searchVolume, difficulty, competition, trend, intent, cpc, opportunityScore, serpFeatures, cluster, recommendedUse, priority, reason and contentAngle.`,
     });
-
-    if (!res.ok) throw new Error(`Keyword bridge error ${res.status}: ${await res.text()}`);
-
-    const data = await res.json();
+    const data = JSON.parse(raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, ''));
     const results = normaliseKeywordResults(data.keywords || data);
     if (results.length > 0) return results;
-    throw new Error('Keyword bridge returned no usable keywords');
-  } catch (bridgeError) {
-    console.warn("ChatGPT keyword research failed, falling back to Gemini:", bridgeError);
+    throw new Error('Echo queue returned no usable keywords');
+  } catch (queueError) {
+    console.warn("Echo keyword research failed, falling back to Gemini:", queueError);
   }
 
   const ai = getAiClient();
@@ -208,7 +198,7 @@ function normaliseAuditResult(raw: any, options: AuditOptions = {}): AuditResult
       priority: Number.isFinite(Number(issue?.priority)) ? Number(issue.priority) : index + 1,
       evidence: String(issue?.evidence || '').trim(),
     }))
-    .filter((issue) => issue.message && issue.recommendation)
+    .filter((issue:{message:string;recommendation:string}) => issue.message && issue.recommendation)
     .slice(0, 12);
 
   const score = Math.max(0, Math.min(100, Number(raw?.score ?? raw?.seoScore ?? 50)));
@@ -239,21 +229,14 @@ export const analyzeText = async (text: string, options: AuditOptions = {}): Pro
   };
 
   try {
-    const res = await fetch(`${ECHO_BRIDGE_URL}/audit`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${ECHO_BRIDGE_SECRET}`,
-      },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(180_000),
+    const raw = await runEchoJob({
+      kind: 'audit',
+      message: `Run a senior SEO audit using this payload: ${JSON.stringify(payload)}. Return only valid JSON with summary, score, issues, strengths, competitors, nextActions and metadata.`,
     });
-
-    if (!res.ok) throw new Error(`Audit bridge error ${res.status}: ${await res.text()}`);
-    const data = await res.json();
+    const data = JSON.parse(raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, ''));
     return normaliseAuditResult(data.audit || data, options);
-  } catch (bridgeError) {
-    console.warn("Hermes audit bridge failed, falling back to Gemini:", bridgeError);
+  } catch (queueError) {
+    console.warn("Hermes audit queue failed, falling back to Gemini:", queueError);
   }
 
   const ai = getAiClient();
@@ -357,27 +340,12 @@ async function callEchoBridge(
   executingUser: { id: string; name: string },
   model: string = 'auto'
 ): Promise<string> {
-  const res = await fetch(`${ECHO_BRIDGE_URL}/chat`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${ECHO_BRIDGE_SECRET}`,
-    },
-    body: JSON.stringify({
-      history,
-      message,
-      userId: executingUser.id,
-      userName: executingUser.name,
-      model
-    }),
-    signal: AbortSignal.timeout(120_000),
+  return runEchoJob({
+    kind: 'chat',
+    message,
+    sessionKey: `${executingUser.id}:${model}`,
+    history: history ? [{ role: 'user', content: history }] : [],
   });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Bridge error ${res.status}: ${err}`);
-  }
-  const data = await res.json();
-  return data.response || '';
 }
 
 export const getChatResponse = async (
@@ -389,8 +357,8 @@ export const getChatResponse = async (
   try {
     return await callEchoBridge(history, message, bridgeUser);
   } catch (bridgeError) {
-    console.error("Chat response failed: Echo bridge unavailable", bridgeError);
-    throw new Error("Echo bridge unavailable. Start the local Hermes bridge rather than using paid/browser-side AI fallback.");
+    console.error("Chat response failed: Echo queue unavailable", bridgeError);
+    throw new Error("Echo queue unavailable. Please try again shortly.");
   }
 };
 

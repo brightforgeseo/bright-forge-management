@@ -1,83 +1,67 @@
-// Bright Forge Portal — service worker for web push notifications.
-// Minimal & focused: receive push events, show notifications, route clicks back into the app.
-
-const SW_VERSION = 'bf-sw-v1.0.293';
-
-self.addEventListener('install', (event) => {
-  // Activate immediately on first install
-  self.skipWaiting();
-});
-
-self.addEventListener('activate', (event) => {
-  // Take control of any open clients without waiting for reload
-  event.waitUntil(self.clients.claim());
-});
-
-// Push payload contract from the send-push edge function:
-// { title: string, body: string, icon?: string, tag?: string, url?: string, linkView?: string, linkData?: object }
-self.addEventListener('push', (event) => {
-  let data = {};
+// Recipient binding is a privacy guard, not resource authorisation.
+// The backend must send recipientId and authorise every linked resource.
+const SW_VERSION = 'bf-sw-recipient-v3';
+const STATE = 'bf-push-session-v2';
+const KEY = '/__push_session__';
+const GATE = '/__push_delivery_gate__';
+let serial = Promise.resolve();
+const enqueue = work => { const result=serial.then(work); serial=result.catch(()=>{}); return result; };
+async function binding() {
   try {
-    data = event.data ? event.data.json() : {};
-  } catch (e) {
-    // Fallback if the payload isn't JSON
-    data = { title: 'Bright Forge', body: event.data ? event.data.text() : '' };
-  }
-
-  const title = data.title || 'Bright Forge';
-  const options = {
-    body: data.body || '',
-    icon: data.icon || '/favicon.png',
-    badge: '/favicon.png',
-    tag: data.tag || undefined,           // collapses repeats with the same tag
-    renotify: !!data.tag,                 // still vibrate/sound on repeat tags
-    requireInteraction: false,
-    data: {
-      url: data.url || '/',
-      linkView: data.linkView || null,
-      linkData: data.linkData || null
-    }
-  };
-
-  event.waitUntil(self.registration.showNotification(title, options));
+    const cache=await caches.open(STATE);
+    const value=await cache.match(KEY), gateValue=await cache.match(GATE);
+    if (!value || !gateValue) return null;
+    const session=await value.json(), gate=await gateValue.json();
+    return session.protocol===3 && gate.enabled===true && gate.requestId===session.requestId ? session : null;
+  } catch { return null; }
+}
+const matches = (session, recipientId) => typeof recipientId==='string' && !!recipientId && session?.recipientId===recipientId && session.expiresAt>Date.now();
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', event => event.waitUntil(self.clients.claim()));
+self.addEventListener('push', event => {
+  event.waitUntil(enqueue(async()=>{
+    let data;try { data=event.data.json(); } catch { return; }
+    if (!matches(await binding(),data.recipientId)) return;
+    await self.registration.showNotification(data.title || 'Bright Forge', {
+      body:data.body || '', icon:'/favicon.png', badge:'/favicon.png',
+      tag:data.tag ? `${data.recipientId}:${data.tag}` : undefined,
+      renotify:false, requireInteraction:false,
+      data:{recipientId:data.recipientId,linkView:data.linkView || null,linkData:data.linkData || null}
+    });
+  }));
 });
-
-// When the user clicks the notification: focus an existing tab if we have one,
-// otherwise open a new one. Pass deep-link data via URL hash so the app can route on load.
-self.addEventListener('notificationclick', (event) => {
+self.addEventListener('notificationclick', event => {
   event.notification.close();
-
-  const targetUrl = (() => {
-    const base = (event.notification.data && event.notification.data.url) || '/';
-    const linkView = event.notification.data && event.notification.data.linkView;
-    const linkData = event.notification.data && event.notification.data.linkData;
-    if (!linkView) return base;
-    const payload = encodeURIComponent(JSON.stringify({ linkView, linkData }));
-    const sep = base.includes('#') ? '&' : '#';
-    return `${base}${sep}push=${payload}`;
-  })();
-
-  event.waitUntil((async () => {
-    const allClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    // Try to focus an already-open window first
-    for (const client of allClients) {
+  event.waitUntil(enqueue(async()=>{
+    const data=event.notification.data;
+    if (!matches(await binding(),data?.recipientId)) return;
+    // Destinations are application view data only, never arbitrary URLs.
+    const targetUrl='/#push='+encodeURIComponent(JSON.stringify({recipientId:data.recipientId,linkView:data.linkView,linkData:data.linkData}));
+    for (const client of await self.clients.matchAll({type:'window',includeUncontrolled:true})) {
       if ('focus' in client) {
-        try {
-          await client.focus();
-          // Send a message so the app can route in-tab without a full reload
-          client.postMessage({ type: 'push-click', url: targetUrl });
-          return;
-        } catch {}
+        try { await client.focus();client.postMessage({type:'push-click',url:targetUrl});return; } catch {}
       }
     }
-    // Otherwise open a new window
-    if (self.clients.openWindow) {
-      await self.clients.openWindow(targetUrl);
-    }
-  })());
+    if (self.clients.openWindow) await self.clients.openWindow(targetUrl);
+  }));
 });
-
-// Allow the page to ask the SW to update on demand
-self.addEventListener('message', (event) => {
-  if (event.data === 'skipWaiting') self.skipWaiting();
+self.addEventListener('message', event => {
+  if (event.data==='skipWaiting') {self.skipWaiting();return;}
+  if (event.data?.type!=='push-session') return;
+  event.waitUntil(enqueue(async()=>{
+    try {
+      const client=event.source;
+      if (!client?.url || new URL(client.url).origin!==self.location.origin) throw new Error('Invalid source');
+      const cache=await caches.open(STATE);
+      const previous=await binding();
+      const {recipientId,expiresAt,requestId,protocol}=event.data;
+      const valid=protocol===3 && typeof requestId==='string' && typeof recipientId==='string' && recipientId && Number.isFinite(expiresAt) && expiresAt>Date.now();
+      if (!valid || previous?.recipientId!==recipientId) {
+        for (const notification of await self.registration.getNotifications()) notification.close();
+      }
+      if (valid) await cache.put(KEY,new Response(JSON.stringify({recipientId,expiresAt,requestId,protocol})));
+      else await cache.delete(KEY);
+      event.ports?.[0]?.postMessage({ok:true,protocol:3});
+    } catch {event.ports?.[0]?.postMessage({ok:false});}
+  }));
 });

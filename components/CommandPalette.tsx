@@ -23,12 +23,14 @@ interface Props {
   onClose: () => void;
   onNavigate: (view: ToolView) => void;
   currentUser: UserType;
-  clients?: { id: string; name: string }[];
+  clients?: { id: string; name: string; db_id?:string }[];
   profiles?: Profile[];
 }
 
 const VIEW_ICONS: Record<ToolView, React.ReactNode> = {
   [ToolView.DASHBOARD]:          <LayoutDashboard size={16} />,
+  [ToolView.CLIENTS]: <Hash size={16}/>,
+  [ToolView.OPERATIONS]: <BarChart size={16}/>,
   [ToolView.BUSINESS_OS]:        <Command size={16} />,
   [ToolView.KEYWORD_RESEARCH]:   <Search size={16} />,
   [ToolView.CONTENT_GENERATOR]:  <PenTool size={16} />,
@@ -43,7 +45,9 @@ const VIEW_ICONS: Record<ToolView, React.ReactNode> = {
 };
 
 const VIEW_LABELS: Record<ToolView, string> = {
-  [ToolView.DASHBOARD]:          'Dashboard',
+  [ToolView.DASHBOARD]:          'Home',
+  [ToolView.CLIENTS]:'Client workspaces',
+  [ToolView.OPERATIONS]:'Delivery overview',
   [ToolView.BUSINESS_OS]:        'Business OS',
   [ToolView.KEYWORD_RESEARCH]:   'Keyword Research',
   [ToolView.CONTENT_GENERATOR]:  'Content Generator',
@@ -53,7 +57,7 @@ const VIEW_LABELS: Record<ToolView, string> = {
   [ToolView.MY_WORK]:            'My Work',
   [ToolView.TEAM_CHAT]:          'Team Chat',
   [ToolView.BUSINESS_INBOX]:     'Business Inbox',
-  [ToolView.ECHO_WORKSPACES]:    'Echo Workspaces',
+  [ToolView.ECHO_WORKSPACES]:    'SEO research',
   [ToolView.SETTINGS]:           'Settings',
 };
 
@@ -88,9 +92,9 @@ const CommandPalette: React.FC<Props> = ({ isOpen, onClose, onNavigate, currentU
   const clientItems: CommandItem[] = clients.map(c => ({
     id: `client-${c.id}`,
     label: c.name,
-    sublabel: 'Open in Project Tasks',
+    sublabel: 'Open client workspace',
     icon: <Hash size={16} />,
-    action: () => { onNavigate(ToolView.TASKS); onClose(); },
+    action: () => { onNavigate(ToolView.CLIENTS);window.dispatchEvent(new CustomEvent('portalOpenClient',{detail:{ownerId:currentUser.id,clientId:c.db_id||c.id}}));onClose(); },
     category: 'client' as const,
     keywords: [c.name.toLowerCase()],
   }));
