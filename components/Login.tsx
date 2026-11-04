@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Mail, Lock, ArrowRight, Loader2, AlertTriangle, User } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Loader2, AlertTriangle } from 'lucide-react';
 import { BrandingConfig } from '../types';
 import { supabase } from '../lib/supabaseClient';
-import { checkAllowlist, verifyPreProvisionedUser, consumePreProvisionedUser, ensureProfileExists } from '../services/databaseService';
+import { ensureProfileExists } from '../services/databaseService';
 import logoUrl from '../logo';
 
 interface LoginProps {
@@ -12,10 +12,10 @@ interface LoginProps {
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin, branding }) => {
-  const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
+  const [mode, setMode] = useState<'login' | 'forgot'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -66,96 +66,13 @@ const Login: React.FC<LoginProps> = ({ onLogin, branding }) => {
         return;
       }
 
-      if (mode === 'login') {
-          // 1. Attempt Standard Login
-          const { data, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
-
-          if (!loginError && data.user) {
-              // Ensure profile exists for this user
-              await ensureProfileExists(data.user.id, data.user.email, data.user.user_metadata?.full_name);
-              onLogin(data.user.email || email);
-              return;
-          }
-
-          // 2. Smart Login (Pre-provisioned User)
-          // If login failed, check if this is a pre-provisioned user with a temp password
-          if (loginError) {
-              const preUser = await verifyPreProvisionedUser(email, password);
-              if (preUser) {
-                  // Try to create account first (for new users)
-                  const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-                      email,
-                      password,
-                      options: { data: { full_name: preUser.name } }
-                  });
-
-                  if (signUpError) {
-                      // User already exists - they need a password reset
-                      // We'll use the admin workaround: delete and recreate
-                      if (signUpError.message.includes('already registered')) {
-                          // Show message to contact admin for now
-                          // The temp_password matched, so they are who they say they are
-                          throw new Error(
-                            "Your temp password is correct, but your account already exists with a different password. " +
-                            "Please contact Ben to reset your password, or try the password you set when you first logged in."
-                          );
-                      }
-                      throw new Error("Activation failed: " + signUpError.message);
-                  }
-
-                  // If successful, clear temp password and log them in
-                  if (signUpData.session && signUpData.user) {
-                      await ensureProfileExists(signUpData.user.id, email, preUser.name);
-                      await consumePreProvisionedUser(email);
-                      onLogin(email);
-                      return;
-                  } else if (signUpData.user && !signUpData.session) {
-                      // User created but needs email confirmation - try to sign in anyway
-                      // (This happens when email confirmation is enabled)
-                      await ensureProfileExists(signUpData.user.id, email, preUser.name);
-                      const { data: loginData, error: loginErr } = await supabase.auth.signInWithPassword({ email, password });
-                      if (!loginErr && loginData.session) {
-                          await consumePreProvisionedUser(email);
-                          onLogin(email);
-                          return;
-                      }
-                      setSuccessMsg('Account activated! Please check your email for a confirmation link, then try logging in again.');
-                      return;
-                  }
-              }
-          }
-
-          throw loginError;
-
-      } else {
-          // SIGN UP (Manual)
-          if (!fullName.trim()) throw new Error('Please enter your full name.');
-
-          // 1. Check Allowlist
-          const isAllowed = await checkAllowlist(email);
-          if (!isAllowed) {
-            throw new Error('This email has not been authorized by the Owner. Please ask Ben for an invite.');
-          }
-
-          // 2. Create Account
-          const { data, error } = await supabase.auth.signUp({
-            email,
-            password,
-            options: { data: { full_name: fullName } }
-          });
-
-          if (error) throw error;
-
-          setSuccessMsg('Account created! Logging you in...');
-          if (data.user) {
-              await ensureProfileExists(data.user.id, email, fullName);
-              setTimeout(() => onLogin(email), 1500);
-          } else if (data.session) {
-              setTimeout(() => onLogin(email), 1500);
-          } else {
-              setSuccessMsg('Account created! Please check your email to verify.');
-          }
-      }
+      // Existing registered accounts only. Signup/temporary-password activation
+      // is intentionally disabled server-side; do not query an anon allowlist.
+      const { data, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
+      if (loginError) throw loginError;
+      if (!data.user || !data.session) throw new Error('Sign-in did not return a session. Please try again.');
+      await ensureProfileExists(data.user.id, data.user.email, data.user.user_metadata?.full_name);
+      onLogin(data.user.email || email);
 
     } catch (err: any) {
       console.error('Auth error:', err);
@@ -191,7 +108,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, branding }) => {
           <img src={logoUrl} alt="BrightForge" className="w-[250px] mx-auto mb-4" />
           <p className="text-portal-soft">
             {mode === 'login' && 'Sign in to access your team portal'}
-            {mode === 'signup' && 'Create your team account'}
+
             {mode === 'forgot' && 'Reset your password'}
           </p>
         </div>
@@ -204,28 +121,12 @@ const Login: React.FC<LoginProps> = ({ onLogin, branding }) => {
                 <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
                 <div className="text-sm text-amber-300">
                     <p className="font-bold">Configuration Required</p>
-                    <p>Please add your Supabase API Key to <code>lib/supabaseClient.ts</code>.</p>
+                    <p>The portal connection is unavailable. Please contact Ben.</p>
                 </div>
              </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {mode === 'signup' && (
-             <div className="space-y-2 animate-slideIn">
-               <label className="block text-sm font-medium text-portal-text">Full Name</label>
-               <div className="relative">
-                 <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-portal-soft" />
-                 <input
-                    type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 bg-portal-surface2 border border-white/[0.07] rounded-xl text-white placeholder-portal-soft focus:outline-none focus:border-portal-accent focus:ring-1 focus:ring-portal-accent transition-colors"
-                    placeholder="e.g. Jane Doe"
-                    required={mode === 'signup'}
-                  />
-               </div>
-             </div>
-          )}
 
           <div className="space-y-2">
             <label className="block text-sm font-medium text-portal-text">Work Email</label>
@@ -270,7 +171,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, branding }) => {
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
               <>
                 {mode === 'login' && 'Sign In'}
-                {mode === 'signup' && 'Create Account'}
+
                 {mode === 'forgot' && 'Send Reset Link'}
                 <ArrowRight className="w-5 h-5" />
               </>
@@ -297,12 +198,9 @@ const Login: React.FC<LoginProps> = ({ onLogin, branding }) => {
                Back to Sign In
              </button>
            ) : (
-             <button
-               onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError(''); setSuccessMsg(''); }}
-               className="text-sm text-portal-accent hover:text-portal-accent-light font-medium transition-colors"
-             >
-               {mode === 'login' ? 'Invited to the team? Sign Up' : 'Already have an account? Sign In'}
-             </button>
+             <p className="text-sm text-portal-soft">
+               New access is arranged by Ben. Self-signup and temporary-password activation are not available here.
+             </p>
            )}
         </div>
         </div>

@@ -1128,10 +1128,10 @@ The acting user is **${executingUser.name}** — attribute actions and notificat
       messages
     });
 
-    const toolUses = response.content.filter(b => b.type === 'tool_use') as any[];
+    const toolUses = response.content.filter((b:any) => b.type === 'tool_use') as any[];
 
     if (toolUses.length === 0 || response.stop_reason === 'end_turn') {
-      const textBlock = response.content.find(b => b.type === 'text') as any | undefined;
+      const textBlock = response.content.find((b:any) => b.type === 'text') as any | undefined;
       return textBlock?.text || 'Done.';
     }
 

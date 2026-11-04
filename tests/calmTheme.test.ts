@@ -28,10 +28,13 @@ test('theme embeds Inter locally and keeps legacy palette fallbacks', () => {
 });
 
 // Theme activation is deliberately confined to the authenticated team shell.
-test('calm theme is team scoped with a separate dark sidebar', () => {
+test('team theme is scoped to the persistent shell, not client portals', () => {
   const app = fs.readFileSync('App.tsx', 'utf8');
-  const sidebar = fs.readFileSync('components/Sidebar.tsx', 'utf8');
-  assert.match(app, /className="portal-calm flex h-screen/);
-  assert.match(sidebar, /portal-sidebar/);
+  const shell=fs.readFileSync('components/PortalShell.tsx','utf8'),css=fs.readFileSync('components/PortalShell.css','utf8');
+  assert.match(app, /<PortalShell key=\{currentUser\.id\}/);
+  assert.match(shell, /className="portal-product"/);
+  assert.match(css, /\.pp-topbar/);
+  assert.match(css, /\.pp-primary/);
+  assert.doesNotMatch(fs.readFileSync('ClientPortalApp.tsx','utf8'), /portal-product|PortalShell/);
   assert.doesNotMatch(fs.readFileSync('ClientPortalApp.tsx', 'utf8'), /portal-calm/);
 });

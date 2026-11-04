@@ -3,6 +3,21 @@ const { app, BrowserWindow, shell, ipcMain, dialog, Notification } = require('el
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 
+// COSMIC / AppImage launch often closes stdout. A later console.log then
+// throws write EPIPE and Electron treats that as a fatal main-process crash.
+function ignoreBrokenPipe(stream) {
+  if (!stream || typeof stream.on !== 'function') return;
+  stream.on('error', (err) => {
+    if (err && err.code === 'EPIPE') return;
+  });
+}
+ignoreBrokenPipe(process.stdout);
+ignoreBrokenPipe(process.stderr);
+process.on('uncaughtException', (err) => {
+  if (err && err.code === 'EPIPE') return;
+  console.error('[portal] uncaughtException', err);
+});
+
 // Bazzite's Electron GPU child can crash repeatedly under the current driver
 // stack, which terminates the whole desktop portal. The portal is a business
 // dashboard, so favour a stable software-rendered UI over GPU acceleration.
@@ -21,11 +36,17 @@ if (process.platform === 'win32') {
 }
 
 // Helper function to show native OS notification
-function showNativeNotification(title, body) {
-  console.log('[Notification] Attempting to show notification:', { title, body, supported: Notification.isSupported() });
+const activeNotifications = new Set();
+function clearNativeNotifications() {
+  const cards = [...activeNotifications];
+  activeNotifications.clear();
+  for (const card of cards) card.close();
+}
 
+function showNativeNotification(title, body, destination) {
   if (Notification.isSupported()) {
     try {
+      console.log('[Notification] Attempting to show notification:', { title, body, supported: true });
       // Build notification options
       const notificationOptions = {
         title: title,
@@ -40,13 +61,18 @@ function showNativeNotification(title, body) {
       }
 
       const notification = new Notification(notificationOptions);
+      activeNotifications.add(notification);
+      notification.on('close', () => activeNotifications.delete(notification));
 
       notification.on('click', () => {
+        if (!activeNotifications.has(notification)) return;
         // Focus the main window when notification is clicked
         if (mainWindow) {
           if (mainWindow.isMinimized()) mainWindow.restore();
           mainWindow.focus();
+          if (destination) mainWindow.webContents.send('notification-click', destination);
         }
+        activeNotifications.delete(notification);
       });
 
       notification.on('show', () => {
@@ -228,8 +254,16 @@ autoUpdater.on('error', (err) => {
 });
 
 // IPC handlers for renderer process communication
-ipcMain.on('show-notification', (event, { title, body }) => {
-  showNativeNotification(title, body);
+ipcMain.handle('notification-status', (event) => {
+  if (event.sender !== mainWindow?.webContents) throw new Error('Untrusted sender');
+  return {supported:Notification.isSupported(), permission:'unknown', requiresRunningApp:true, closedAppPush:false};
+});
+ipcMain.on('clear-notifications', (event) => {
+  if (event.sender === mainWindow?.webContents) clearNativeNotifications();
+});
+ipcMain.on('show-notification', (event, { title, body, destination }) => {
+  if (event.sender !== mainWindow?.webContents) return;
+  showNativeNotification(title, body, destination);
 });
 
 ipcMain.on('focus-window', () => {

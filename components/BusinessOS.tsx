@@ -1,3 +1,4 @@
+import {notificationLinkStorage} from '../lib/notificationLinkStorage.mjs';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
@@ -292,7 +293,7 @@ const BusinessOSContent: React.FC<BusinessOSProps> = ({ currentUser, setCurrentV
 
   const openTask = (task: TaskWithContext) => {
     const detail = { taskId: task.task.id, boardId: task.boardId, groupId: task.groupId };
-    try { localStorage.setItem('openTaskModal', JSON.stringify(detail)); } catch {}
+    try { notificationLinkStorage.setItem('openTaskModal', JSON.stringify(detail)); } catch {}
     setCurrentView(ToolView.TASKS);
     window.requestAnimationFrame(() => window.dispatchEvent(new CustomEvent('openTaskModal', { detail })));
   };
@@ -350,7 +351,7 @@ const BusinessOSContent: React.FC<BusinessOSProps> = ({ currentUser, setCurrentV
       <div className="grid items-start gap-5 xl:grid-cols-12">
         <section className="overflow-hidden border border-white/[0.07] bg-portal-surface xl:col-span-8">
           <SectionHeader eyebrow="Your judgement" title="Decision Queue" count={snapshot.decisionQueue.length} detail="Explicit Ben approval and decision signals" />
-          {snapshot.decisionQueue.length ? snapshot.decisionQueue.slice(0, 12).map(task => <TaskRow key={`${task.boardId}-${task.task.id}`} task={task} onOpen={openTask} />) : <div className="px-5 py-10 text-center text-sm text-portal-soft">No Portal tasks explicitly call for Ben approval or a decision.</div>}
+          {snapshot.decisionQueue.length ? snapshot.decisionQueue.slice(0, 12).map((task:any) => <TaskRow key={`${task.boardId}-${task.task.id}`} task={task} onOpen={openTask} />) : <div className="px-5 py-10 text-center text-sm text-portal-soft">No Portal tasks explicitly call for Ben approval or a decision.</div>}
         </section>
 
         <aside className="overflow-hidden border border-white/[0.07] bg-portal-surface xl:col-span-4">
@@ -371,7 +372,7 @@ const BusinessOSContent: React.FC<BusinessOSProps> = ({ currentUser, setCurrentV
 
         <section className="overflow-hidden border border-white/[0.07] bg-portal-surface xl:col-span-5">
           <SectionHeader eyebrow="Evidence control" title="Completion Proof Gaps" count={snapshot.completedProofGaps.length} detail="Status is not proof" />
-          {snapshot.completedProofGaps.length ? snapshot.completedProofGaps.slice(0, 10).map(task => <TaskRow key={`${task.boardId}-${task.task.id}`} task={task} actionLabel="Inspect" onOpen={openTask} />) : <div className="flex flex-col items-center px-5 py-10 text-center"><CheckCircle2 className="h-6 w-6 text-emerald-400" /><div className="mt-2 text-sm font-medium text-white">No completed proof gaps detected</div><div className="mt-1 text-xs text-portal-soft">Every completed task in scope has a proof-bearing link or attachment.</div></div>}
+          {snapshot.completedProofGaps.length ? snapshot.completedProofGaps.slice(0, 10).map((task:any) => <TaskRow key={`${task.boardId}-${task.task.id}`} task={task} actionLabel="Inspect" onOpen={openTask} />) : <div className="flex flex-col items-center px-5 py-10 text-center"><CheckCircle2 className="h-6 w-6 text-emerald-400" /><div className="mt-2 text-sm font-medium text-white">No completed proof gaps detected</div><div className="mt-1 text-xs text-portal-soft">Every completed task in scope has a proof-bearing link or attachment.</div></div>}
         </section>
       </div>
 

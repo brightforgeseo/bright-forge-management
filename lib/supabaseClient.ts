@@ -6,10 +6,9 @@ import { resolveSupabaseAssetUrl } from './supabaseAssetUrl';
 // Desktop clients launched from file:// do not have a browser origin to infer.
 // Use the Linux-hosted Tailnet portal proxy, not the retired Windows node.
 const LOCAL_SUPABASE_URL = process.env.SUPABASE_URL || 'https://echo-ben.tailfdbc33.ts.net/supabase';
-// SECURITY: the fallback below is the publicly known supabase-demo key. Set
-// SUPABASE_ANON_KEY at build time after rotating the JWT secret on the
-// self-hosted instance — see SECURITY_ROTATE_SUPABASE_KEYS.md.
-const LOCAL_SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+// Public anon key is supplied at build time. Never embed a stock/demo fallback.
+const LOCAL_SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+if (!LOCAL_SUPABASE_ANON_KEY) throw new Error('SUPABASE_ANON_KEY is required at build time');
 
 const getSupabaseUrl = () => {
   if (typeof window !== 'undefined' && window.location.protocol.startsWith('http')) {
@@ -40,15 +39,18 @@ export const normalizeSupabaseAssetUrl = (url?: string | null): string | undefin
     portalOrigin: PORTAL_ORIGIN,
   });
 
-// Browser code must not bundle a service-role key. Keep the admin export for legacy imports,
-// but bind it to the publishable/anon key so privileged operations still require server-side routes.
-const SUPABASE_SERVICE_ROLE_KEY = LOCAL_SUPABASE_ANON_KEY;
-
+// One browser client owns login, refresh, logout and Realtime state. An anon
+// publishable key identifies the project; the signed-in session supplies authority.
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-export const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  }
-});
+/** @deprecated Compatibility alias only: same user session, NO admin authority. */
+export const supabaseAdmin = supabase;
+
+export const ACCOUNT_ADMIN_UNAVAILABLE =
+  'Account administration is unavailable until a verified server-side owner route is configured. Contact Ben.';
+
+export const requirePortalUser = async () => {
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user) throw new Error('Please sign in again.');
+  return data.user;
+};

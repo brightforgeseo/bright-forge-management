@@ -1,3 +1,4 @@
+import {notificationLinkStorage} from '../lib/notificationLinkStorage.mjs';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
@@ -637,7 +638,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, setCurrentView }) =>
     };
 
     try {
-      localStorage.setItem('openTaskModal', JSON.stringify(linkData));
+      notificationLinkStorage.setItem('openTaskModal', JSON.stringify(linkData));
     } catch (e) {
       console.error('[Dashboard] Failed to store task deep link:', e);
     }

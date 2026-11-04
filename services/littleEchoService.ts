@@ -1,8 +1,5 @@
 import { ContentResult } from '../types';
-import { getBridgeUrl } from '../lib/bridgeClient';
-
-const BRIDGE_URL = getBridgeUrl();
-const BRIDGE_SECRET = ['brightforge', 'echo', 'bridge', '2026'].join('-');
+import { runEchoJob } from '../lib/echoQueueClient';
 
 /**
  * Generate SEO content using the portal bridge pipeline.
@@ -36,24 +33,16 @@ Return ONLY valid JSON in this exact format:
   "metaDescription": "Meta description 150-160 chars with primary keyword and CTA"
 }`;
 
-  const res = await fetch(`${BRIDGE_URL}/content`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${BRIDGE_SECRET}`,
-    },
-    body: JSON.stringify({ prompt, maxTokens: mode === 'full' ? 8000 : 4000, temperature: 0.7, mode, ...(upgradeDraft ? { upgradeDraft } : {}) }),
+  const content = await runEchoJob({
+    kind: 'content',
+    message: `${prompt}\n\nMode: ${mode}.${upgradeDraft ? `\nUpgrade this supplied draft:\n${upgradeDraft.slice(0, 7000)}` : ''}`,
   });
-
-  if (!res.ok) throw new Error(`Little Echo bridge error: ${res.status}`);
-
-  const data = await res.json();
-  const text: string = data.content || '';
-  const rawDraft: string | undefined = data.draft;
+  const text = content || '';
+  const rawDraft = upgradeDraft;
 
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (jsonMatch) {
-    return { ...JSON.parse(jsonMatch[0]) as ContentResult, rawDraft, mode: data.mode };
+    return { ...JSON.parse(jsonMatch[0]) as ContentResult, rawDraft, mode };
   }
 
   return {
@@ -61,6 +50,6 @@ Return ONLY valid JSON in this exact format:
     content: text,
     metaDescription: `${primaryKeyword} — expert guide covering everything you need to know.`,
     rawDraft,
-    mode: data.mode,
+    mode,
   };
 };

@@ -16,29 +16,68 @@
 // Environment overrides:
 //   PORT                       listen port            (default 8080)
 //   SUPABASE_INTERNAL_URL      local Supabase API     (default http://127.0.0.1:54321)
-//   SUPABASE_SERVICE_ROLE_KEY  key used for uploads   (default: demo service key)
+//   SUPABASE_SERVICE_ROLE_KEY  key used for uploads   (required; no fallback)
 //                              MUST be updated when the demo JWT secret is
 //                              rotated - see SECURITY_ROTATE_SUPABASE_KEYS.md
 
 const http = require('node:http');
-const net = require('node:net');
+const { createRealtimeProxy } = require('./portal-realtime-proxy.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const { URL } = require('node:url');
+const { normaliseEchoJob } = require('./echo-queue-core.cjs');
+const { createEchoJobsHandler } = require('./portal-echo-jobs.cjs');
+const { createBusinessInboxHandler } = require('./portal-business-inbox.cjs');
+const { publicProxyAllowed } = require('./portal-proxy-policy.cjs');
+const { makeLegacyNotificationHandler } = require('./portal-notification-compat.cjs');
+const { createPrivateBotsHandler } = require('./portal-private-bots.cjs');
+const { createPrivateBotAuthenticator, createPrivateBotWorker } = require('./private-bot-runtime.cjs');
+const { createTelegramPortal, createTelegramCommands } = require('./private-bot-telegram.cjs');
+const { startTelegramSocket } = require('./private-bot-telegram-socket.cjs');
+const { createOrdinaryEchoWork } = require('./ordinary-echo-work.cjs');
+const { createResearchHandler } = require('./portal-research.cjs');
+const { createClientSeoHandler } = require('./portal-client-seo.cjs');
+const { createBusinessAuthenticator } = require('./portal-business-auth.cjs');
+const privateBotBuild=require('./private-bot-build.cjs');
+privateBotBuild.initialise();
 
 const PORT = Number(process.env.PORT) || 8080;
 const SUPABASE_URL = new URL(process.env.SUPABASE_INTERNAL_URL || 'http://127.0.0.1:54321');
-// Default service-role JWT for the stock supabase-demo secret. This is the
-// publicly documented demo key (same family as the anon key the app ships
-// with) - it only works until the JWT secret is rotated, at which point set
-// SUPABASE_SERVICE_ROLE_KEY in the environment instead.
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
-const ANON_KEY = process.env.SUPABASE_ANON_KEY ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
-const DIST = path.resolve(__dirname, '..', 'dist');
+// Privileged credentials are required from the protected service environment.
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const ANON_KEY = process.env.SUPABASE_ANON_KEY;
+if (!SERVICE_KEY || !ANON_KEY) {
+  throw new Error('SUPABASE_SERVICE_ROLE_KEY and SUPABASE_ANON_KEY are required');
+}
+const DIST = process.env.PORTAL_DIST_DIR ? path.resolve(process.env.PORTAL_DIST_DIR) : path.resolve(__dirname, '..', 'dist');
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+const MAX_ECHO_JOB_BYTES = 9 * 1024 * 1024; // six MiB of owner-supplied bytes plus base64/JSON
+const MAX_INBOX_REQUEST_BYTES = 128 * 1024;
+
+// Private workspaces never reuse general Echo authentication, history or execution.
+const privateApi = async (route, method = 'GET', body) => {
+  const response = await fetch(new URL(route, SUPABASE_URL), {
+    method, signal: AbortSignal.timeout(15000),
+    headers: { apikey: SERVICE_KEY, authorization: `Bearer ${SERVICE_KEY}`, 'content-type': 'application/json', Prefer: 'return=representation' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!response.ok) throw Object.assign(new Error('private database request failed'), { status: response.status });
+  return response.status === 204 ? null : response.json();
+};
+const privateAuthenticate = createPrivateBotAuthenticator({ api: privateApi, validate: async token => {
+  const response = await fetch(new URL('/auth/v1/user', SUPABASE_URL), {
+    signal: AbortSignal.timeout(10000), headers: { apikey: ANON_KEY, authorization: `Bearer ${token}` },
+  });
+  return response.ok ? response.json() : null;
+} });
+const handlePrivateBots = createPrivateBotsHandler({ authenticate: privateAuthenticate, api: privateApi, telegramPortal: createTelegramPortal({api:privateApi}) });
+const privateWorker = createPrivateBotWorker({ api: privateApi, concurrency: 2 });
+// Research is normal authenticated business work. Runs stay private to the
+// requesting user; provider credentials and owner billing never reach the UI.
+const authenticateBusiness=createBusinessAuthenticator({api:privateApi,base:SUPABASE_URL,anonKey:ANON_KEY});
+const handleResearch=createResearchHandler({authenticate:authenticateBusiness,root:process.env.PORTAL_RESEARCH_ROOT||undefined});
+const handleClientSeo=createClientSeoHandler({authenticate:authenticateBusiness,api:privateApi,readResearch:handleResearch.read});
 
 const getPortalVersion = () => {
   try {
@@ -76,7 +115,15 @@ const log = (msg) => console.log(`[portal ${new Date().toISOString()}] ${msg}`);
 
 // ---- /supabase/* HTTP proxy -------------------------------------------------
 
+const handleLegacyNotification = makeLegacyNotificationHandler({supabaseUrl:SUPABASE_URL.toString(),anonKey:ANON_KEY});
 const proxySupabase = (req, res) => {
+  if (req.method === 'POST' && req.url.split('?')[0] === '/supabase/rest/v1/notifications') {
+    return handleLegacyNotification(req, res);
+  }
+  if (!publicProxyAllowed(req)) {
+    res.writeHead(403, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+    return res.end(JSON.stringify({ error: 'privileged route unavailable on public proxy' }));
+  }
   const targetPath = req.url.replace(/^\/supabase/, '') || '/';
   const headers = { ...req.headers, host: SUPABASE_URL.host };
   delete headers.connection;
@@ -88,7 +135,7 @@ const proxySupabase = (req, res) => {
     }
   );
   upstream.on('error', (e) => {
-    log(`supabase proxy error ${req.method} ${targetPath}: ${e.message}`);
+    log('supabase proxy transport error'); // Never log credential-bearing URLs.
     if (!res.headersSent) res.writeHead(502, { 'content-type': 'text/plain' });
     res.end('Supabase unreachable');
   });
@@ -100,11 +147,11 @@ const proxySupabase = (req, res) => {
 // The funnel exposes this server to the whole internet, so uploads require a
 // logged-in portal user. Tokens are verified against Supabase auth and the
 // result is cached briefly to keep uploads snappy.
-const tokenCache = new Map(); // token -> cache expiry (ms epoch)
+const tokenCache = new Map(); // token -> { expiresAt, user }
 
 const verifyUserToken = (token, callback) => {
   const cached = tokenCache.get(token);
-  if (cached && cached > Date.now()) return callback(true);
+  if (cached && cached.expiresAt > Date.now()) return callback(cached.user);
   const check = http.request(
     {
       hostname: SUPABASE_URL.hostname,
@@ -114,18 +161,39 @@ const verifyUserToken = (token, callback) => {
       headers: { apikey: ANON_KEY, authorization: `Bearer ${token}` },
     },
     (ur) => {
-      ur.resume();
-      const ok = ur.statusCode === 200;
-      if (ok) {
-        if (tokenCache.size > 500) tokenCache.clear();
-        tokenCache.set(token, Date.now() + 5 * 60 * 1000);
-      }
-      callback(ok);
+      let body = '';
+      ur.on('data', (chunk) => { body += chunk; });
+      ur.on('end', () => {
+        let user = null;
+        if (ur.statusCode === 200) {
+          try { user = JSON.parse(body); } catch {}
+        }
+        if (user?.id) {
+          if (tokenCache.size > 500) tokenCache.clear();
+          tokenCache.set(token, { expiresAt: Date.now() + 5 * 60 * 1000, user });
+        }
+        callback(user?.id ? user : null);
+      });
     }
   );
   check.on('error', () => callback(false));
   check.end();
 };
+
+const handleEchoJobs = createEchoJobsHandler({
+  normaliseEchoJob,
+  verifyUserToken,
+  SUPABASE_URL,
+  SERVICE_KEY,
+  maxRequestBytes: MAX_ECHO_JOB_BYTES,
+});
+
+const handleBusinessInbox = createBusinessInboxHandler({
+  verifyUserToken,
+  SUPABASE_URL,
+  SERVICE_KEY,
+  maxRequestBytes: MAX_INBOX_REQUEST_BYTES,
+});
 
 const handleUpload = (req, res, requestUrl) => {
   const auth = req.headers.authorization || '';
@@ -239,7 +307,12 @@ const serveStatic = (req, res, requestUrl) => {
 
 const server = http.createServer((req, res) => {
   const requestUrl = new URL(req.url, 'http://localhost');
+  if (requestUrl.pathname === '/api/client-seo' || requestUrl.pathname.startsWith('/api/client-seo/')) return handleClientSeo(req,res);
+  if (requestUrl.pathname === '/api/research' || requestUrl.pathname.startsWith('/api/research/')) return handleResearch(req, res);
   if (req.url.startsWith('/supabase/')) return proxySupabase(req, res);
+  if (requestUrl.pathname === '/api/private-bots' || requestUrl.pathname.startsWith('/api/private-bots/')) return handlePrivateBots(req, res);
+  if (requestUrl.pathname === '/api/echo/jobs') return handleEchoJobs(req, res, requestUrl);
+  if (requestUrl.pathname === '/api/business-inbox') return handleBusinessInbox(req, res);
   if (requestUrl.pathname === '/api/uploads' && req.method === 'POST') return handleUpload(req, res, requestUrl);
   if (requestUrl.pathname === '/healthz') {
     res.writeHead(200, { 'content-type': 'text/plain' });
@@ -258,34 +331,16 @@ const server = http.createServer((req, res) => {
 
 // WebSocket upgrades (Supabase Realtime) - this is what makes online badges
 // and instant unread counts work through the funnel.
-server.on('upgrade', (req, socket, head) => {
-  if (!req.url.startsWith('/supabase/')) return socket.destroy();
-  const targetPath = req.url.replace(/^\/supabase/, '');
-  const upstream = net.connect(Number(SUPABASE_URL.port) || 80, SUPABASE_URL.hostname, () => {
-    let raw = `${req.method} ${targetPath} HTTP/1.1\r\n`;
-    for (let i = 0; i < req.rawHeaders.length; i += 2) {
-      const name = req.rawHeaders[i];
-      const value = name.toLowerCase() === 'host' ? SUPABASE_URL.host : req.rawHeaders[i + 1];
-      raw += `${name}: ${value}\r\n`;
-    }
-    raw += '\r\n';
-    upstream.write(raw);
-    if (head && head.length) upstream.write(head);
-    socket.pipe(upstream);
-    upstream.pipe(socket);
-  });
-  const teardown = () => {
-    socket.destroy();
-    upstream.destroy();
-  };
-  upstream.on('error', teardown);
-  socket.on('error', teardown);
-});
+server.on('upgrade', createRealtimeProxy({ upstreamUrl: SUPABASE_URL }));
 
 server.listen(PORT, () => {
+  if (process.env.PRIVATE_BOT_WORKER_DISABLED !== '1') privateWorker.start().catch(() => log('Private bot worker unavailable; pending jobs remain persisted'));
+  if (process.env.PRIVATE_BOT_WORKER_DISABLED !== '1') startTelegramSocket({command:createTelegramCommands({api:privateApi}),work:createOrdinaryEchoWork({api:privateApi})}).catch(() => log('Private Telegram socket unavailable'));
   log(`Portal server listening on http://localhost:${PORT}`);
   log(`  static:   ${DIST}`);
   log(`  supabase: ${SUPABASE_URL.href} (proxied at /supabase, websockets included)`);
   log(`  uploads:  POST /api/uploads`);
+  log(`  Echo:     GET/POST /api/echo/jobs`);
+  log(`  inbox:    POST /api/business-inbox`);
   log(`Expose to the team with: tailscale funnel --bg ${PORT}`);
 });

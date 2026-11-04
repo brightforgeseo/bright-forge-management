@@ -1,4 +1,4 @@
-const DEFAULT_REMOTE_BRIDGE_URL = 'https://echo-ai.tailfdbc33.ts.net:8443';
+const DEFAULT_REMOTE_BRIDGE_URL = 'https://echo-ben.tailfdbc33.ts.net';
 
 export const getBridgeUrl = (): string => {
   if (
@@ -12,5 +12,3 @@ export const getBridgeUrl = (): string => {
 
   return DEFAULT_REMOTE_BRIDGE_URL;
 };
-
-export const BRIDGE_SECRET = 'brightforge-echo-bridge-2026';

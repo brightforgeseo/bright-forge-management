@@ -1,4 +1,5 @@
 
+import {notificationLinkStorage} from '../lib/notificationLinkStorage.mjs';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useDialogFocus } from '../lib/useDialogFocus';
 import { Plus, Sparkles, ChevronDown, ChevronUp, ChevronRight, Trash2, Briefcase, CheckCircle2, Settings, Mail, Phone, Globe, X, Image as ImageIcon, Edit3, Palette, Loader2, Upload, UserCircle, Link as LinkIcon, MessageCircle, Send, Search, Share2, Hash, Users, Archive, RotateCcw, UserPlus, GripVertical, CheckSquare, Paperclip, File as FileIcon } from 'lucide-react';
@@ -288,6 +289,8 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   const [clients, setClients] = useState<ClientBoard[]>([]);
   const clientsRef = useRef<ClientBoard[]>([]); // Keep a ref for immediate access
   const [isLoadingData, setIsLoadingData] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const selectedClientIdRef = useRef<string>('');
   const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
@@ -300,9 +303,15 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   // Fetch Data on Mount
   useEffect(() => {
     const loadData = async () => {
+      if(pendingSaveRef.current&&clientsRef.current.length){setIsLoadingData(false);return;}
       setIsLoadingData(true);
+      setLoadError(null);
+      try {
       const [boards, profiles] = await Promise.all([fetchClientBoards(), fetchProfiles()]);
-      const defaultBoardId = boards.length > 0 ? boards[0].id : '';
+      let remembered='';try{remembered=localStorage.getItem('portalOpenWork:'+currentUser.id)||localStorage.getItem('portalTaskClient:'+currentUser.id)||'';}catch{}
+      const candidate=remembered||selectedClientIdRef.current;
+      const defaultBoardId=boards.some(b=>b.id===candidate)?candidate:boards[0]?.id||'';
+      try{localStorage.removeItem('portalOpenWork:'+currentUser.id);}catch{}
 
       if (boards.length > 0) {
         setClients(boards);
@@ -311,10 +320,15 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
       }
       // archivedBoards starts as [] by default, loaded lazily when user opens archive panel
       setTeamProfiles(profiles);
-      setIsLoadingData(false);
+      } catch (error) {
+        console.error("Error loading Project Tasks:", error);
+        setLoadError("Could not load client boards. Please retry.");
+      } finally {
+        setIsLoadingData(false);
+      }
     };
     loadData();
-  }, []);
+  }, [loadAttempt]);
 
   useEffect(() => {
     selectedClientIdRef.current = selectedClientId;
@@ -326,7 +340,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
     const maxRetries = 10;
 
     const checkForDeepLink = () => {
-      const openTaskData = localStorage.getItem('openTaskModal');
+      const openTaskData = notificationLinkStorage.getItem('openTaskModal');
       if (!openTaskData) return;
 
       // If clients aren't loaded yet, wait and retry
@@ -338,7 +352,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
 
       if (clients.length === 0) {
         addToast('error', 'Unable to open task - boards not loaded. Please try again.');
-        localStorage.removeItem('openTaskModal');
+        notificationLinkStorage.removeItem('openTaskModal');
         return;
       }
 
@@ -409,11 +423,11 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
         } else {
           addToast('error', 'Board not found. The board may have been deleted.');
         }
-        localStorage.removeItem('openTaskModal');
+        notificationLinkStorage.removeItem('openTaskModal');
       } catch (e) {
         console.error('Error processing deep link:', e);
         addToast('error', 'Failed to open notification link. Please try again.');
-        localStorage.removeItem('openTaskModal');
+        notificationLinkStorage.removeItem('openTaskModal');
       }
     };
 
@@ -428,7 +442,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   // need to nudge it whenever a new openTaskModal entry shows up.
   useEffect(() => {
     const checkAndOpen = () => {
-      if (localStorage.getItem('openTaskModal') && clients.length > 0) {
+      if (notificationLinkStorage.getItem('openTaskModal') && clients.length > 0) {
         // Touch state to retrigger the deep-link effect
         setClients(prev => [...prev]);
       }
@@ -570,6 +584,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
 
   function selectClient(clientId: string) {
     selectedClientIdRef.current = clientId;
+    try{localStorage.setItem('portalTaskClient:'+currentUser.id,clientId);}catch{}
     setSelectedClientId(clientId);
     setTaskModal(current => current && current.clientId !== clientId ? null : current);
     setActivePicker(null);
@@ -1705,6 +1720,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ currentUser, addToast }) => {
   useDialogFocus(!!taskModal && !activePicker && !activePersonPicker, '.portal-task-dialog', () => setTaskModal(null));
 
   if (isLoadingData) return <div className="flex h-full items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-brand-500" /></div>;
+  if (loadError) return <div role="alert" className="flex h-full flex-col items-center justify-center gap-4 p-6"><p>{loadError}</p><button type="button" className="rounded-lg bg-brand-500 px-4 py-2 text-white" onClick={() => setLoadAttempt(value => value + 1)}>Retry loading boards</button></div>;
 
   return (
     <div className="portal-task-board flex flex-col h-full overflow-hidden bg-portal-surface relative">

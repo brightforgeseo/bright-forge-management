@@ -1,5 +1,5 @@
 
-import { supabase, supabaseAdmin, normalizeSupabaseAssetUrl } from '../lib/supabaseClient';
+import { supabase, normalizeSupabaseAssetUrl, ACCOUNT_ADMIN_UNAVAILABLE } from '../lib/supabaseClient';
 import { ClientBoard, ClientBoardSummary, ChatMessage, ChatChannel, Profile, AppNotification } from '../types';
 
 type TimedCache<T> = { value: T; expiresAt: number; inflight?: Promise<T> };
@@ -373,23 +373,18 @@ export const updateUserProfile = async (fullName: string) => {
 
 // --- Channels & DMs ---
 
+let channelsCacheToken:string|null=null;
 export const fetchChannels = async (): Promise<ChatChannel[]> => {
-  if (isCacheFresh(channelsCache)) return cloneCachedValue(channelsCache!.value);
-  if (channelsCache?.inflight) return cloneCachedValue(await channelsCache.inflight);
+  const {data:{session}}=await supabase.auth.getSession();const token=session?.access_token;if(!token)return [];
+  const {data:{user},error:authError}=await supabase.auth.getUser(token);if(authError||!user)return [];
+  if (channelsCacheToken===token&&isCacheFresh(channelsCache)) return cloneCachedValue(channelsCache!.value);
+  if (channelsCacheToken===token&&channelsCache?.inflight) return cloneCachedValue(await channelsCache.inflight);
 
   const inflight = (async () => {
-    // Get the current user
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      console.error('No authenticated user');
-      return [];
-    }
-
     // Fetch all channels
     const { data: allChannels, error: channelsError } = await supabase
       .from('channels')
-      .select('*')
+      .select('*').setHeader('Authorization','Bearer '+token)
       .order('created_at', { ascending: true });
 
     if (channelsError) {
@@ -400,7 +395,7 @@ export const fetchChannels = async (): Promise<ChatChannel[]> => {
     // Fetch user's channel memberships
     const { data: memberships, error: membershipsError } = await supabase
       .from('channel_members')
-      .select('channel_id')
+      .select('channel_id').setHeader('Authorization','Bearer '+token)
       .eq('user_id', user.id);
 
     if (membershipsError) {
@@ -420,12 +415,16 @@ export const fetchChannels = async (): Promise<ChatChannel[]> => {
     }) || [];
 
     const value = filteredChannels as ChatChannel[];
-    channelsCache = { value, expiresAt: Date.now() + 15_000 };
+    channelsCacheToken=token;channelsCache = { value, expiresAt: Date.now() + 15_000 };
     return value;
   })();
 
-  channelsCache = { value: [], expiresAt: 0, inflight };
-  return cloneCachedValue(await inflight);
+  channelsCacheToken=token;channelsCache = { value: [], expiresAt: 0, inflight };
+  try {
+    return cloneCachedValue(await inflight);
+  } finally {
+    if (channelsCache?.inflight === inflight) channelsCache = null;
+  }
 };
 
 export const createChannel = async (
@@ -572,7 +571,11 @@ export const fetchClientBoardSummaries = async (): Promise<ClientBoardSummary[]>
   })();
 
   boardSummariesCache = { value: [], expiresAt: 0, inflight };
-  return cloneCachedValue(await inflight);
+  try {
+    return cloneCachedValue(await inflight);
+  } finally {
+    if (boardSummariesCache?.inflight === inflight) boardSummariesCache = null;
+  }
 };
 
 export const fetchClientBoards = async (): Promise<ClientBoard[]> => {
@@ -588,7 +591,7 @@ export const fetchClientBoards = async (): Promise<ClientBoard[]> => {
 
     if (error) {
       console.error('Error fetching boards:', error);
-      return [];
+      throw error;
     }
 
     const boards = parseBoardRows(data);
@@ -597,7 +600,11 @@ export const fetchClientBoards = async (): Promise<ClientBoard[]> => {
   })();
 
   clientBoardsCache = { value: [], expiresAt: 0, inflight };
-  return cloneCachedValue(await inflight);
+  try {
+    return cloneCachedValue(await inflight);
+  } finally {
+    if (clientBoardsCache?.inflight === inflight) clientBoardsCache = null;
+  }
 };
 
 export const fetchClientBoardByDbId = async (dbId: string): Promise<ClientBoard | null> => {
@@ -1229,7 +1236,7 @@ export const uploadFile = async (file: File, bucket: string = 'uploads'): Promis
     // portal origin explicitly; for web keep same-origin so URLs remain portable.
     if (typeof window !== 'undefined') {
       const isHttpApp = window.location.protocol.startsWith('http');
-      const portalOrigin = isHttpApp ? '' : 'https://echo-ai.tailfdbc33.ts.net';
+      const portalOrigin = isHttpApp ? '' : 'https://echo-ben.tailfdbc33.ts.net';
       const params = new URLSearchParams({ bucket, filename: fileName, originalName: file.name });
       // The uploads endpoint requires a logged-in user's token.
       const { data: sessionData } = await supabase.auth.getSession();
@@ -1536,40 +1543,15 @@ export interface AuthUser {
 }
 
 export const fetchAllAuthUsers = async (): Promise<AuthUser[]> => {
-  const { data, error } = await supabaseAdmin.auth.admin.listUsers();
-
-  if (error) {
-    console.error('Error fetching auth users:', error);
-    throw error;
-  }
-
-  return data.users.map(user => ({
-    id: user.id,
-    email: user.email || '',
-    created_at: user.created_at,
-    last_sign_in_at: user.last_sign_in_at || null,
-    user_metadata: user.user_metadata || {}
-  }));
+  throw new Error(ACCOUNT_ADMIN_UNAVAILABLE);
 };
 
 export const resetUserPassword = async (userId: string, newPassword: string): Promise<void> => {
-  const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-    password: newPassword
-  });
-
-  if (error) {
-    console.error('Error resetting password:', error);
-    throw error;
-  }
+  throw new Error(ACCOUNT_ADMIN_UNAVAILABLE);
 };
 
 export const deleteAuthUser = async (userId: string): Promise<void> => {
-  const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
-
-  if (error) {
-    console.error('Error deleting user:', error);
-    throw error;
-  }
+  throw new Error(ACCOUNT_ADMIN_UNAVAILABLE);
 };
 
 export const updateUserRole = async (email: string, newRole: string): Promise<void> => {

@@ -1,4 +1,4 @@
-import { supabase, supabaseAdmin } from '../lib/supabaseClient';
+import { supabase, requirePortalUser, ACCOUNT_ADMIN_UNAVAILABLE } from '../lib/supabaseClient';
 import {
   PartnerAccount,
   PartnerClientAccess,
@@ -81,6 +81,7 @@ export const fetchPartnerClients = async (partnerId: string): Promise<ClientBoar
   const { data: boardsData, error: boardsError } = await supabase
     .from('client_boards')
     .select('*')
+    .in('board_data->>id', clientBoardIds)
     .order('created_at', { ascending: false });
 
   if (boardsError) {
@@ -108,7 +109,9 @@ export const grantClientAccess = async (
   clientBoardId: string,
   grantedBy: string
 ): Promise<boolean> => {
-  const { error } = await supabaseAdmin
+  const user = await requirePortalUser();
+  if (grantedBy !== user.id) throw new Error('The granting user must match the signed-in session.');
+  const { error } = await supabase
     .from('partner_client_access')
     .insert({
       partner_id: partnerId,
@@ -128,7 +131,8 @@ export const revokeClientAccess = async (
   partnerId: string,
   clientBoardId: string
 ): Promise<boolean> => {
-  const { error } = await supabaseAdmin
+  await requirePortalUser();
+  const { error } = await supabase
     .from('partner_client_access')
     .delete()
     .eq('partner_id', partnerId)
@@ -372,10 +376,12 @@ export const addCommentToTask = async (
   comment: TaskComment
 ): Promise<boolean> => {
   try {
+    await requirePortalUser();
     // Fetch the current client board data
-    const { data: boardsData, error: fetchError } = await supabaseAdmin
+    const { data: boardsData, error: fetchError } = await supabase
       .from('client_boards')
       .select('*')
+      .eq('board_data->>id', clientBoardId)
       .order('created_at', { ascending: false });
 
     if (fetchError) {
@@ -424,10 +430,11 @@ export const addCommentToTask = async (
     }
 
     // Update the board data
-    const { error: updateError } = await supabaseAdmin
+    const { error: updateError } = await supabase
       .from('client_boards')
       .update({ board_data: boardData, updated_at: new Date().toISOString() })
-      .eq('id', targetRow.id);
+      .eq('id', targetRow.id)
+      .eq('board_data->>id', clientBoardId);
 
     if (updateError) {
       console.error('[addCommentToTask] Update error:', updateError.message);
@@ -448,7 +455,8 @@ export const assignTaskToPartner = async (
   groupId: string,
   visibleNotes?: string
 ): Promise<boolean> => {
-  const { error } = await supabaseAdmin
+  await requirePortalUser();
+  const { error } = await supabase
     .from('partner_tasks')
     .insert({
       partner_id: partnerId,
@@ -470,7 +478,8 @@ export const unassignTaskFromPartner = async (
   partnerId: string,
   taskId: string
 ): Promise<boolean> => {
-  const { error } = await supabaseAdmin
+  await requirePortalUser();
+  const { error } = await supabase
     .from('partner_tasks')
     .delete()
     .eq('partner_id', partnerId)
@@ -492,7 +501,8 @@ export const fetchPartnerMessages = async (
   partnerId: string,
   limit: number = 100
 ): Promise<PartnerMessage[]> => {
-  const { data, error } = await supabaseAdmin
+  await requirePortalUser();
+  const { data, error } = await supabase
     .from('partner_messages')
     .select('*')
     .eq('partner_id', partnerId)
@@ -500,8 +510,7 @@ export const fetchPartnerMessages = async (
     .limit(limit);
 
   if (error) {
-    console.error('[fetchPartnerMessages] Error:', error.message);
-    return [];
+    throw new Error('Partner messages could not be loaded. Please check your session and access.');
   }
 
   return data as PartnerMessage[];
@@ -517,7 +526,11 @@ export const sendPartnerMessage = async (
   attachmentType?: 'image' | 'file',
   attachmentName?: string
 ): Promise<PartnerMessage | null> => {
-  const { data, error } = await supabaseAdmin
+  const user = await requirePortalUser();
+  if (senderId !== user.id || (senderType === 'partner' && partnerId !== user.id)) {
+    throw new Error('The sender must match the signed-in session.');
+  }
+  const { data, error } = await supabase
     .from('partner_messages')
     .insert({
       partner_id: partnerId,
@@ -533,8 +546,7 @@ export const sendPartnerMessage = async (
     .single();
 
   if (error) {
-    console.error('[sendPartnerMessage] Error:', error.message);
-    return null;
+    throw new Error('Partner message was not sent. Please check your session and access.');
   }
 
   return data as PartnerMessage;
@@ -544,8 +556,10 @@ export const markPartnerMessagesRead = async (
   partnerId: string,
   senderType: 'partner' | 'team'
 ): Promise<boolean> => {
+  const user = await requirePortalUser();
+  if (senderType === 'partner' && partnerId !== user.id) throw new Error('Partner session mismatch.');
   // Mark messages from the other party as read
-  const { error } = await supabaseAdmin
+  const { error } = await supabase
     .from('partner_messages')
     .update({ is_read: true })
     .eq('partner_id', partnerId)
@@ -564,8 +578,10 @@ export const getUnreadMessageCount = async (
   partnerId: string,
   forPartner: boolean = true
 ): Promise<number> => {
+  const user = await requirePortalUser();
+  if (forPartner && partnerId !== user.id) throw new Error('Partner session mismatch.');
   const senderType = forPartner ? 'team' : 'partner';
-  const { count, error } = await supabaseAdmin
+  const { count, error } = await supabase
     .from('partner_messages')
     .select('*', { count: 'exact', head: true })
     .eq('partner_id', partnerId)
@@ -573,8 +589,7 @@ export const getUnreadMessageCount = async (
     .eq('is_read', false);
 
   if (error) {
-    console.error('[getUnreadMessageCount] Error:', error.message);
-    return 0;
+    throw new Error('Unread messages could not be checked. Please check your session and access.');
   }
 
   return count || 0;
@@ -790,83 +805,49 @@ export const createPartnerAccount = async (
   companyName: string,
   fullName: string
 ): Promise<PartnerAccount | null> => {
-  try {
-    // Create user in Supabase Auth with partner metadata
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        user_type: 'partner',
-        company_name: companyName,
-        full_name: fullName,
-      },
-    });
-
-    if (authError) {
-      console.error('[createPartnerAccount] Auth error:', authError.message);
-      return null;
-    }
-
-    // Create partner_accounts record (use admin client to bypass RLS)
-    const { data, error } = await supabaseAdmin
-      .from('partner_accounts')
-      .insert({
-        id: authData.user.id,
-        email,
-        company_name: companyName,
-        full_name: fullName,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('[createPartnerAccount] DB error:', error.message);
-      // Clean up auth user if DB insert fails
-      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-      return null;
-    }
-
-    return data as PartnerAccount;
-  } catch (err) {
-    console.error('[createPartnerAccount] Unexpected error:', err);
-    return null;
-  }
+  // Previously an anon-key auth.admin call, not a working account feature.
+  // Never infer owner authority from a writable profile or display name.
+  throw new Error(ACCOUNT_ADMIN_UNAVAILABLE);
 };
 
-// Fetch all partners (for admin view) - uses admin client to bypass RLS
+// Authenticated internal view. Database grants/RLS remain authoritative;
+// the UI role is presentation only, not a server-side owner permission.
 export const fetchAllPartners = async (): Promise<PartnerWithStats[]> => {
-  const { data, error } = await supabaseAdmin
+  await requirePortalUser();
+  const { data, error } = await supabase
     .from('partner_accounts')
     .select('*')
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.error('[fetchAllPartners] Error:', error.message);
-    return [];
+    throw new Error('Partner accounts could not be loaded. Please check your session and access.');
   }
 
   // Enrich with stats
   const partnersWithStats: PartnerWithStats[] = [];
   for (const partner of data as PartnerAccount[]) {
     const [clients, tasks, unread, lastMessage] = await Promise.all([
-      supabaseAdmin
+      supabase
         .from('partner_client_access')
         .select('*', { count: 'exact', head: true })
         .eq('partner_id', partner.id),
-      supabaseAdmin
+      supabase
         .from('partner_tasks')
         .select('*', { count: 'exact', head: true })
         .eq('partner_id', partner.id),
       getUnreadMessageCount(partner.id, false),
-      supabaseAdmin
+      supabase
         .from('partner_messages')
         .select('created_at')
         .eq('partner_id', partner.id)
         .order('created_at', { ascending: false })
         .limit(1)
-        .single(),
+        .maybeSingle(),
     ]);
+
+    if (clients.error || tasks.error || lastMessage.error) {
+      throw new Error('Partner statistics could not be loaded. Please check your session and access.');
+    }
 
     partnersWithStats.push({
       ...partner,
@@ -882,29 +863,8 @@ export const fetchAllPartners = async (): Promise<PartnerWithStats[]> => {
 
 // Delete a partner account
 export const deletePartnerAccount = async (partnerId: string): Promise<boolean> => {
-  try {
-    // Delete from Supabase Auth
-    const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(partnerId);
-    if (authError) {
-      console.error('[deletePartnerAccount] Auth error:', authError.message);
-    }
-
-    // Delete from partner_accounts (cascades to related tables)
-    const { error } = await supabaseAdmin
-      .from('partner_accounts')
-      .delete()
-      .eq('id', partnerId);
-
-    if (error) {
-      console.error('[deletePartnerAccount] DB error:', error.message);
-      return false;
-    }
-
-    return true;
-  } catch (err) {
-    console.error('[deletePartnerAccount] Unexpected error:', err);
-    return false;
-  }
+  // Do not delete the DB record after a failed privileged Auth deletion.
+  throw new Error(ACCOUNT_ADMIN_UNAVAILABLE);
 };
 
 // Toggle partner active status
@@ -912,7 +872,8 @@ export const togglePartnerActive = async (
   partnerId: string,
   isActive: boolean
 ): Promise<boolean> => {
-  const { error } = await supabaseAdmin
+  await requirePortalUser();
+  const { error } = await supabase
     .from('partner_accounts')
     .update({ is_active: isActive })
     .eq('id', partnerId);

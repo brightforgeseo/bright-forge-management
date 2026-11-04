@@ -1,0 +1,12 @@
+import React,{useEffect,useState}from'react';
+import {Globe,Search,Link2,Sparkles,ChevronDown,BarChart3}from'lucide-react';
+import {RESEARCH_GROUPS,readStudioNavigation,validStudioNavigation,navigateStudio}from'../lib/researchNavigation.mjs';
+interface Props{ownerId:string;active:boolean;collapsed:boolean;onOpen:()=>void;onExpand:()=>void;}
+const icons:any={domain:Globe,keywords:Search,links:Link2,search:BarChart3,ai:Sparkles};
+export default function UnifiedResearchNav({ownerId,active,collapsed,onOpen,onExpand}:Props){
+ const [route,setRoute]=useState(()=>readStudioNavigation(ownerId));
+ const [expanded,setExpanded]=useState<string|null>(()=>{const r=readStudioNavigation(ownerId);return RESEARCH_GROUPS.find(g=>g.tools.some(t=>t.id===r.operation))?.label||null;});
+ useEffect(()=>{const handler=(event:Event)=>{const next=(event as CustomEvent).detail;if(!validStudioNavigation(next,ownerId))return;setRoute(next);if(next.mode==='research')setExpanded(RESEARCH_GROUPS.find(g=>g.tools.some(t=>t.id===next.operation))?.label||null);};window.addEventListener('echoStudioNavigation',handler);return()=>window.removeEventListener('echoStudioNavigation',handler);},[ownerId]);
+ const choose=(id:string)=>{navigateStudio(ownerId,{mode:'research',operation:id});onOpen();};
+ return <section className="unified-research-nav" aria-label="Search intelligence navigation">{!collapsed&&<h2>SEARCH INTELLIGENCE</h2>}{RESEARCH_GROUPS.map(group=>{const Icon=icons[group.icon];const selected=active&&route.mode==='research'&&group.tools.some(t=>t.id===route.operation);const open=expanded===group.label&&!collapsed;return <div className="unified-nav-group" key={group.label}><button type="button" className={'unified-group-toggle'+(selected?' is-current':'')} aria-label={group.label} aria-expanded={open} title={collapsed?group.label:undefined} onClick={()=>{if(collapsed){setExpanded(group.label);onExpand();}else setExpanded(open?null:group.label);}}><Icon size={17}/>{!collapsed&&<><span>{group.label}</span><ChevronDown size={14} className={open?'is-open':''}/></>}</button>{open&&<div className="unified-tool-links">{group.tools.map(tool=><button type="button" key={tool.id} className={active&&route.mode==='research'&&route.operation===tool.id?'is-current':''} aria-current={active&&route.mode==='research'&&route.operation===tool.id?'page':undefined} onClick={()=>choose(tool.id)}>{tool.label}</button>)}</div>}</div>;})}</section>;
+}
